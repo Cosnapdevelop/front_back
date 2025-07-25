@@ -1,600 +1,155 @@
 import { Effect, Post, User, UserProfile, Comment } from '../types';
 
-export const mockUsers: User[] = [
+export const mockUsers: (User & UserProfile)[] = [
   {
     id: '1',
     username: 'ai_artist_pro',
+    email: 'ai_artist_pro@example.com',
     avatar: 'https://images.pexels.com/photos/1264210/pexels-photo-1264210.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
     bio: 'Professional AI artist specializing in portrait enhancement',
+    joinDate: '2023-01-01',
+    effectsCreated: 12,
+    totalLikes: 15420,
+    recentHistory: [],
+    bookmarkedEffects: [],
+    preferences: {
+      theme: 'light',
+      notifications: true,
+      privacy: 'public'
+    },
     followersCount: 15420,
     followingCount: 892,
     isFollowing: false,
-    isPrivate: false,
+    isPrivate: false
   },
   {
     id: '2',
     username: 'creative_soul',
+    email: 'creative_soul@example.com',
     avatar: 'https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
     bio: 'Digital artist and ComfyUI enthusiast',
+    joinDate: '2022-11-15',
+    effectsCreated: 8,
+    totalLikes: 8760,
+    recentHistory: [],
+    bookmarkedEffects: [],
+    preferences: {
+      theme: 'dark',
+      notifications: false,
+      privacy: 'private'
+    },
     followersCount: 8760,
     followingCount: 445,
     isFollowing: true,
-    isPrivate: true,
+    isPrivate: true
   },
   {
     id: '3',
     username: 'tech_wizard',
+    email: 'tech_wizard@example.com',
     avatar: 'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
     bio: 'AI workflow developer and researcher',
+    joinDate: '2021-08-20',
+    effectsCreated: 20,
+    totalLikes: 22100,
+    recentHistory: [],
+    bookmarkedEffects: [],
+    preferences: {
+      theme: 'light',
+      notifications: true,
+      privacy: 'public'
+    },
     followersCount: 22100,
     followingCount: 156,
     isFollowing: false,
-    isPrivate: false,
-  },
+    isPrivate: false
+  }
 ];
 
 export const mockEffects: Effect[] = [
+  // Ultimate upscale final v.1
   {
-    id: '1',
-    name: 'Cyberpunk Portrait',
-    description: 'Transform your photos into stunning cyberpunk-style portraits with neon lighting and futuristic elements.',
+    id: 'ultimate-upscale-final-v1',
+    name: 'Ultimate upscale final v.1',
+    description: '高质量终极放大，适合图片细节增强。',
     author: mockUsers[0],
-    category: 'Portrait',
-    tags: ['cyberpunk', 'neon', 'futuristic', 'portrait'],
-    beforeImage: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/2182863/pexels-photo-2182863.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1240,
+    category: 'Upscale',
+    tags: ['upscale', 'ultimate', 'final'],
+    beforeImage: '',
+    afterImage: '',
+    likesCount: 0,
     isLiked: false,
     isBookmarked: false,
-    createdAt: '2024-01-15',
-    difficulty: 'Medium',
-    processingTime: '2-3 minutes',
-    comments: [
-      {
-        id: 'c1',
-        user: mockUsers[1],
-        content: 'This effect is absolutely stunning! The neon colors are perfect.',
-        createdAt: '2024-01-16T10:30:00Z',
-        likesCount: 12,
-        isLiked: false,
-        replies: [],
-      },
-      {
-        id: 'c2',
-        user: mockUsers[2],
-        content: 'Great work! Could you share the workflow file?',
-        createdAt: '2024-01-16T09:15:00Z',
-        likesCount: 8,
-        isLiked: true,
-        replies: [],
-      },
-    ],
-    parameters: [
-      {
-        name: 'Neon Intensity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 75,
-        description: 'Controls the intensity of neon lighting effects'
-      },
-      {
-        name: 'Color Scheme',
-        type: 'select',
-        options: ['Blue/Pink', 'Green/Purple', 'Orange/Cyan', 'Random'],
-        default: 'Blue/Pink',
-        description: 'Choose the dominant color palette'
-      },
-      {
-        name: 'Style Prompt',
-        type: 'text',
-        default: 'cyberpunk portrait, neon lights, futuristic',
-        description: 'Additional style description'
-      }
-    ],
-  },
-  {
-    id: '2',
-    name: 'Anime Style Converter',
-    description: 'Convert realistic photos into beautiful anime-style illustrations with vibrant colors and soft details.',
-    author: mockUsers[1],
-    category: 'Artistic',
-    tags: ['anime', 'illustration', 'colorful', 'soft'],
-    beforeImage: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 2156,
-    isLiked: true,
-    isBookmarked: true,
-    createdAt: '2024-01-12',
+    createdAt: '2024-04-01',
     difficulty: 'Easy',
     processingTime: '1-2 minutes',
+    webappId: '1907581130097192962',
     parameters: [
-      {
-        name: 'Anime Strength',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 5,
-        default: 80,
-        description: 'How much anime style to apply'
-      },
-      {
-        name: 'Eye Enhancement',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 90,
-        description: 'Enhance eye details in anime style'
-      }
+      { name: 'image', type: 'image', description: '上传需要放大的图片' },
+      { name: 'value_161', type: 'slider', default: 1, min: 0, max: 2, step: 0.01, description: '参数 value (nodeId:161)' },
+      { name: 'value_160', type: 'slider', default: 0.25, min: 0, max: 1, step: 0.01, description: '参数 value (nodeId:160)' }
     ],
+    nodeInfoTemplate: [
+      { nodeId: '2', fieldName: 'image', paramKey: 'image' },
+      { nodeId: '161', fieldName: 'value', paramKey: 'value_161' },
+      { nodeId: '160', fieldName: 'value', paramKey: 'value_160' }
+    ]
   },
+  // 超强换脸
   {
-    id: '3',
-    name: 'Vintage Film Look',
-    description: 'Add authentic vintage film aesthetics with grain, color grading, and classic photography vibes.',
-    author: mockUsers[2],
-    category: 'Photography',
-    tags: ['vintage', 'film', 'retro', 'grain'],
-    beforeImage: 'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 892,
-    isLiked: false,
-    isBookmarked: false,
-    createdAt: '2024-01-10',
-    difficulty: 'Hard',
-    processingTime: '3-5 minutes',
-    parameters: [
-      {
-        name: 'Film Type',
-        type: 'select',
-        options: ['Kodak Portra', 'Fuji Velvia', 'Ilford HP5', 'Polaroid'],
-        default: 'Kodak Portra',
-        description: 'Choose film emulation type'
-      },
-      {
-        name: 'Grain Amount',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 45,
-        description: 'Amount of film grain to add'
-      },
-      {
-        name: 'Color Temperature',
-        type: 'slider',
-        min: -50,
-        max: 50,
-        step: 1,
-        default: 10,
-        description: 'Adjust color temperature (warm/cool)'
-      }
-    ],
-  },
-  {
-    id: '4',
-    name: 'Oil Painting Style',
-    description: 'Transform photos into classical oil painting masterpieces with rich textures and artistic brushstrokes.',
-    author: mockUsers[0],
-    category: 'Artistic',
-    tags: ['oil painting', 'classical', 'artistic', 'texture'],
-    beforeImage: 'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1456,
-    isLiked: true,
-    isBookmarked: false,
-    createdAt: '2024-01-08',
-    difficulty: 'Medium',
-    processingTime: '2-4 minutes',
-    parameters: [
-      {
-        name: 'Brush Size',
-        type: 'slider',
-        min: 1,
-        max: 20,
-        step: 1,
-        default: 8,
-        description: 'Size of paint brush strokes'
-      },
-      {
-        name: 'Texture Intensity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 70,
-        description: 'Intensity of canvas texture'
-      }
-    ],
-  },
-  {
-    id: '5',
-    name: 'HDR Enhancement',
-    description: 'Enhance dynamic range and create stunning HDR effects with balanced exposure and vivid details.',
+    id: 'super-face-swap',
+    name: '超强换脸',
+    description: 'AI驱动的超强换脸，支持双图输入。',
     author: mockUsers[1],
-    category: 'Photography',
-    tags: ['hdr', 'enhancement', 'dynamic range', 'vivid'],
-    beforeImage: 'https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1266808/pexels-photo-1266808.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 723,
+    category: 'FaceSwap',
+    tags: ['face', 'swap', 'AI'],
+    beforeImage: '',
+    afterImage: '',
+    likesCount: 0,
     isLiked: false,
-    isBookmarked: true,
-    createdAt: '2024-01-05',
+    isBookmarked: false,
+    createdAt: '2024-04-01',
     difficulty: 'Easy',
     processingTime: '1-2 minutes',
+    webappId: '1907365560131153921',
     parameters: [
-      {
-        name: 'HDR Strength',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 60,
-        description: 'Intensity of HDR effect'
-      },
-      {
-        name: 'Shadow Recovery',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 50,
-        description: 'Recover details in shadows'
-      }
+      { name: 'image_43', type: 'image', description: '上传底图（nodeId:43）' },
+      { name: 'image_69', type: 'image', description: '上传换脸图（nodeId:69）' }
     ],
+    nodeInfoTemplate: [
+      { nodeId: '43', fieldName: 'image', paramKey: 'image_43' },
+      { nodeId: '69', fieldName: 'image', paramKey: 'image_69' }
+    ]
   },
+  // kontext nunchaku Dev 双图编辑极速版
   {
-    id: '6',
-    name: 'Fantasy Portrait',
-    description: 'Create magical fantasy portraits with ethereal lighting, mystical elements, and enchanting atmospheres.',
+    id: 'kontext-nunchaku-dev-dual',
+    name: 'kontext nunchaku Dev 双图编辑极速版',
+    description: 'AI双图编辑，极速体验，支持文本指令。',
     author: mockUsers[2],
-    category: 'Fantasy',
-    tags: ['fantasy', 'magical', 'ethereal', 'mystical'],
-    beforeImage: 'https://images.pexels.com/photos/1264210/pexels-photo-1264210.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1890,
+    category: 'Edit',
+    tags: ['kontext', 'nunchaku', 'dual', 'edit'],
+    beforeImage: '',
+    afterImage: '',
+    likesCount: 0,
     isLiked: false,
     isBookmarked: false,
-    createdAt: '2024-01-03',
-    difficulty: 'Hard',
-    processingTime: '3-6 minutes',
-    parameters: [
-      {
-        name: 'Magic Elements',
-        type: 'select',
-        options: ['Sparkles', 'Fire', 'Ice', 'Nature', 'Cosmic'],
-        default: 'Sparkles',
-        description: 'Type of magical elements to add'
-      },
-      {
-        name: 'Atmosphere Intensity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 75,
-        description: 'Intensity of magical atmosphere'
-      }
-    ],
-  },
-  {
-    id: '7',
-    name: 'Black & White Classic',
-    description: 'Convert your photos to timeless black and white with enhanced contrast and dramatic lighting.',
-    author: mockUsers[1],
-    category: 'Photography',
-    tags: ['black and white', 'classic', 'contrast', 'dramatic'],
-    beforeImage: 'https://images.pexels.com/photos/1563356/pexels-photo-1563356.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1120,
-    isLiked: false,
-    isBookmarked: false,
-    createdAt: '2024-01-02',
-    difficulty: 'Easy',
-    processingTime: '30 seconds',
-    parameters: [
-      {
-        name: 'Contrast Level',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 70,
-        description: 'Adjust the contrast intensity'
-      },
-      {
-        name: 'Film Grain',
-        type: 'slider',
-        min: 0,
-        max: 50,
-        step: 1,
-        default: 15,
-        description: 'Add vintage film grain effect'
-      }
-    ],
-  },
-  {
-    id: '8',
-    name: 'Watercolor Art',
-    description: 'Transform your photos into beautiful watercolor paintings with soft edges and flowing colors.',
-    author: mockUsers[0],
-    category: 'Artistic',
-    tags: ['watercolor', 'painting', 'soft', 'artistic'],
-    beforeImage: 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 987,
-    isLiked: true,
-    isBookmarked: false,
-    createdAt: '2024-01-01',
-    difficulty: 'Medium',
-    processingTime: '2-3 minutes',
-    parameters: [
-      {
-        name: 'Paint Flow',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 5,
-        default: 60,
-        description: 'Control the watercolor flow effect'
-      },
-      {
-        name: 'Color Saturation',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 80,
-        description: 'Adjust color vibrancy'
-      }
-    ],
-  },
-  {
-    id: '9',
-    name: 'Neon Glow Effect',
-    description: 'Add vibrant neon glow effects to your images with customizable colors and intensity.',
-    author: mockUsers[2],
-    category: 'Modern',
-    tags: ['neon', 'glow', 'vibrant', 'modern'],
-    beforeImage: 'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/2182863/pexels-photo-2182863.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1567,
-    isLiked: false,
-    isBookmarked: true,
-    createdAt: '2023-12-30',
-    difficulty: 'Hard',
-    processingTime: '3-4 minutes',
-    parameters: [
-      {
-        name: 'Glow Intensity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 85,
-        description: 'Control the neon glow strength'
-      },
-      {
-        name: 'Neon Color',
-        type: 'select',
-        options: ['Electric Blue', 'Hot Pink', 'Lime Green', 'Purple', 'Orange'],
-        default: 'Electric Blue',
-        description: 'Choose the neon color theme'
-      }
-    ],
-  },
-  {
-    id: '10',
-    name: 'Retro 80s Style',
-    description: 'Give your photos a nostalgic 80s aesthetic with synthwave colors and retro vibes.',
-    author: mockUsers[1],
-    category: 'Vintage',
-    tags: ['80s', 'retro', 'synthwave', 'nostalgic'],
-    beforeImage: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 834,
-    isLiked: false,
-    isBookmarked: false,
-    createdAt: '2023-12-28',
-    difficulty: 'Medium',
-    processingTime: '2-3 minutes',
-    parameters: [
-      {
-        name: 'Synthwave Intensity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 75,
-        description: 'Control the 80s aesthetic strength'
-      },
-      {
-        name: 'Color Palette',
-        type: 'select',
-        options: ['Classic Pink/Blue', 'Purple/Orange', 'Teal/Magenta'],
-        default: 'Classic Pink/Blue',
-        description: 'Choose the retro color scheme'
-      }
-    ],
-  },
-  {
-    id: '11',
-    name: 'Sketch to Reality',
-    description: 'Transform simple sketches into photorealistic images with AI-powered enhancement.',
-    author: mockUsers[0],
-    category: 'Modern',
-    tags: ['sketch', 'realistic', 'enhancement', 'ai'],
-    beforeImage: 'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1563356/pexels-photo-1563356.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 2234,
-    isLiked: true,
-    isBookmarked: true,
-    createdAt: '2023-12-25',
-    difficulty: 'Hard',
-    processingTime: '4-6 minutes',
-    parameters: [
-      {
-        name: 'Realism Level',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 90,
-        description: 'How realistic the final image should be'
-      },
-      {
-        name: 'Detail Enhancement',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 80,
-        description: 'Level of detail to add'
-      }
-    ],
-  },
-  {
-    id: '12',
-    name: 'Double Exposure',
-    description: 'Create stunning double exposure effects by blending two images with artistic transparency.',
-    author: mockUsers[2],
-    category: 'Artistic',
-    tags: ['double exposure', 'blend', 'artistic', 'creative'],
-    beforeImage: 'https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1212984/pexels-photo-1212984.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1345,
-    isLiked: false,
-    isBookmarked: false,
-    createdAt: '2023-12-22',
-    difficulty: 'Medium',
-    processingTime: '2-3 minutes',
-    parameters: [
-      {
-        name: 'Blend Opacity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 65,
-        description: 'Control the transparency blend'
-      },
-      {
-        name: 'Blend Mode',
-        type: 'select',
-        options: ['Screen', 'Multiply', 'Overlay', 'Soft Light'],
-        default: 'Screen',
-        description: 'Choose the blending technique'
-      }
-    ],
-  },
-  {
-    id: '13',
-    name: 'Pop Art Style',
-    description: 'Transform your photos into vibrant pop art with bold colors and comic book aesthetics.',
-    author: mockUsers[1],
-    category: 'Artistic',
-    tags: ['pop art', 'comic', 'bold', 'vibrant'],
-    beforeImage: 'https://images.pexels.com/photos/1264210/pexels-photo-1264210.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1678,
-    isLiked: true,
-    isBookmarked: false,
-    createdAt: '2023-12-20',
+    createdAt: '2024-04-01',
     difficulty: 'Easy',
     processingTime: '1-2 minutes',
+    webappId: '1939674572449091585',
     parameters: [
-      {
-        name: 'Color Intensity',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 85,
-        description: 'Control the boldness of colors'
-      },
-      {
-        name: 'Halftone Effect',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 40,
-        description: 'Add comic book dot pattern'
-      }
+      { name: 'image_258', type: 'image', description: '上传左图（nodeId:258）' },
+      { name: 'image_260', type: 'image', description: '上传右图（nodeId:260）' },
+      { name: 'text_320', type: 'text', default: '', description: '编辑指令（nodeId:320）' }
     ],
+    nodeInfoTemplate: [
+      { nodeId: '258', fieldName: 'image', paramKey: 'image_258' },
+      { nodeId: '260', fieldName: 'image', paramKey: 'image_260' },
+      { nodeId: '320', fieldName: 'text', paramKey: 'text_320' }
+    ]
   },
-  {
-    id: '14',
-    name: 'Dreamy Soft Focus',
-    description: 'Create ethereal, dreamy portraits with soft focus and romantic lighting effects.',
-    author: mockUsers[0],
-    category: 'Portrait',
-    tags: ['dreamy', 'soft focus', 'romantic', 'ethereal'],
-    beforeImage: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 923,
-    isLiked: false,
-    isBookmarked: true,
-    createdAt: '2023-12-18',
-    difficulty: 'Easy',
-    processingTime: '1-2 minutes',
-    parameters: [
-      {
-        name: 'Softness Level',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 70,
-        description: 'Control the soft focus intensity'
-      },
-      {
-        name: 'Glow Amount',
-        type: 'slider',
-        min: 0,
-        max: 100,
-        step: 1,
-        default: 50,
-        description: 'Add dreamy glow effect'
-      }
-    ],
-  },
-  {
-    id: '15',
-    name: 'Cinematic Color Grade',
-    description: 'Apply professional cinematic color grading to give your photos a movie-like quality.',
-    author: mockUsers[2],
-    category: 'Photography',
-    tags: ['cinematic', 'color grade', 'movie', 'professional'],
-    beforeImage: 'https://images.pexels.com/photos/1366919/pexels-photo-1366919.jpeg?auto=compress&cs=tinysrgb&w=400',
-    afterImage: 'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=400',
-    likesCount: 1789,
-    isLiked: false,
-    isBookmarked: false,
-    createdAt: '2023-12-15',
-    difficulty: 'Medium',
-    processingTime: '2-3 minutes',
-    parameters: [
-      {
-        name: 'Color Temperature',
-        type: 'slider',
-        min: -100,
-        max: 100,
-        step: 1,
-        default: -20,
-        description: 'Adjust warm/cool tones'
-      },
-      {
-        name: 'Film Look',
-        type: 'select',
-        options: ['Blockbuster', 'Indie Film', 'Noir', 'Sci-Fi'],
-        default: 'Blockbuster',
-        description: 'Choose cinematic style'
-      }
-    ],
-  },
+  // flux-kontext-test
   {
     id: 'flux-kontext-test',
     name: 'Flux Kontext Single Picture Mode',
@@ -610,19 +165,20 @@ export const mockEffects: Effect[] = [
     createdAt: '2024-01-20',
     difficulty: 'Easy',
     processingTime: '1-3 minutes',
+    webappId: '1937084629516193794',
     parameters: [
-      {
-        name: 'image',
-        type: 'image',
-        default: '',
-        description: '上传需要处理的图片'
-      },
-      {
-        name: 'prompt',
-        type: 'text',
-        default: 'Transform this image with beautiful artistic enhancements',
-        description: 'Describe how you want the AI to transform your image'
-      }
+      { name: 'image', type: 'image', description: '上传需要处理的图片' },
+      { name: 'model', type: 'select', default: 'flux-kontext-pro', description: '模型选择', options: [{ value: 'flux-kontext-pro', label: 'Flux Kontext Pro' }] },
+      { name: 'aspect_ratio', type: 'select', default: 'match_input_image', description: '输出比例', options: [
+        { value: 'match_input_image', label: '匹配上传图像比例' },
+        { value: '1:1', label: '1:1 正方形，适配社交媒体图文' },
+        { value: '16:9', label: '16:9 横版宽屏，主流视频平台' },
+        { value: '9:16', label: '9:16 竖版长屏，短视频' },
+        { value: '4:3', label: '4:3 传统比例，教育/老式屏幕' },
+        { value: '3:4', label: '3:4 坚版摄影，人像摄影' },
+        { value: '3:2', label: '3:2 胶片经典比例，人文风景' }
+      ] },
+      { name: 'prompt', type: 'text', default: '给这个女人的发型变成齐耳短发,', description: 'AI 提示词' }
     ],
     nodeInfoTemplate: [
       { nodeId: '39', fieldName: 'image', paramKey: 'image' },
@@ -631,6 +187,7 @@ export const mockEffects: Effect[] = [
       { nodeId: '52', fieldName: 'prompt', paramKey: 'prompt' }
     ]
   },
+  // portrait-upscale-pro
   {
     id: 'portrait-upscale-pro',
     name: '顶级人像放大-支持全身（体验版）',
@@ -646,15 +203,53 @@ export const mockEffects: Effect[] = [
     createdAt: '2024-04-01',
     difficulty: 'Easy',
     processingTime: '1-2 minutes',
+    webappId: '1947926545896734722',
     parameters: [
-      {
-        name: 'image',
-        type: 'image',
-        default: '',
-        description: '上传需要放大的人像图片'
-      }
+      { name: 'image', type: 'image', description: '上传需要放大的人像图片' }
     ],
-    // nodeInfoTemplate 字段已移除，避免类型错误
+    nodeInfoTemplate: [
+      { nodeId: '6011', fieldName: 'image', paramKey: 'image' }
+    ]
+  },
+  // 换背景 | 电商实用版V5.0
+  {
+    id: 'bg-replace-ecommerce-v5',
+    name: '换背景 | 电商实用版V5.0',
+    description: '电商产品图换背景，支持多种比例和光源设置。',
+    author: mockUsers[0],
+    category: 'Ecommerce',
+    tags: ['background', 'replace', 'ecommerce', 'product'],
+    beforeImage: '',
+    afterImage: '',
+    likesCount: 0,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-04-01',
+    difficulty: 'Easy',
+    processingTime: '1-2 minutes',
+    webappId: '1903718280794906626',
+    parameters: [
+      { name: 'image_150', type: 'image', description: '上传产品原图（nodeId:150）' },
+      { name: 'image_48', type: 'image', description: '上传背景图（nodeId:48）' },
+      { name: 'text_114', type: 'text', default: '0--产品图原始比例\n1--1:1\n2--3:2\n3--4:3\n4--16:9\n5--2:3\n6--3:4\n7--9:16', description: '比例说明（nodeId:114）' },
+      { name: 'value_165', type: 'slider', default: 0, min: 0, max: 7, step: 1, description: '选择输出比例（nodeId:165）' },
+      { name: 'value_110', type: 'slider', default: 1, min: 0, max: 2, step: 0.01, description: '强度参数（nodeId:110）' },
+      { name: 'light_position_173', type: 'select', default: 'Top Right Light', description: '光源位置（nodeId:173）', options: [
+        { value: 'Top Right Light', label: '右上光源' },
+        { value: 'Top Left Light', label: '左上光源' },
+        { value: 'Bottom Right Light', label: '右下光源' },
+        { value: 'Bottom Left Light', label: '左下光源' },
+        { value: 'Center Light', label: '中央光源' }
+      ] }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '150', fieldName: 'image', paramKey: 'image_150' },
+      { nodeId: '48', fieldName: 'image', paramKey: 'image_48' },
+      { nodeId: '114', fieldName: 'text', paramKey: 'text_114' },
+      { nodeId: '165', fieldName: 'value', paramKey: 'value_165' },
+      { nodeId: '110', fieldName: 'value', paramKey: 'value_110' },
+      { nodeId: '173', fieldName: 'light_position', paramKey: 'light_position_173' }
+    ]
   }
 ];
 
@@ -738,5 +333,9 @@ export function createMockUser(): UserProfile {
       notifications: true,
       privacy: 'public',
     },
+    followersCount: 1250,
+    followingCount: 50,
+    isFollowing: false,
+    isPrivate: false
   };
 }

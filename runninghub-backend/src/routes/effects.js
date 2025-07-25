@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
-import { uploadImage, startComfyUITask, getTaskStatus } from '../runninghub.js';
+import { uploadImageService } from '../services/uploadService.js';
+import { startTaskService, waitForTaskAndGetImages } from '../services/taskService.js';
 import fs from 'fs';
 
 const router = express.Router();
@@ -9,25 +10,18 @@ const upload = multer({ dest: 'uploads/' });
 // 上传图片并发起特效任务
 router.post('/apply', upload.single('image'), async (req, res) => {
   try {
-    // 1. 上传图片到 RunningHub
-    const imageInfo = await uploadImage(req.file.path);
+    const imageInfo = await uploadImageService(req.file.path);
     fs.unlink(req.file.path, () => {});
-
-    // 2. 获取前端传来的 nodeInfoList（不含图片字段）
     let nodeInfoList = req.body.nodeInfoList ? JSON.parse(req.body.nodeInfoList) : [];
-
-    // 3. 自动插入图片fileName到nodeInfoList的第一项
-    nodeInfoList = [
-      { nodeId: "39", fieldName: "image", fieldValue: imageInfo.fileName },
-      ...nodeInfoList
-    ];
-
-    // 4. 发起 ComfyUI 任务
-    const task = await startComfyUITask(imageInfo.fileName, nodeInfoList);
-
-    res.json({ taskId: task.taskId });
+    // 自动将图片 fileName 填充到 nodeInfoList 的 image 参数
+    nodeInfoList = nodeInfoList.map(item =>
+      item.fieldName === 'image' ? { ...item, fieldValue: imageInfo.fileName } : item
+    );
+    const webappId = req.body.webappId;
+    const taskId = await startTaskService(imageInfo.fileName, nodeInfoList, webappId);
+    const images = await waitForTaskAndGetImages(taskId, { interval: 5000, maxAttempts: 60 });
+    res.json({ taskId, images });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -13,7 +13,7 @@ export interface Effect {
   id: string;
   name: string;
   description: string;
-  author: User;
+  author: UserProfile;
   category: string;
   tags: string[];
   beforeImage: string;
@@ -22,21 +22,22 @@ export interface Effect {
   isLiked: boolean;
   isBookmarked: boolean;
   createdAt: string;
-  difficulty: 'Easy' | 'Medium' | 'Hard';
+  difficulty: string;
   processingTime: string;
   parameters: EffectParameter[];
-  comments?: Comment[];
+  nodeInfoTemplate?: Array<{ nodeId: string; fieldName: string; paramKey: string }>;
+  webappId?: string;
 }
 
 export interface EffectParameter {
   name: string;
-  type: 'slider' | 'text' | 'select' | 'image';
+  type: 'image' | 'select' | 'text' | 'slider';
+  description?: string;
+  default?: any; // image 类型可不填 default
+  options?: Array<string | { value: string; label: string }>;
   min?: number;
   max?: number;
   step?: number;
-  default: any;
-  options?: string[];
-  description: string;
 }
 
 export interface Comment {
@@ -79,6 +80,10 @@ export interface UserProfile {
     notifications: boolean;
     privacy: 'public' | 'private';
   };
+  followersCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+  isPrivate?: boolean;
 }
 
 export interface Notification {

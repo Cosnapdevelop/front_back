@@ -44,6 +44,39 @@ export interface TaskResultResponse {
   message?: string;
 }
 
+// 新增：统一封装 applyEffect 方法
+export interface ApplyEffectParams {
+  image: File;
+  nodeInfoList?: any[];
+  webappId?: string;
+}
+
+export interface ApplyEffectResponse {
+  taskId: string;
+  images: Array<{ id: string; url: string }>;
+  error?: string;
+}
+
+export async function applyEffect({ image, nodeInfoList, webappId }: ApplyEffectParams): Promise<ApplyEffectResponse> {
+  const formData = new FormData();
+  formData.append('image', image);
+  if (nodeInfoList) {
+    formData.append('nodeInfoList', JSON.stringify(nodeInfoList));
+  }
+  if (webappId) {
+    formData.append('webappId', webappId);
+  }
+  const response = await fetch('/api/effects/apply', {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to start processing task');
+  }
+  return await response.json();
+}
+
 class RunningHubAPI {
   private config: RunningHubConfig;
   private axiosInstance;

@@ -17,6 +17,7 @@ import {
 import { useApp } from '../context/AppContext';
 import RunningHubAPI from '../services/runningHubApi';
 import { RUNNING_HUB_CONFIG } from '../config/runningHub';
+import useTaskProcessing from '../hooks/useTaskProcessing';
 
 const ApplyEffect = () => {
   const { id } = useParams();
@@ -25,12 +26,7 @@ const ApplyEffect = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string, name: string, size: number}>>([]);
-  const [processedImages, setProcessedImages] = useState<Array<{id: string, url: string}>>([]);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [parameters, setParameters] = useState<Record<string, any>>({});
   // 新增：用于存储每个 image 参数上传的图片信息
@@ -172,6 +168,10 @@ const ApplyEffect = () => {
           size: file.size
         }
       }));
+      setParameters(prev => ({
+        ...prev,
+        [paramName]: file // 关键：同步图片参数到 parameters
+      }));
       setUploadErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[paramName];
@@ -184,103 +184,17 @@ const ApplyEffect = () => {
     reader.readAsDataURL(file);
   };
 
-  const processImagesWithRunningHub = async () => {
-    setIsProcessing(true);
-    setProgress(0);
-    setProcessedImages([]);
-    try {
-      // 1. 获取 image 参数的文件
-      const imageParams = effect.parameters.filter(p => p.type === 'image');
-      if (imageParams.length === 0) {
-        throw new Error('没有找到图片参数');
-      }
-      
-      const imageParam = imageParams[0];
-      const fileObj = imageParamFiles[imageParam.name];
-      if (!fileObj?.file) {
-        throw new Error(`请上传${imageParam.name}`);
-      }
-
-      // 2. 构建 nodeInfoList（不包含图片，图片由后端处理）
-      let nodeInfoList = [];
-      if (effect.nodeInfoTemplate) {
-        // 过滤掉图片参数，只保留其他参数
-        const nonImageParams = { ...parameters };
-        imageParams.forEach(param => {
-          delete nonImageParams[param.name];
-        });
-        nodeInfoList = effect.nodeInfoTemplate
-          .filter(item => item.paramKey !== imageParam.name)
-          .map(item => ({
-            nodeId: item.nodeId,
-            fieldName: item.fieldName,
-            fieldValue: nonImageParams[item.paramKey] || item.fieldValue
-          }));
-      }
-
-      // 3. 调用后端接口，上传图片并发起任务
-      setProgress(30);
-      const formData = new FormData();
-      formData.append('image', fileObj.file);
-      formData.append('nodeInfoList', JSON.stringify(nodeInfoList));
-      
-      const response = await fetch('http://localhost:3001/api/effects/apply', {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to start processing task');
-      }
-      
-      const result = await response.json();
-      
-      // 4. 等待任务完成
-      setProgress(60);
-      let taskStatus = 'pending';
-      let attempts = 0;
-      const maxAttempts = 60; // 最多等待10分钟
-      
-      while (!['completed', 'success', 'SUCCESS'].includes(taskStatus) && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // 等待10秒，减少轮询频率
-        attempts++;
-        
-        try {
-          const statusResponse = await fetch(`http://localhost:3001/api/effects/status/${result.taskId}`);
-          if (statusResponse.ok) {
-            const statusData = await statusResponse.json();
-            taskStatus = statusData.status;
-            setProgress(60 + (attempts / maxAttempts) * 30);
-          }
-        } catch (error) {
-          console.error('Error checking status:', error);
-        }
-      }
-      
-      if (['completed', 'success', 'SUCCESS'].includes(taskStatus)) {
-        // 获取真实处理结果图片
-        const resultRes = await fetch(`http://localhost:3001/api/effects/result/${result.taskId}`);
-        if (resultRes.ok) {
-          const resultData = await resultRes.json();
-          // 假设 resultData.results 是图片数组，包含 fileUrl 字段
-          setProcessedImages(resultData.results.map((img, idx) => ({ id: String(idx), url: img.fileUrl })));
-          setProgress(100);
-        } else {
-          setProcessedImages([]);
-          throw new Error('任务已完成，但获取结果图片失败');
-        }
-      } else {
-        throw new Error('任务处理超时或失败');
-      }
-      
-    } catch (error) {
-      console.error('Error in processing:', error);
-      alert(error instanceof Error ? error.message : 'Failed to process images. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const {
+    isProcessing,
+    progress,
+    processedImages,
+    uploadProgress,
+    uploadErrors,
+    processImagesWithRunningHub,
+    setProcessedImages,
+    setUploadProgress,
+    setUploadErrors
+  } = useTaskProcessing({ effect, imageParamFiles, parameters, setParameters });
 
   const simulateProcessing = () => {
     // Fallback simulation for development/testing
@@ -400,11 +314,17 @@ const ApplyEffect = () => {
               onChange={(e) => handleParameterChange(param.name, e.target.value)}
               className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white"
             >
-              {param.options.map((option: string) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
+              {param.options.map((option: any) =>
+                typeof option === 'object' ? (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ) : (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                )
+              )}
             </select>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {param.description}
@@ -698,13 +618,18 @@ const ApplyEffect = () => {
                 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      // fetch+blob 下载，避免跳转
+                      const response = await fetch(previewImage.url);
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
                       const link = document.createElement('a');
-                      link.href = previewImage.url;
+                      link.href = url;
                       link.download = previewImage.name;
                       document.body.appendChild(link);
                       link.click();
                       document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
                     }}
                     className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-2 rounded-lg transition-all"
                   >
