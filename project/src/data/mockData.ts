@@ -631,6 +631,31 @@ export const mockEffects: Effect[] = [
       { nodeId: '52', fieldName: 'prompt', paramKey: 'prompt' }
     ]
   },
+  {
+    id: 'portrait-upscale-pro',
+    name: '顶级人像放大-支持全身（体验版）',
+    description: 'AI驱动的人像全身高质量放大，适合照片修复和细节增强。',
+    author: mockUsers[0],
+    category: 'Portrait',
+    tags: ['upscale', 'portrait', '全身', '高质量'],
+    beforeImage: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/2182863/pexels-photo-2182863.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 0,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-04-01',
+    difficulty: 'Easy',
+    processingTime: '1-2 minutes',
+    parameters: [
+      {
+        name: 'image',
+        type: 'image',
+        default: '',
+        description: '上传需要放大的人像图片'
+      }
+    ],
+    // nodeInfoTemplate 字段已移除，避免类型错误
+  }
 ];
 
 export const mockComments: Comment[] = [

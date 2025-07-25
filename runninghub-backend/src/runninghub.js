@@ -44,7 +44,7 @@ export async function startComfyUITask(imageFileName, nodeInfoList) {
   const requestBody = {
     webappId: '1947926545896734722', // 顶级人像放大-支持全身（体验版），用字符串传递
     apiKey: '8ee162873b6e44bd97d3ef6fce2de105',
-    nodeInfoList: nodeInfoList || [
+    nodeInfoList: [
       {
         nodeId: '6011',
         fieldName: 'image',
