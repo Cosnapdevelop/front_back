@@ -240,10 +240,10 @@ const ApplyEffect = () => {
       setProgress(60);
       let taskStatus = 'pending';
       let attempts = 0;
-      const maxAttempts = 30; // 最多等待5分钟
+      const maxAttempts = 60; // 最多等待10分钟
       
-      while (taskStatus === 'pending' && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 10000)); // 等待10秒
+      while (!['completed', 'success', 'SUCCESS'].includes(taskStatus) && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 等待10秒，减少轮询频率
         attempts++;
         
         try {
@@ -258,10 +258,18 @@ const ApplyEffect = () => {
         }
       }
       
-      if (taskStatus === 'completed') {
-        // 模拟成功结果
-        setProcessedImages([{ id: 'result', url: effect.afterImage }]);
-        setProgress(100);
+      if (['completed', 'success', 'SUCCESS'].includes(taskStatus)) {
+        // 获取真实处理结果图片
+        const resultRes = await fetch(`http://localhost:3001/api/effects/result/${result.taskId}`);
+        if (resultRes.ok) {
+          const resultData = await resultRes.json();
+          // 假设 resultData.results 是图片数组，包含 fileUrl 字段
+          setProcessedImages(resultData.results.map((img, idx) => ({ id: String(idx), url: img.fileUrl })));
+          setProgress(100);
+        } else {
+          setProcessedImages([]);
+          throw new Error('任务已完成，但获取结果图片失败');
+        }
       } else {
         throw new Error('任务处理超时或失败');
       }
