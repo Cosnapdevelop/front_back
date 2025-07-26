@@ -78,7 +78,9 @@ const useTaskProcessing = ({ effect, imageParamFiles, parameters, setParameters 
 
   return {
     isProcessing,
+    setIsProcessing,
     progress,
+    setProgress,
     processedImages,
     uploadProgress,
     uploadErrors,

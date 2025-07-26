@@ -186,7 +186,9 @@ const ApplyEffect = () => {
 
   const {
     isProcessing,
+    setIsProcessing,
     progress,
+    setProgress,
     processedImages,
     uploadProgress,
     uploadErrors,
@@ -200,7 +202,7 @@ const ApplyEffect = () => {
     // Fallback simulation for development/testing
     
     const interval = setInterval(() => {
-      setProgress(prev => {
+      setProgress((prev: number) => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsProcessing(false);
@@ -339,7 +341,7 @@ const ApplyEffect = () => {
               {param.name}
             </label>
             <textarea
-              value={parameters[param.name] || param.default}
+              value={parameters[param.name] !== undefined ? parameters[param.name] : (param.default || '')}
               onChange={(e) => handleParameterChange(param.name, e.target.value)}
               rows={3}
               className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white resize-none"
