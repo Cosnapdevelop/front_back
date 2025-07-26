@@ -149,6 +149,34 @@ export const mockEffects: Effect[] = [
       { nodeId: '320', fieldName: 'text', paramKey: 'text_320' }
     ]
   },
+  // kontext nunchaku Dev 双图编辑极速版- LLM提示词智能扩写-StarAI
+  {
+    id: 'kontext-nunchaku-dev-dual-llm',
+    name: 'kontext nunchaku Dev 双图编辑极速版- LLM提示词智能扩写-StarAI',
+    description: 'AI双图编辑，支持LLM智能扩写提示词，极速体验。',
+    author: mockUsers[2],
+    category: 'Edit',
+    tags: ['kontext', 'nunchaku', 'dual', 'edit', 'llm', 'starai'],
+    beforeImage: '',
+    afterImage: '',
+    likesCount: 0,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-04-01',
+    difficulty: 'Easy',
+    processingTime: '1-2 minutes',
+    webappId: '1939674572449091585',
+    parameters: [
+      { name: 'image_258', type: 'image', description: '上传左图（nodeId:258）' },
+      { name: 'image_260', type: 'image', description: '上传右图（nodeId:260）' },
+      { name: 'text_320', type: 'text', default: '将右边的项链戴在左边女人脖子上，保持人物细节不改变，氛围一致', description: 'LLM智能扩写提示词（nodeId:320）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '258', fieldName: 'image', paramKey: 'image_258' },
+      { nodeId: '260', fieldName: 'image', paramKey: 'image_260' },
+      { nodeId: '320', fieldName: 'text', paramKey: 'text_320' }
+    ]
+  },
   // flux-kontext-test
   {
     id: 'flux-kontext-test',
