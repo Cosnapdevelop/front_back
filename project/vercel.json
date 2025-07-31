@@ -20,6 +20,6 @@
     }
   ],
   "env": {
-    "VITE_API_BASE_URL": "https://your-backend-domain.com"
+    "VITE_API_BASE_URL": "https://cosnap-back.onrender.com"
   }
 }
