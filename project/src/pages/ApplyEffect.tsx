@@ -198,13 +198,37 @@ const ApplyEffect = () => {
     setParameters(prev => ({ ...prev, [paramName]: value }));
   };
 
-  const handleDownload = (result: string, index: number) => {
-    const link = document.createElement('a');
-    link.href = result;
-    link.download = `generated-image-${index + 1}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (event: React.MouseEvent, result: string, index: number) => {
+    // 阻止事件冒泡，避免触发图片预览
+    event.preventDefault();
+    event.stopPropagation();
+    
+    try {
+      console.log('[下载] 开始下载图片:', result);
+      
+      // 使用 fetch + blob 下载，避免页面跳转
+      const response = await fetch(result);
+      if (!response.ok) {
+        throw new Error('下载失败');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cosnap-generated-${index + 1}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // 释放blob URL
+      window.URL.revokeObjectURL(url);
+      console.log('[下载] 图片下载完成');
+    } catch (error) {
+      console.error('[下载] 下载失败:', error);
+      alert('下载失败，请重试');
+    }
   };
 
   const removeImage = (imageId: string) => {
@@ -562,14 +586,20 @@ const ApplyEffect = () => {
                       <img
                         src={result}
                         alt={`Generated ${index + 1}`}
-                        className="w-full h-full object-cover rounded-lg"
+                        className="w-full h-full object-cover rounded-lg cursor-default select-none"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onDragStart={(e) => e.preventDefault()}
                       />
-                            <button
-                        onClick={() => handleDownload(result, index)}
-                        className="absolute top-2 right-2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition-shadow"
-                            >
+                      <button
+                        onClick={(event) => handleDownload(event, result, index)}
+                        className="absolute top-2 right-2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition-shadow z-10"
+                        title="下载图片"
+                      >
                         <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                            </button>
+                      </button>
                     </div>
                   ))}
                 </div>

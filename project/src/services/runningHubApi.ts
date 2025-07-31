@@ -32,7 +32,7 @@ function getRunningHubAxiosInstance(): AxiosInstance {
 // 上传图片到RunningHub
 export async function uploadImage(file: File): Promise<string> {
   try {
-    const formData = new FormData();
+  const formData = new FormData();
     formData.append('file', file);
     
     const response = await getRunningHubAxiosInstance().post('/upload/openapi/upload', formData, {
