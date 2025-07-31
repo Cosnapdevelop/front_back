@@ -77,10 +77,7 @@ const Navbar = () => {
               <RegionSelector showDescription={false} />
             </div>
 
-            {/* Search button for mobile */}
-            <button className="md:hidden p-2 text-obsidian-600 dark:text-pearl-300 hover:text-mint-600 dark:hover:text-mint-400 transition-colors">
-              <Search className="h-5 w-5" />
-            </button>
+            {/* Search button removed from here, moved to secondary bar */}
             
             {/* Image Library */}
             <Link 
@@ -152,11 +149,14 @@ const Navbar = () => {
         </div>
       )}
 
-      {/* 地区选择器 - 移动版（在导航栏下方居中） */}
+      {/* 地区选择器 - 移动版集成到搜索按钮旁边 */}
       {!isDetailPage && (
         <div className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
-          <div className="flex justify-center">
+          <div className="flex justify-between items-center">
             <RegionSelector showDescription={false} />
+            <button className="p-2 text-obsidian-600 dark:text-pearl-300 hover:text-mint-600 dark:hover:text-mint-400 transition-colors">
+              <Search className="h-5 w-5" />
+            </button>
           </div>
         </div>
       )}
