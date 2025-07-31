@@ -125,6 +125,35 @@ export const mockEffects: Effect[] = [
       { nodeId: '62', fieldName: 'image', paramKey: 'image_62' },
       { nodeId: '327', fieldName: 'prompt', paramKey: 'prompt_327' }
     ]
+  },
+  // 背景一键生成，风格迁移_放大_ic控光_F1修复
+  {
+    id: 'background-generation-style-transfer',
+    name: '背景一键生成，风格迁移_放大_ic控光_F1修复',
+    description: '全能型背景处理工作流，集成风格迁移、AI放大、IC控光、F1修复等多种技术，实现专业级背景生成与优化，适用于高质量图像制作。',
+    author: mockUsers[0],
+    category: 'Professional',
+    tags: ['background', 'generation', 'style-transfer', 'upscale', 'ic-light', 'flux', 'professional'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 756,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-04-20',
+    difficulty: 'Expert',
+    processingTime: '5-8 minutes',
+    workflowId: '1950890208722092034', // 新工作流ID
+    isTrending: true,
+    parameters: [
+      { name: 'image_62', type: 'image', description: '上传主体图片（要处理的原始图片）' },
+      { name: 'image_84', type: 'image', description: '上传背景风格参考图（目标风格图片）' },
+      { name: 'prompt_257', type: 'text', default: '杰作，最佳细节，最佳画质，最佳质量，逼真，RAW照片，8k', description: '图像质量描述提示词（用于翻译和优化）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '62', fieldName: 'image', paramKey: 'image_62' },
+      { nodeId: '84', fieldName: 'image', paramKey: 'image_84' },
+      { nodeId: '257', fieldName: 'text', paramKey: 'prompt_257' }
+    ]
   }
 ];
 
