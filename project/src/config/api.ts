@@ -11,6 +11,13 @@ const PROD_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://your-bac
 
 export const API_BASE_URL = isDevelopment ? DEV_API_BASE_URL : PROD_API_BASE_URL;
 
+// 调试信息 - 在控制台显示当前配置
+console.log('🔧 API配置调试信息:');
+console.log('- 环境模式:', import.meta.env.MODE);
+console.log('- 是否开发环境:', isDevelopment);
+console.log('- VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
+console.log('- 最终使用的API_BASE_URL:', API_BASE_URL);
+
 // 获取当前地区的RunningHub API URL
 export function getRunningHubApiUrl(): string {
   try {
