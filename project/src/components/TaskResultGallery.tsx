@@ -24,13 +24,23 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
             </div>
           </div>
           <button
-            onClick={() => {
-              const link = document.createElement('a');
-              link.href = image.url;
-              link.download = `processed_${image.id}.jpg`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
+            onClick={async () => {
+              try {
+                // 使用 fetch + blob 下载，避免页面跳转
+                const response = await fetch(image.url);
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `processed_${image.id}.jpg`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+              } catch (error) {
+                console.error('下载失败:', error);
+                alert('下载失败，请重试');
+              }
             }}
             className="w-full flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
           >

@@ -1,39 +1,34 @@
 import express from 'express';
-import dotenv from 'dotenv';
-import effectsRouter from './routes/effects.js';
-import fs from 'fs';
-
-// 确保uploads目录存在
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
-
-dotenv.config();
+import cors from 'cors';
+import effectsRoutes from './routes/effects.js';
+import { warmupConnection } from './services/comfyUITaskService.js';
 
 const app = express();
+const PORT = process.env.PORT || 3001;
 
-// 添加 CORS 中间件
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
+// 中间件
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// 路由
+app.use('/api/effects', effectsRoutes);
+
+// 健康检查端点
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// 路由配置
-app.use('/api/effects', effectsRouter);
-// 直接访问根路径的接口
-app.use('/', effectsRouter);
-
-const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`RunningHub 后端服务已启动，端口：${port}`);
+// 启动服务器
+app.listen(PORT, async () => {
+  console.log(`RunningHub 后端服务已启动，端口：${PORT}`);
+  
+  // 启动时预热连接
+  try {
+    console.log('[启动] 开始预热API连接...');
+    await warmupConnection('hongkong'); // 预热香港地区连接
+    console.log('[启动] API连接预热完成');
+  } catch (error) {
+    console.log('[启动] API连接预热失败，但不影响正常功能:', error.message);
+  }
 }); 

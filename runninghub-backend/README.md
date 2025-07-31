@@ -1,4 +1,25 @@
-# RunningHub 后端服务
+# RunningHub Backend
+
+## ⚠️ 重要提示 ⚠️
+
+### WebappId 传递要求
+**RunningHub管理员明确要求：webappId必须使用字符串形式传递，不能使用parseInt()转换为整数**
+
+这个修复解决了之前所有webapp特效返回"webapp not exists"错误的问题。
+
+#### 修复详情
+- **修复前**：`webappId: parseInt(webappId)` ❌
+- **修复后**：`webappId: webappId` ✅
+
+#### 相关文件
+- `src/services/webappTaskService.js` - 主要修复文件
+- `test-all-effects.js` - 测试脚本
+- `../project/src/data/mockData.ts` - 前端特效配置
+
+#### 测试结果
+修复后所有webapp特效都能正常启动任务，返回`code: 0`或`code: 433`。
+
+---
 
 ## 快速开始
 

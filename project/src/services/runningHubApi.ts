@@ -1,215 +1,167 @@
 // RunningHub API Service
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
+import { RUNNING_HUB_CONFIG, getRunningHubApiUrl } from '../config/api';
 
-// Types for RunningHub API
-export interface RunningHubConfig {
-  apiKey: string;
-  baseUrl: string;
-}
+// 创建本地后端API实例
+const localAxiosInstance: AxiosInstance = axios.create({
+  baseURL: RUNNING_HUB_CONFIG.baseUrl,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-export interface UploadImageResponse {
-  success: boolean;
-  data: {
-    url: string;
-    fileId: string;
-  };
-  message?: string;
-}
-
-export interface ComfyUITaskResponse {
-  success: boolean;
-  data: {
-    taskId: string;
-  };
-  message?: string;
-}
-
-export interface TaskStatusResponse {
-  success: boolean;
-  data: {
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    progress?: number;
-  };
-  message?: string;
-}
-
-export interface TaskResultResponse {
-  success: boolean;
-  data: {
-    results: Array<{
-      url: string;
-      type: string;
-    }>;
-  };
-  message?: string;
-}
-
-// 新增：统一封装 applyEffect 方法
-export interface ApplyEffectParams {
-  image: File;
-  nodeInfoList?: any[];
-  webappId?: string;
-}
-
-export interface ApplyEffectResponse {
-  taskId: string;
-  images: Array<{ id: string; url: string }>;
-  error?: string;
-}
-
-export async function applyEffect({ image, nodeInfoList, webappId }: ApplyEffectParams): Promise<ApplyEffectResponse> {
-  const formData = new FormData();
-  formData.append('image', image);
-  if (nodeInfoList) {
-    formData.append('nodeInfoList', JSON.stringify(nodeInfoList));
-  }
-  if (webappId) {
-    formData.append('webappId', webappId);
-  }
-  const response = await fetch('/api/effects/apply', {
-    method: 'POST',
-    body: formData
+// 创建RunningHub API实例 - 动态获取地区配置
+function createRunningHubAxiosInstance(): AxiosInstance {
+  const currentApiUrl = getRunningHubApiUrl();
+  return axios.create({
+    baseURL: currentApiUrl,
+    timeout: 30000,
+    headers: {
+      'Content-Type': 'application/json',
+      'Host': new URL(currentApiUrl).hostname,
+    },
   });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to start processing task');
-  }
-  return await response.json();
 }
 
-class RunningHubAPI {
-  private config: RunningHubConfig;
-  private axiosInstance;
+// 获取当前RunningHub API实例
+function getRunningHubAxiosInstance(): AxiosInstance {
+  return createRunningHubAxiosInstance();
+}
 
-  constructor(config: RunningHubConfig) {
-    this.config = config;
-    this.axiosInstance = axios.create({
-      baseURL: config.baseUrl,
+// 上传图片到RunningHub
+export async function uploadImage(file: File): Promise<string> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await getRunningHubAxiosInstance().post('/upload/openapi/upload', formData, {
       headers: {
-        'Content-Type': 'application/json'
-      }
+        'Content-Type': 'multipart/form-data',
+      },
     });
-  }
 
-  // Step 1: Upload image to RunningHub
-  async uploadImage(file: File): Promise<UploadImageResponse> {
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      
-      const response = await this.axiosInstance.post('/apply', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      throw new Error(error.response?.data?.message || 'Failed to upload image');
+    if (response.data && response.data.code === 0 && response.data.data) {
+      return response.data.data.fileName;
+    } else {
+      throw new Error('上传失败: ' + (response.data?.msg || '未知错误'));
     }
-  }
-
-  // Step 2: Start ComfyUI task
-  async startComfyUITask(nodeInfoList: any[]): Promise<ComfyUITaskResponse> {
-    try {
-      const formData = new FormData();
-      formData.append('nodeInfoList', JSON.stringify(nodeInfoList));
-      
-      const response = await this.axiosInstance.post('/apply', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      return response.data;
-    } catch (error: any) {
-      console.error('Error starting ComfyUI task:', error);
-      throw new Error(error.response?.data?.message || 'Failed to start processing task');
-    }
-  }
-
-  // Step 3: Check task status
-  async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
-    try {
-      const response = await this.axiosInstance.get(`/status/${taskId}`);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error checking task status:', error);
-      throw new Error(error.response?.data?.message || 'Failed to check task status');
-    }
-  }
-
-  // Step 4: Get task results
-  async getTaskResults(taskId: string): Promise<TaskResultResponse> {
-    try {
-      const response = await this.axiosInstance.get(`/task/${taskId}/result`);
-      return response.data;
-    } catch (error: any) {
-      console.error('Error getting task results:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get task results');
-    }
-  }
-
-  // Helper function to build effect-specific nodes
-  private buildEffectNodes(imageFileName: string, effectParams: any): any[] {
-    const { effectId, parameters } = effectParams;
-    
-    // Handle Flux Kontext single picture mode
-    if (effectId === 'flux-kontext-test') {
-      return [
-        {
-          nodeId: "39",
-          fieldName: "image",
-          fieldValue: imageFileName
-        },
-        {
-          nodeId: "37",
-          fieldName: "model",
-          fieldValue: "flux-kontext-pro"
-        },
-        {
-          nodeId: "37",
-          fieldName: "aspect_ratio",
-          fieldValue: "match_input_image"
-        },
-        {
-          nodeId: "52",
-          fieldName: "prompt",
-          fieldValue: parameters.prompt || "Transform this image with AI enhancement"
-        }
-      ];
-    }
-    
-    // Default fallback for other effects
-    return [
-      {
-        nodeId: "39",
-        fieldName: "image",
-        fieldValue: imageFileName
-      }
-    ];
-  }
-
-  // Utility function to poll task until completion
-  async waitForTaskCompletion(taskId: string, maxWaitTime: number = 300000): Promise<TaskResultResponse> {
-    const startTime = Date.now();
-    const pollInterval = 2000; // Check every 2 seconds
-
-    while (Date.now() - startTime < maxWaitTime) {
-      const statusResponse = await this.getTaskStatus(taskId);
-      
-      if (statusResponse.data.status === 'completed') {
-        return this.getTaskResults(taskId);
-      } else if (statusResponse.data.status === 'failed') {
-        throw new Error('Task processing failed');
-      }
-      
-      // Wait before next poll
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-    }
-    
-    throw new Error('Task timeout - processing took too long');
+  } catch (error: any) {
+    console.error('上传图片失败:', error);
+    throw new Error('上传图片失败: ' + (error.response?.data?.msg || error.message));
   }
 }
 
-export default RunningHubAPI;
+// 创建简易ComfyUI任务
+export async function createSimpleComfyUITask(workflowId: string, imageFile: File): Promise<string> {
+  try {
+    // 先上传图片
+    const fileName = await uploadImage(imageFile);
+    
+    // 创建任务
+    const requestBody = {
+      apiKey: RUNNING_HUB_CONFIG.apiKey,
+      workflowId: workflowId,
+      addMetadata: true
+    };
+
+    const response = await getRunningHubAxiosInstance().post('/task/openapi/create', requestBody);
+    
+    if (response.data && response.data.code === 0 && response.data.data && response.data.data.taskId) {
+      return response.data.data.taskId.toString();
+    } else {
+      throw new Error('创建任务失败: ' + (response.data?.msg || '未知错误'));
+    }
+  } catch (error: any) {
+    console.error('创建简易ComfyUI任务失败:', error);
+    throw new Error('创建任务失败: ' + (error.response?.data?.msg || error.message));
+  }
+}
+
+// 创建高级ComfyUI任务
+export async function createAdvancedComfyUITask(workflowId: string, nodeInfoList: any[]): Promise<string> {
+  try {
+    const requestBody = {
+      apiKey: RUNNING_HUB_CONFIG.apiKey,
+      workflowId: workflowId,
+      nodeInfoList: nodeInfoList,
+      addMetadata: true
+    };
+
+    const response = await getRunningHubAxiosInstance().post('/task/openapi/create', requestBody);
+    
+    if (response.data && response.data.code === 0 && response.data.data && response.data.data.taskId) {
+      return response.data.data.taskId.toString();
+    } else {
+      throw new Error('创建任务失败: ' + (response.data?.msg || '未知错误'));
+    }
+  } catch (error: any) {
+    console.error('创建高级ComfyUI任务失败:', error);
+    throw new Error('创建任务失败: ' + (error.response?.data?.msg || error.message));
+  }
+}
+
+// 获取RunningHub任务状态
+export async function getRunningHubTaskStatus(taskId: string): Promise<any> {
+  try {
+    const response = await getRunningHubAxiosInstance().post('/task/openapi/status', {
+      apiKey: RUNNING_HUB_CONFIG.apiKey,
+      taskId: taskId
+    });
+
+    if (response.data && response.data.code === 0) {
+      return response.data.data;
+    } else {
+      throw new Error('获取任务状态失败: ' + (response.data?.msg || '未知错误'));
+    }
+  } catch (error: any) {
+    console.error('获取任务状态失败:', error);
+    throw new Error('获取任务状态失败: ' + (error.response?.data?.msg || error.message));
+  }
+}
+
+// 获取RunningHub任务结果
+export async function getRunningHubTaskResults(taskId: string): Promise<any[]> {
+  try {
+    const response = await getRunningHubAxiosInstance().post('/task/openapi/outputs', {
+      apiKey: RUNNING_HUB_CONFIG.apiKey,
+      taskId: taskId
+    });
+
+    if (response.data && response.data.code === 0 && response.data.data) {
+      return response.data.data;
+    } else {
+      throw new Error('获取任务结果失败: ' + (response.data?.msg || '未知错误'));
+    }
+  } catch (error: any) {
+    console.error('获取任务结果失败:', error);
+    throw new Error('获取任务结果失败: ' + (error.response?.data?.msg || error.message));
+  }
+}
+
+// 开始ComfyUI任务（兼容旧版本）
+export async function startComfyUITask(workflowId: string, imageFile: File): Promise<string> {
+  return createSimpleComfyUITask(workflowId, imageFile);
+}
+
+// 获取任务状态（兼容旧版本）
+export async function getTaskStatus(taskId: string): Promise<any> {
+  try {
+    const response = await localAxiosInstance.get(`/api/task/status/${taskId}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('获取任务状态失败:', error);
+    throw new Error('获取任务状态失败: ' + error.message);
+  }
+}
+
+// 获取任务结果（兼容旧版本）
+export async function getTaskResults(taskId: string): Promise<any[]> {
+  try {
+    const response = await localAxiosInstance.get(`/api/task/results/${taskId}`);
+    return response.data;
+  } catch (error: any) {
+    console.error('获取任务结果失败:', error);
+    throw new Error('获取任务结果失败: ' + error.message);
+  }
+}

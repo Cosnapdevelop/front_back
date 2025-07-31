@@ -11,7 +11,7 @@ const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   
   const featuredEffects = state.effects.slice(0, 4);
-  const trendingEffects = state.effects.filter(effect => effect.likesCount > 1000);
+  const trendingEffects = state.effects.filter(effect => effect.isTrending);
   const recentEffects = state.recentlyViewed.slice(0, 6);
 
   // Auto-scroll carousel
@@ -221,27 +221,44 @@ const Home = () => {
         )}
 
         {/* Trending Effects */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-6 w-6 text-pink-500" />
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Trending Effects
-              </h3>
+        {trendingEffects.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-6 w-6 text-pink-500" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  🔥 Trending Effects
+                </h3>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Hot right now</span>
+                </div>
+              </div>
+              <Link
+                to="/effects"
+                className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium"
+              >
+                Explore All
+              </Link>
             </div>
-            <Link
-              to="/effects"
-              className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 text-sm font-medium"
-            >
-              Explore All
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {trendingEffects.map((effect) => (
-              <EffectCard key={effect.id} effect={effect} />
-            ))}
-          </div>
-        </section>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {trendingEffects.map((effect, index) => (
+                <motion.div
+                  key={effect.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="relative"
+                >
+                  <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-pulse">
+                    TRENDING
+                  </div>
+                  <EffectCard effect={effect} />
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Featured Categories */}
         <section className="mb-12">
@@ -249,7 +266,7 @@ const Home = () => {
             Popular Categories
           </h3>
           <div className="flex flex-wrap gap-3">
-            {['Portrait', 'Artistic', 'Photography', 'Fantasy', 'Vintage', 'Modern'].map((category) => (
+            {['Portrait', 'Artistic', 'Photography', 'Fantasy', 'Vintage', 'Modern', 'Video', 'Ecommerce', 'Upscale', 'FaceSwap', 'Edit'].map((category) => (
               <Link
                 key={category}
                 to={`/effects?category=${category}`}

@@ -8,8 +8,9 @@ import Community from './pages/Community';
 import Profile from './pages/Profile';
 import EffectDetail from './pages/EffectDetail';
 import ApplyEffect from './pages/ApplyEffect';
-import CommentsDetail from './pages/CommentsDetail';
+import PostDetail from './pages/PostDetail';
 import UserProfile from './pages/UserProfile';
+import ImageLibrary from './pages/ImageLibrary';
 
 function App() {
   return (
@@ -24,7 +25,8 @@ function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/effect/:id" element={<EffectDetail />} />
             <Route path="/apply/:id" element={<ApplyEffect />} />
-            <Route path="/comments/:postId" element={<CommentsDetail />} />
+            <Route path="/image-library" element={<ImageLibrary />} />
+            <Route path="/post/:postId" element={<PostDetail />} />
             <Route path="/user/:userId" element={<UserProfile />} />
           </Routes>
         </div>

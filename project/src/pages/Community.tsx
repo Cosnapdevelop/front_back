@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, TrendingUp, Clock, Users, X, Upload, Image as ImageIcon, Send, Camera } from 'lucide-react';
+import { Plus, TrendingUp, Clock, Users, X, Upload, Image as ImageIcon, Send, Camera, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import PostCard from '../components/Cards/PostCard';
 
@@ -8,7 +8,7 @@ const Community = () => {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState<'trending' | 'recent' | 'following'>('trending');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedEffect, setSelectedEffect] = useState<string>('');
   const [postCaption, setPostCaption] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -37,18 +37,28 @@ const Community = () => {
   const filteredPosts = getFilteredPosts();
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Limit to 5 images
+    const maxImages = 5;
+    const filesToProcess = files.slice(0, maxImages - selectedImages.length);
+
+    filesToProcess.forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setSelectedImage(e.target?.result as string);
+        setSelectedImages(prev => [...prev, e.target?.result as string]);
       };
       reader.readAsDataURL(file);
-    }
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleCreatePost = async () => {
-    if (!selectedImage || !postCaption.trim() || !selectedEffect) return;
+    if (selectedImages.length === 0 || !postCaption.trim() || !selectedEffect) return;
     
     setIsSubmitting(true);
     
@@ -65,7 +75,7 @@ const Community = () => {
         id: Date.now().toString(),
         user: state.user,
         effect: effect,
-        image: selectedImage,
+        images: selectedImages,
         caption: postCaption,
         likesCount: 0,
         commentsCount: 0,
@@ -83,7 +93,7 @@ const Community = () => {
       dispatch({ type: 'ADD_POST', payload: newPost });
       
       // Reset form and close modal
-      setSelectedImage(null);
+      setSelectedImages([]);
       setPostCaption('');
       setSelectedEffect('');
       setShowCreateModal(false);
@@ -100,7 +110,7 @@ const Community = () => {
   };
 
   const resetCreateForm = () => {
-    setSelectedImage(null);
+    setSelectedImages([]);
     setPostCaption('');
     setSelectedEffect('');
     setShowCreateModal(false);
@@ -227,13 +237,37 @@ const Community = () => {
                     {/* Image Upload */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                        Upload Your Image
+                        Upload Your Images ({selectedImages.length}/5)
                       </label>
-                      {!selectedImage ? (
+                      
+                      {/* Selected Images */}
+                      {selectedImages.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                          {selectedImages.map((image, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={image}
+                                alt={`Selected ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg"
+                              />
+                              <button
+                                onClick={() => removeImage(index)}
+                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Upload Area */}
+                      {selectedImages.length < 5 && (
                         <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-purple-500 dark:hover:border-purple-400 transition-colors cursor-pointer">
                           <input
                             type="file"
                             accept="image/*"
+                            multiple
                             onChange={handleImageUpload}
                             className="hidden"
                             id="image-upload"
@@ -241,29 +275,12 @@ const Community = () => {
                           <label htmlFor="image-upload" className="cursor-pointer">
                             <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                             <p className="text-gray-600 dark:text-gray-400 font-medium mb-1">
-                              Click to upload your creation
+                              Click to upload your creations
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-500">
-                              PNG, JPG, WebP up to 10MB
+                              PNG, JPG, WebP up to 10MB (max 5 images)
                             </p>
                           </label>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <img
-                            src={selectedImage}
-                            alt="Selected"
-                            className="w-full h-64 object-cover rounded-xl"
-                          />
-                          <button
-                            onClick={() => setSelectedImage(null)}
-                            className="absolute top-3 right-3 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                          <div className="absolute bottom-3 left-3 bg-black/70 text-white px-3 py-1 rounded-lg text-sm">
-                            Click X to change image
-                          </div>
                         </div>
                       )}
                     </div>
@@ -322,7 +339,7 @@ const Community = () => {
                   </button>
                   <button
                     onClick={handleCreatePost}
-                    disabled={!selectedImage || !postCaption.trim() || !selectedEffect || isSubmitting}
+                    disabled={selectedImages.length === 0 || !postCaption.trim() || !selectedEffect || isSubmitting}
                     className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-semibold transition-all duration-300"
                   >
                     {isSubmitting ? (

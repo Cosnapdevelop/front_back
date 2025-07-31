@@ -1,13 +1,16 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Sparkles, Users, User, Bell, Search } from 'lucide-react';
+import { Home, Sparkles, Users, User, Bell, Search, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import NotificationDropdown from './NotificationDropdown';
+import { useImageLibrary } from '../../hooks/useImageLibrary';
+import { RegionSelector } from '../RegionSelector';
 
 const Navbar = () => {
   const location = useLocation();
   const { state, dispatch } = useApp();
+  const { imageCount } = useImageLibrary();
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
@@ -69,10 +72,29 @@ const Navbar = () => {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-3">
+            {/* 地区选择器 - 桌面版 */}
+            <div className="hidden md:block">
+              <RegionSelector showDescription={false} />
+            </div>
+
             {/* Search button for mobile */}
             <button className="md:hidden p-2 text-obsidian-600 dark:text-pearl-300 hover:text-mint-600 dark:hover:text-mint-400 transition-colors">
               <Search className="h-5 w-5" />
             </button>
+            
+            {/* Image Library */}
+            <Link 
+              to="/image-library"
+              className="p-2 text-obsidian-600 dark:text-pearl-300 hover:text-mint-600 dark:hover:text-mint-400 transition-colors rounded-lg hover:bg-mint-50 dark:hover:bg-mint-900/20 relative"
+            >
+              <ImageIcon className="h-5 w-5" />
+              {/* Image count badge */}
+              {imageCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-cosmic-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                  {imageCount > 9 ? '9+' : imageCount}
+                </span>
+              )}
+            </Link>
             
             {/* Notification Bell */}
             <div className="relative">
@@ -129,6 +151,11 @@ const Navbar = () => {
           </div>
         </div>
       )}
+
+      {/* 地区选择器 - 移动版（固定在顶部） */}
+      <div className="md:hidden fixed top-4 right-4 z-50">
+        <RegionSelector showDescription={false} />
+      </div>
     </nav>
   );
 };

@@ -1,23 +1,22 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowLeft, 
   Upload, 
-  Image as ImageIcon, 
+  Download, 
+  Settings, 
   Play, 
-  Pause,
-  Download,
-  Share,
-  RefreshCw,
-  Settings,
+  X, 
   Check,
-  X
+  AlertCircle,
+  Image as ImageIcon,
+  Trash2,
+  Eye,
+  EyeOff,
+  StopCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import RunningHubAPI from '../services/runningHubApi';
-import { RUNNING_HUB_CONFIG } from '../config/runningHub';
-import useTaskProcessing from '../hooks/useTaskProcessing';
+import { useTaskProcessing } from '../hooks/useTaskProcessing';
 
 const ApplyEffect = () => {
   const { id } = useParams();
@@ -25,18 +24,42 @@ const ApplyEffect = () => {
   const { state } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string, name: string, size: number}>>([]);
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [parameters, setParameters] = useState<Record<string, any>>({});
-  // 新增：用于存储每个 image 参数上传的图片信息
   const [imageParamFiles, setImageParamFiles] = useState<Record<string, {file?: File, url?: string, name?: string, size?: number, fileId?: string}>>({});
-  // 新增：图片预览模态框状态
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImage, setPreviewImage] = useState<{url: string, name: string} | null>(null);
 
-  // Initialize RunningHub API
-  const runningHubAPI = new RunningHubAPI(RUNNING_HUB_CONFIG);
+  // 简单的测试状态
+  const [testState, setTestState] = useState('Component loaded');
+
+  // 使用新的任务处理hook
+  const { 
+    isProcessing, 
+    progress, 
+    status, 
+    error, 
+    results, 
+    activeTasks,
+    processTask, 
+    cancelTask,
+    resetState
+  } = useTaskProcessing();
+
+  // 简单的测试函数
+  const testFunction = () => {
+    console.log('[Test] 测试函数被调用');
+    setTestState('Test button clicked at ' + new Date().toLocaleTimeString());
+  };
+
+  console.log('[ApplyEffect] 组件渲染:', {
+    id,
+    testState,
+    isProcessing,
+    status,
+    activeTasksSize: activeTasks?.size || 0
+  });
 
   const effect = state.effects.find(e => e.id === id);
 
@@ -51,7 +74,7 @@ const ApplyEffect = () => {
   }
 
   // Initialize parameters with defaults
-  React.useEffect(() => {
+  useEffect(() => {
     const defaultParams: Record<string, any> = {};
     effect.parameters.forEach(param => {
       defaultParams[param.name] = param.default;
@@ -60,7 +83,8 @@ const ApplyEffect = () => {
   }, [effect.parameters]);
 
   const validateFile = (file: File): string | null => {
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 100 * 1024 * 1024; // 100MB (系统支持云存储，最大100MB)
+    const runningHubLimit = 10 * 1024 * 1024; // 10MB (RunningHub原生限制)
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     
     if (!allowedTypes.includes(file.type)) {
@@ -68,7 +92,14 @@ const ApplyEffect = () => {
     }
     
     if (file.size > maxSize) {
-      return `File too large. Maximum size: 10MB`;
+      return `File too large. Maximum size: 100MB`;
+    }
+    
+    // 如果文件大于10MB，给用户一个提示
+    if (file.size > runningHubLimit) {
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      console.log(`[文件上传] 大文件检测: ${fileSizeMB}MB，将使用云存储上传`);
+      // 这里不返回错误，让用户知道会使用云存储
     }
     
     return null;
@@ -79,9 +110,18 @@ const ApplyEffect = () => {
     handleMultipleFiles(files);
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   const handleMultipleFiles = (files: File[]) => {
     const maxFiles = 5;
     const currentCount = uploadedImages.length;
+    const runningHubLimit = 10 * 1024 * 1024; // 10MB
     
     if (currentCount + files.length > maxFiles) {
       alert(`Maximum ${maxFiles} images allowed. You can upload ${maxFiles - currentCount} more.`);
@@ -93,47 +133,27 @@ const ApplyEffect = () => {
       const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       
       if (error) {
-        setUploadErrors(prev => ({ ...prev, [fileId]: error }));
+        alert(error);
         return;
       }
-
-      // Show upload progress
-      setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+      
+      // 检查是否为大文件，给用户提示
+      if (file.size > runningHubLimit) {
+        const fileSizeMB = formatFileSize(file.size);
+        console.log(`[文件上传] 检测到大文件: ${file.name} (${fileSizeMB})，将使用云存储上传`);
+        // 可以在这里添加一个用户提示，但不阻止上传
+      }
       
       const reader = new FileReader();
-      reader.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const progress = (e.loaded / e.total) * 100;
-          setUploadProgress(prev => ({ ...prev, [fileId]: progress }));
-        }
-      };
-      
       reader.onload = (e) => {
-        const imageUrl = e.target?.result as string;
-        const newImage = {
+        const url = e.target?.result as string;
+        setUploadedImages(prev => [...prev, {
           id: fileId,
-          url: imageUrl,
+          url,
           name: file.name,
           size: file.size
-        };
-        
-        setUploadedImages(prev => [...prev, newImage]);
-        setUploadProgress(prev => {
-          const newProgress = { ...prev };
-          delete newProgress[fileId];
-          return newProgress;
-        });
+        }]);
       };
-      
-      reader.onerror = () => {
-        setUploadErrors(prev => ({ ...prev, [fileId]: 'Failed to read file' }));
-        setUploadProgress(prev => {
-          const newProgress = { ...prev };
-          delete newProgress[fileId];
-          return newProgress;
-        });
-      };
-      
       reader.readAsDataURL(file);
     });
   };
@@ -144,506 +164,414 @@ const ApplyEffect = () => {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
-    if (files.length > 0) {
+    const files = Array.from(e.dataTransfer.files);
       handleMultipleFiles(files);
-    }
   };
 
-  // 新增：处理单个 image 参数的图片上传
   const handleImageParamUpload = (paramName: string, file: File) => {
     const error = validateFile(file);
     if (error) {
-      setUploadErrors(prev => ({ ...prev, [paramName]: error }));
+      alert(error);
       return;
     }
+
+    const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const reader = new FileReader();
     reader.onload = (e) => {
+      const url = e.target?.result as string;
       setImageParamFiles(prev => ({
         ...prev,
         [paramName]: {
           file,
-          url: e.target?.result as string,
+          url,
           name: file.name,
-          size: file.size
+          size: file.size,
+          fileId
         }
       }));
-      setParameters(prev => ({
-        ...prev,
-        [paramName]: file // 关键：同步图片参数到 parameters
-      }));
-      setUploadErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[paramName];
-        return newErrors;
-      });
-    };
-    reader.onerror = () => {
-      setUploadErrors(prev => ({ ...prev, [paramName]: 'Failed to read file' }));
     };
     reader.readAsDataURL(file);
   };
 
-  const {
-    isProcessing,
-    setIsProcessing,
-    progress,
-    setProgress,
-    processedImages,
-    uploadProgress,
-    uploadErrors,
-    processImagesWithRunningHub,
-    setProcessedImages,
-    setUploadProgress,
-    setUploadErrors
-  } = useTaskProcessing({ effect, imageParamFiles, parameters, setParameters });
-
-  const simulateProcessing = () => {
-    // Fallback simulation for development/testing
-    
-    const interval = setInterval(() => {
-      setProgress((prev: number) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsProcessing(false);
-          // Create processed versions of all uploaded images
-          setProcessedImages(uploadedImages.map(img => ({
-            id: img.id,
-            url: effect.afterImage // In real app, this would be the processed version
-          })));
-          return 100;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-  };
-
   const handleParameterChange = (paramName: string, value: any) => {
-    setParameters(prev => ({
-      ...prev,
-      [paramName]: value
-    }));
+    setParameters(prev => ({ ...prev, [paramName]: value }));
   };
 
-  const handleDownload = () => {
-    if (processedImages.length === 0) return;
-    
-    // 显示第一张处理后的图片预览
-    const firstImage = processedImages[0];
-    setPreviewImage({
-      url: firstImage.url,
-      name: `${effect.name.replace(/\s+/g, '_').toLowerCase()}_processed.jpg`
-    });
-    setShowImagePreview(true);
+  const handleDownload = (result: string, index: number) => {
+    const link = document.createElement('a');
+    link.href = result;
+    link.download = `generated-image-${index + 1}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const removeImage = (imageId: string) => {
     setUploadedImages(prev => prev.filter(img => img.id !== imageId));
-    setProcessedImages(prev => prev.filter(img => img.id !== imageId));
-    setUploadErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[imageId];
-      return newErrors;
-    });
   };
 
-  // 修改参数渲染，image 类型渲染独立上传控件
   const renderParameterInput = (param: any) => {
-    if (param.type === 'image') {
-      const fileObj = imageParamFiles[param.name];
+    switch (param.type) {
+      case 'image':
       return (
         <div key={param.name} className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{param.name}</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {param.label || param.name}
+            </label>
+            <div className="flex items-center space-x-4">
+              {imageParamFiles[param.name]?.url ? (
+                <div className="relative">
+                  <img 
+                    src={imageParamFiles[param.name].url} 
+                    alt={param.name}
+                    className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setImageParamFiles(prev => {
+                      const newState = { ...prev };
+                      delete newState[param.name];
+                      return newState;
+                    })}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
           <input
             type="file"
-            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-            onChange={e => {
-              if (e.target.files && e.target.files[0]) {
-                handleImageParamUpload(param.name, e.target.files[0]);
-              }
-            }}
-            disabled={isProcessing}
-          />
-          {fileObj?.url && (
-            <div className="mt-2">
-              <img src={fileObj.url} alt={param.name} className="w-32 h-32 object-cover rounded" />
-              <div className="text-xs text-gray-500 dark:text-gray-400">{fileObj.name} ({fileObj.size && (fileObj.size / 1024 / 1024).toFixed(1)}MB)</div>
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageParamUpload(param.name, file);
+                      }
+                    }}
+                    className="hidden"
+                    id={`param-${param.name}`}
+                  />
+                  <label
+                    htmlFor={`param-${param.name}`}
+                    className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                  >
+                    <Upload size={16} className="inline mr-2" />
+                    Upload Image
+                  </label>
+                </div>
+              )}
             </div>
+            {param.description && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
           )}
-          {uploadErrors[param.name] && (
-            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">{uploadErrors[param.name]}</div>
-          )}
-          <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
         </div>
       );
-    }
-    // 其余类型保持原有逻辑
-    switch (param.type) {
-      case 'slider':
+      case 'range':
         return (
           <div key={param.name} className="space-y-2">
-            <div className="flex justify-between">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {param.name}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {param.label || param.name}: {parameters[param.name]}
               </label>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                {parameters[param.name]}
-              </span>
-            </div>
             <input
               type="range"
               min={param.min}
               max={param.max}
-              step={param.step}
+              step={param.step || 1}
               value={parameters[param.name] || param.default}
-              onChange={(e) => handleParameterChange(param.name, Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+              onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {param.description}
-            </p>
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+              <span>{param.min}</span>
+              <span>{param.max}</span>
+            </div>
+            {param.description && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
+            )}
           </div>
         );
-
       case 'select':
         return (
           <div key={param.name} className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {param.name}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {param.label || param.name}
             </label>
             <select
               value={parameters[param.name] || param.default}
               onChange={(e) => handleParameterChange(param.name, e.target.value)}
-              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white"
             >
-              {param.options.map((option: any) =>
-                typeof option === 'object' ? (
+              {param.options.map((option: any) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
-                ) : (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                )
-              )}
+              ))}
             </select>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {param.description}
-            </p>
+            {param.description && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
+            )}
           </div>
         );
-
-      case 'text':
+      default:
         return (
           <div key={param.name} className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {param.name}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              {param.label || param.name}
             </label>
-            <textarea
+            <input
+              type="text"
               value={parameters[param.name] !== undefined ? parameters[param.name] : (param.default || '')}
               onChange={(e) => handleParameterChange(param.name, e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+              placeholder={param.placeholder}
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {param.description}
-            </p>
+            {param.description && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
+            )}
           </div>
         );
+    }
+  };
 
-      default:
-        return null;
+  const handleProcessImages = async () => {
+    // 检查是否有图片文件
+    const hasUploadedImages = uploadedImages.length > 0;
+    const hasParamImages = Object.values(imageParamFiles).some(paramFile => paramFile.file);
+    
+    console.log('[ApplyEffect] 图片检查:', {
+      uploadedImages: uploadedImages.length,
+      imageParamFiles: Object.keys(imageParamFiles),
+      hasUploadedImages,
+      hasParamImages
+    });
+    
+    if (!hasUploadedImages && !hasParamImages) {
+      alert('Please upload at least one image');
+      return;
+    }
+
+    try {
+      // 收集所有图片文件，按照nodeInfoTemplate的顺序
+      const imageFiles: File[] = [];
+      
+      // 首先从参数图片中获取文件，按照nodeInfoTemplate的顺序
+      if (effect.nodeInfoTemplate) {
+        for (const nodeInfo of effect.nodeInfoTemplate) {
+          const paramKey = nodeInfo.paramKey;
+          if (paramKey && imageParamFiles[paramKey] && imageParamFiles[paramKey].file) {
+            imageFiles.push(imageParamFiles[paramKey].file!);
+            console.log(`[ApplyEffect] 添加参数图片: ${paramKey} -> ${imageParamFiles[paramKey].file!.name}`);
+          }
+        }
+      }
+      
+      // 然后从上传的图片中获取文件（如果有的话）
+      for (const image of uploadedImages) {
+        // 这里需要从URL重新创建File对象
+        const response = await fetch(image.url);
+        const blob = await response.blob();
+        const file = new File([blob], image.name, { type: blob.type });
+        imageFiles.push(file);
+        console.log(`[ApplyEffect] 添加上传图片: ${image.name}`);
+      }
+
+      console.log('[ApplyEffect] 收集到的图片文件:', {
+        totalFiles: imageFiles.length,
+        fileNames: imageFiles.map(f => f.name),
+        nodeInfoTemplate: effect.nodeInfoTemplate,
+        imageParamFiles: Object.keys(imageParamFiles)
+      });
+
+      await processTask(effect, parameters, imageFiles);
+    } catch (error) {
+      console.error('处理失败:', error);
+    }
+  };
+
+  const handleCancelTask = async () => {
+    console.log('[ApplyEffect] 用户点击取消按钮');
+    console.log('[ApplyEffect] 当前状态:', {
+      isProcessing,
+      status,
+      activeTasks: activeTasks,
+      activeTasksSize: activeTasks.size,
+      activeTasksKeys: Array.from(activeTasks.keys())
+    });
+    
+    // 获取当前活跃的任务ID
+    const activeTaskIds = Array.from(activeTasks.keys());
+    console.log('[ApplyEffect] 当前活跃任务:', activeTaskIds);
+    
+    if (activeTaskIds.length === 0) {
+      console.log('[ApplyEffect] 没有活跃任务，显示错误');
+      alert('没有正在进行的任务可以取消');
+      return;
+    }
+    
+    // 取消所有活跃任务
+    for (const taskId of activeTaskIds) {
+      try {
+        console.log(`[ApplyEffect] 开始取消任务: ${taskId}`);
+        await cancelTask(taskId);
+        console.log(`[ApplyEffect] 成功取消任务: ${taskId}`);
+      } catch (error) {
+        console.error(`[ApplyEffect] 取消任务失败: ${taskId}`, error);
+      }
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center space-x-4">
+        <div className="mb-8">
               <button
                 onClick={() => navigate(-1)}
-                className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+            className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4"
               >
-                <ArrowLeft className="h-5 w-5" />
-                <span>Back</span>
+            <X className="h-5 w-5 mr-2" />
+            Back
               </button>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Apply: {effect.name}
-              </h1>
-            </div>
 
-            <div className="flex items-center space-x-3">
+          {/* Test Button */}
               <button
-                onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
-                  showAdvancedSettings
-                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Settings</span>
+            onClick={testFunction}
+            className="mb-4 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg"
+          >
+            Test Button - {testState}
               </button>
-            </div>
-          </div>
+          
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            {effect.name}
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {effect.description}
+          </p>
         </div>
-      </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Image Upload/Display */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Effect Parameters
-                </h2>
-                
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Parameters */}
                 <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Parameters
+              </h2>
+              <div className="space-y-4">
                   {effect.parameters.map(renderParameterInput)}
+              </div>
                 </div>
                 
-                {/* Action Button */}
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            {/* Process Button */}
+            <div className="space-y-3">
                   <button
-                    onClick={processImagesWithRunningHub}
+                onClick={handleProcessImages}
                     disabled={isProcessing}
-                    className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-all"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
                   >
                     {isProcessing ? (
                       <>
-                        <RefreshCw className="h-5 w-5 animate-spin" />
-                        <span>Processing...</span>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Processing...
                       </>
                     ) : (
                       <>
-                        <Play className="h-5 w-5" />
-                        <span>Apply Effect</span>
+                    <Play className="h-5 w-5 mr-2" />
+                    Start Processing
                       </>
                     )}
                   </button>
-                </div>
 
-                {/* Processing Progress */}
+              {/* Debug Button */}
+              <button
+                onClick={() => {
+                  console.log('[Debug] 当前状态:', {
+                    isProcessing,
+                    status,
+                    progress,
+                    activeTasks: activeTasks,
+                    activeTasksSize: activeTasks.size,
+                    activeTasksKeys: Array.from(activeTasks.keys())
+                  });
+                }}
+                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
+              >
+                Debug State
+              </button>
+
                 {isProcessing && (
-                  <div className="mt-4 space-y-2">
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                      {Math.round(progress)}%
-                    </p>
-                  </div>
-                )}
-
-                {/* Processed Results */}
-                {!isProcessing && processedImages.length > 0 && (
-                  <div className="mt-6 space-y-4">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Processed Result
-                    </h3>
-                    {processedImages.map((image, index) => (
-                      <div key={image.id} className="space-y-2">
-                        <div className="relative">
-                          <img
-                            src={image.url}
-                            alt={`Processed ${index + 1}`}
-                            className="w-full h-48 object-cover rounded-lg"
-                          />
-                          <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                            Processed
-                          </div>
-                        </div>
                         <button 
-                          onClick={handleDownload}
-                          className="w-full flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"
+                  onClick={handleCancelTask}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
                         >
-                          <Download className="h-4 w-4" />
-                          <span>Download Result</span>
+                  <StopCircle className="h-5 w-5 mr-2" />
+                  Cancel Processing
                         </button>
-                      </div>
-                    ))}
-                  </div>
                 )}
-              </div>
             </div>
 
-
+            {/* Progress Bar */}
+            {isProcessing && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                <div className="mb-2 flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                  <span>Progress</span>
+                  <span>{Math.round(progress)}%</span>
           </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-32 space-y-6">
-              {/* Effect Info */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-                  Effect Information
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-400 mb-1">Description</p>
-                    <p className="text-gray-900 dark:text-white">
-                      {effect.description}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-400 mb-1">Processing Time</p>
-                    <p className="text-gray-900 dark:text-white">
-                      {effect.processingTime}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 dark:text-gray-400 mb-1">Difficulty</p>
-                    <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                      effect.difficulty === 'Easy' 
-                        ? 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30'
-                        : effect.difficulty === 'Medium'
-                        ? 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30'
-                        : 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30'
-                    }`}>
-                      {effect.difficulty}
-                    </span>
-                  </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  ></div>
                 </div>
               </div>
+            )}
 
-              {/* Tips */}
-              <div className="bg-blue-50 dark:bg-blue-900/30 rounded-xl p-6">
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-4">
-                  💡 Tips for Best Results with AI Processing
-                </h3>
-                <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
-                  <li>• Use high-quality images for better results</li>
-                  <li>• Ensure good lighting in your photos</li>
-                  <li>• Try different parameter settings</li>
-                  <li>• Processing may take 1-5 minutes per image</li>
-                  <li>• Check your internet connection for uploads</li>
-                </ul>
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
+                  <span className="text-red-800 dark:text-red-200">{error}</span>
+                </div>
               </div>
+            )}
+          </div>
 
-              {/* Processing Status */}
-              {(isProcessing || processedImages.length > 0) && (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-                    Processing Status ({uploadedImages.length} image{uploadedImages.length !== 1 ? 's' : ''})
-                  </h3>
-                  {isProcessing ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          Processing your images...
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
+          {/* Right Column - Results */}
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Results
+              </h2>
+              
+              {results.length > 0 ? (
+                <div className="space-y-4">
+                  {results.map((result, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={result}
+                        alt={`Generated ${index + 1}`}
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                            <button
+                        onClick={() => handleDownload(result, index)}
+                        className="absolute top-2 right-2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+                            >
+                        <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                            </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
-                      <Check className="h-4 w-4" />
-                      <span className="text-sm">All images processed successfully!</span>
-                    </div>
-                  )}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                  <ImageIcon className="mx-auto h-12 w-12 mb-4" />
+                  <p>No results yet. Upload images and start processing to see results.</p>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
-
-      {/* Image Preview Modal */}
-      <AnimatePresence>
-        {showImagePreview && previewImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowImagePreview(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  📸 图片预览
-                </h3>
-                <button
-                  onClick={() => setShowImagePreview(false)}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-
-              {/* Image Content */}
-              <div className="p-6">
-                <div className="relative">
-                  <img 
-                    src={previewImage.url} 
-                    alt={previewImage.name} 
-                    className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-lg" 
-                  />
-                  <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
-                    {previewImage.name}
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer Actions */}
-              <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                <button
-                  onClick={() => setShowImagePreview(false)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-900 dark:text-white rounded-lg transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>返回</span>
-                </button>
-                
-                <div className="flex space-x-3">
-                  <button
-                    onClick={async () => {
-                      // fetch+blob 下载，避免跳转
-                      const response = await fetch(previewImage.url);
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = previewImage.name;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(url);
-                    }}
-                    className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-2 rounded-lg transition-all"
-                  >
-                    <Download className="h-4 w-4" />
-                    <span>下载图片</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

@@ -10,7 +10,7 @@ const Effects = () => {
   const [sortBy, setSortBy] = useState('popular');
   const [showFilters, setShowFilters] = useState(false);
 
-  const categories = ['All', 'Portrait', 'Artistic', 'Photography', 'Fantasy', 'Vintage', 'Modern'];
+  const categories = ['All', 'Portrait', 'Artistic', 'Photography', 'Fantasy', 'Vintage', 'Modern', 'Video', 'Ecommerce', 'Upscale', 'FaceSwap', 'Edit'];
   const difficulties = ['All', 'Easy', 'Medium', 'Hard'];
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
 
@@ -200,6 +200,43 @@ const Effects = () => {
             </motion.div>
           )}
         </div>
+
+        {/* Trending Effects */}
+        {(() => {
+          const trendingEffects = state.effects.filter(effect => effect.isTrending);
+          if (trendingEffects.length > 0) {
+            return (
+              <div className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    🔥 Trending Effects
+                  </h2>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Hot right now</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {trendingEffects.map((effect, index) => (
+                    <motion.div
+                      key={effect.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="relative"
+                    >
+                      <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-pulse">
+                        TRENDING
+                      </div>
+                      <EffectCard effect={effect} />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Results */}
         <div className="mb-6">

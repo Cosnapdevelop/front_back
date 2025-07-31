@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Post } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,10 @@ interface PostCardProps {
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { dispatch } = useApp();
   const navigate = useNavigate();
-  const [showComments, setShowComments] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+  // 向后兼容：如果post.images不存在但post.image存在，则创建一个单元素数组
+  const postImages = post.images || (post.image ? [post.image] : []);
 
   const handleLike = () => {
     dispatch({ type: 'LIKE_POST', payload: post.id });
@@ -23,8 +26,25 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
 
   const handleCommentsClick = () => {
-    navigate(`/comments/${post.id}`);
+    navigate(`/post/${post.id}`);
   };
+
+  const handleImageClick = () => {
+    navigate(`/post/${post.id}`);
+  };
+
+  const nextImage = () => {
+    if (postImages.length > 0) {
+      setCurrentImageIndex((prev) => (prev + 1) % postImages.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (postImages.length > 0) {
+      setCurrentImageIndex((prev) => (prev - 1 + postImages.length) % postImages.length);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -67,10 +87,41 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {/* Image */}
       <div className="relative">
         <img
-          src={post.image}
+          src={postImages[currentImageIndex] || 'https://via.placeholder.com/400x300?text=No+Image'}
           alt="Post"
-          className="w-full h-64 sm:h-80 object-cover"
+          className="w-full h-64 sm:h-80 object-cover cursor-pointer"
+          onClick={handleImageClick}
         />
+        
+        {/* Image Navigation for Multiple Images */}
+        {postImages.length > 1 && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                prevImage();
+              }}
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                nextImage();
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            
+            {/* Image Counter */}
+            <div className="absolute top-3 right-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
+              {currentImageIndex + 1} / {postImages.length}
+            </div>
+          </>
+        )}
+        
         <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
           {post.effect.name}
         </div>
@@ -123,43 +174,14 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           {post.caption}
         </p>
 
-        {/* Comments */}
-        {showComments && post.comments.length > 0 && (
-          <div className="mt-3 space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
-            {post.comments.map((comment) => (
-              <div key={comment.id} className="flex items-start space-x-2">
-                <button
-                  onClick={() => navigate(`/user/${comment.user.id}`)}
-                  className="flex-shrink-0 hover:opacity-80 transition-opacity"
-                >
-                  <img
-                    src={comment.user.avatar}
-                    alt={comment.user.username}
-                    className="h-6 w-6 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-purple-500 hover:ring-offset-1 dark:hover:ring-offset-gray-800 transition-all"
-                  />
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900 dark:text-white">
-                    <button
-                      onClick={() => navigate(`/user/${comment.user.id}`)}
-                      className="font-semibold hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
-                    >
-                      @{comment.user.username}
-                    </button>{' '}
-                    {comment.content}
-                  </p>
-                  <div className="flex items-center space-x-3 mt-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatDate(comment.createdAt)}
-                    </span>
-                    <button className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500">
-                      {comment.likesCount} likes
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* View All Comments Link */}
+        {post.commentsCount > 0 && (
+          <button
+            onClick={handleCommentsClick}
+            className="text-sm text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+          >
+            View all {post.commentsCount} comments
+          </button>
         )}
       </div>
     </motion.div>

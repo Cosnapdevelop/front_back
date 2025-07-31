@@ -26,7 +26,10 @@ export interface Effect {
   processingTime: string;
   parameters: EffectParameter[];
   nodeInfoTemplate?: Array<{ nodeId: string; fieldName: string; paramKey: string }>;
-  webappId?: string;
+  workflowId?: string; // ComfyUI workflow ID
+  webappId?: string; // Webapp ID
+  isTrending?: boolean;
+  isPlusWorkflow?: boolean; // 标记是否为Plus工作流
 }
 
 export interface EffectParameter {
@@ -54,7 +57,8 @@ export interface Post {
   id: string;
   user: User;
   effect: Effect;
-  image: string;
+  images?: string[]; // 改为支持多张图片
+  image?: string; // 保留旧字段以支持向后兼容
   caption: string;
   likesCount: number;
   commentsCount: number;
@@ -96,4 +100,15 @@ export interface Notification {
   createdAt: string;
   read: boolean;
   actionUrl?: string; // URL to navigate when notification is clicked
+}
+
+export interface GeneratedImage {
+  id: string;
+  url: string;
+  effectId: string;
+  effectName: string;
+  createdAt: string;
+  parameters: Record<string, any>;
+  originalImageName?: string;
+  processedImageName?: string;
 }
