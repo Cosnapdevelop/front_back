@@ -1,15 +1,15 @@
-import { useState, useCallback } from 'react';
-import { useImageLibrary } from './useImageLibrary';
+import React, { useState, useCallback } from 'react';
 import imageLibraryService from '../services/imageLibraryService';
 import { getCurrentRegionConfig } from '../config/regions';
 import { API_BASE_URL } from '../config/api';
 
 export interface TaskProcessingState {
   isProcessing: boolean;
-  status: 'idle' | 'processing' | 'completed' | 'failed';
+  status: 'idle' | 'processing' | 'completed' | 'failed' | 'cancelled';
   progress: number;
   error: string | null;
   results: string[];
+  isCancelled: boolean; // 新增：标记是否被用户主动取消
   // 移除单个任务的ID，改为管理多个任务
   activeTasks: Map<string, {
     taskId: string;
@@ -26,14 +26,21 @@ const initialState: TaskProcessingState = {
   progress: 0,
   error: null,
   results: [],
+  isCancelled: false,
   activeTasks: new Map()
 };
 
 export const useTaskProcessing = () => {
   const [state, setState] = useState<TaskProcessingState>(initialState);
+  
+  // 存储轮询间隔的引用，用于清理
+  const pollIntervalsRef = React.useRef<Map<string, number>>(new Map());
 
   // 重置状态
   const resetState = useCallback(() => {
+    // 清理所有轮询间隔
+    pollIntervalsRef.current.forEach(interval => clearInterval(interval));
+    pollIntervalsRef.current.clear();
     setState(initialState);
   }, []);
 
@@ -59,7 +66,7 @@ export const useTaskProcessing = () => {
       const formData = new FormData();
       
       // 添加图片文件
-      imageParamFiles.forEach((file, index) => {
+      imageParamFiles.forEach((file) => {
         formData.append('images', file);
       });
 
@@ -217,9 +224,12 @@ export const useTaskProcessing = () => {
       } finally {
         setState(prev => {
           const newActiveTasks = new Map(prev.activeTasks);
-          const currentTask = newActiveTasks.get(newActiveTasks.keys().next().value);
-          if (currentTask) {
-            imageLibraryService.updateImageStatus(currentTask.imageId, 'failed');
+          const firstTaskId = newActiveTasks.keys().next().value;
+          if (firstTaskId) {
+            const currentTask = newActiveTasks.get(firstTaskId);
+            if (currentTask) {
+              imageLibraryService.updateImageStatus(currentTask.imageId, 'failed');
+            }
           }
           // 只有在没有活跃任务时才设置isProcessing为false
           return { 
@@ -232,9 +242,12 @@ export const useTaskProcessing = () => {
       console.error('任务处理失败:', error);
       setState(prev => {
         const newActiveTasks = new Map(prev.activeTasks);
-        const currentTask = newActiveTasks.get(newActiveTasks.keys().next().value);
-        if (currentTask) {
-          imageLibraryService.updateImageStatus(currentTask.imageId, 'failed');
+        const firstTaskId = newActiveTasks.keys().next().value;
+        if (firstTaskId) {
+          const currentTask = newActiveTasks.get(firstTaskId);
+          if (currentTask) {
+            imageLibraryService.updateImageStatus(currentTask.imageId, 'failed');
+          }
         }
         return {
           ...prev,
@@ -247,9 +260,12 @@ export const useTaskProcessing = () => {
     } finally {
       setState(prev => {
         const newActiveTasks = new Map(prev.activeTasks);
-        const currentTask = newActiveTasks.get(newActiveTasks.keys().next().value);
-        if (currentTask) {
-          imageLibraryService.updateImageStatus(currentTask.imageId, 'failed');
+        const firstTaskId = newActiveTasks.keys().next().value;
+        if (firstTaskId) {
+          const currentTask = newActiveTasks.get(firstTaskId);
+          if (currentTask) {
+            imageLibraryService.updateImageStatus(currentTask.imageId, 'failed');
+          }
         }
         // 只有在没有活跃任务时才设置isProcessing为false
         return { 
@@ -472,9 +488,14 @@ export const useTaskProcessing = () => {
           });
           
           clearInterval(pollInterval);
+          // 从管理器中移除
+          pollIntervalsRef.current.delete(taskId);
         }
       }
     }, interval);
+    
+    // 将轮询间隔添加到管理器中
+    pollIntervalsRef.current.set(taskId, pollInterval);
   }, []);
 
   // 取消任务
@@ -484,6 +505,14 @@ export const useTaskProcessing = () => {
       isProcessing: state.isProcessing,
       status: state.status
     });
+    
+    // 立即停止对应的轮询
+    const pollInterval = pollIntervalsRef.current.get(taskId);
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollIntervalsRef.current.delete(taskId);
+      console.log('[取消任务] 已停止轮询间隔:', taskId);
+    }
     
     // 如果没有taskId，直接重置状态
     if (!taskId) {
@@ -498,10 +527,11 @@ export const useTaskProcessing = () => {
       setState(prev => ({
         ...prev,
         isProcessing: false,
-        status: 'idle',
+        status: 'cancelled' as const,
         progress: 0,
         error: null,
         results: [],
+        isCancelled: true, // 标记为用户主动取消
         activeTasks: new Map() // 清空活跃任务
       }));
       
@@ -547,13 +577,14 @@ export const useTaskProcessing = () => {
           const newState = {
             ...prev,
             isProcessing: false,
-            status: 'idle',
+            status: 'cancelled' as const,
             progress: 0,
-            error: null,
+            error: null, // 主动取消时不设置错误信息
             results: [],
+            isCancelled: true, // 标记为用户主动取消
             activeTasks: newActiveTasks
           };
-          console.log('[取消任务] 新状态:', newState);
+          console.log('[取消任务] 新状态 (用户主动取消):', newState);
           return newState;
         });
         
@@ -567,7 +598,7 @@ export const useTaskProcessing = () => {
     } catch (error: any) {
       console.error('[取消任务] 取消任务失败:', error);
       
-      // 即使取消失败，也要重置状态
+      // 即使取消失败，也要重置状态为取消（因为是用户主动操作）
       setState(prev => {
         const currentTask = prev.activeTasks.get(taskId);
         if (currentTask && currentTask.imageId) {
@@ -576,10 +607,11 @@ export const useTaskProcessing = () => {
         return {
           ...prev,
           isProcessing: false,
-          status: 'idle',
+          status: 'cancelled' as const,
           progress: 0,
-          error: null,
+          error: null, // 用户主动取消，不显示错误
           results: [],
+          isCancelled: true, // 标记为用户主动取消
           activeTasks: new Map() // 清空活跃任务
         };
       });
@@ -594,6 +626,7 @@ export const useTaskProcessing = () => {
     status: state.status,
     error: state.error,
     results: state.results,
+    isCancelled: state.isCancelled,
     activeTasks: state.activeTasks,
     processTask,
     cancelTask,

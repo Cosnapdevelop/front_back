@@ -41,6 +41,7 @@ const ApplyEffect = () => {
     status, 
     error, 
     results, 
+    isCancelled,
     activeTasks,
     processTask, 
     cancelTask,
@@ -526,12 +527,22 @@ const ApplyEffect = () => {
               </div>
             )}
 
-            {/* Error Display */}
-            {error && (
+            {/* Error Display - 只在非用户主动取消时显示 */}
+            {error && !isCancelled && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <div className="flex items-center">
                   <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
                   <span className="text-red-800 dark:text-red-200">{error}</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Cancelled Status Display */}
+            {isCancelled && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
+                  <span className="text-yellow-800 dark:text-yellow-200">任务已取消</span>
                 </div>
               </div>
             )}
