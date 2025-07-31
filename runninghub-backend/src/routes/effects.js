@@ -168,48 +168,77 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
     }
 
     // 更新nodeInfoList中的fieldValue
+    let imageIndex = 0;
     const updatedNodeInfoList = parsedNodeInfoList.map((nodeInfo, index) => {
       console.log(`[${taskType}] 处理节点 ${index}:`, {
         nodeId: nodeInfo.nodeId,
         fieldName: nodeInfo.fieldName,
         paramKey: nodeInfo.paramKey,
         hasParamKey: !!nodeInfo.paramKey,
-        uploadedImagesCount: uploadedImages.length
+        uploadedImagesCount: uploadedImages.length,
+        imageIndex: imageIndex
       });
       
-      if (nodeInfo.paramKey && uploadedImages[index] !== undefined) {
-        // 图片参数
-        const updatedNode = {
-          ...nodeInfo,
-          fieldValue: uploadedImages[index]
-        };
-        console.log(`[${taskType}] 更新图片节点 ${index}:`, {
-          nodeId: nodeInfo.nodeId,
-          paramKey: nodeInfo.paramKey,
-          fieldValue: uploadedImages[index]
-        });
-        return updatedNode;
-      } else if (nodeInfo.paramKey && req.body[nodeInfo.paramKey] !== undefined) {
-        // 文本参数
-        const updatedNode = {
-          ...nodeInfo,
-          fieldValue: req.body[nodeInfo.paramKey]
-        };
-        console.log(`[${taskType}] 更新文本节点 ${index}:`, {
-          nodeId: nodeInfo.nodeId,
-          paramKey: nodeInfo.paramKey,
-          fieldValue: req.body[nodeInfo.paramKey]
-        });
-        return updatedNode;
-      } else if (nodeInfo.paramKey) {
-        console.warn(`[${taskType}] 节点 ${index} 缺少参数:`, {
-          nodeId: nodeInfo.nodeId,
-          paramKey: nodeInfo.paramKey,
-          index: index,
-          uploadedImagesLength: uploadedImages.length,
-          bodyParams: Object.keys(req.body)
-        });
+      if (nodeInfo.fieldName === 'image') {
+        // 图片节点 - 按顺序分配上传的图片
+        if (imageIndex < uploadedImages.length) {
+          const updatedNode = {
+            ...nodeInfo,
+            fieldValue: uploadedImages[imageIndex]
+          };
+          console.log(`[${taskType}] 更新图片节点 ${index}:`, {
+            nodeId: nodeInfo.nodeId,
+            fieldName: nodeInfo.fieldName,
+            fieldValue: uploadedImages[imageIndex]
+          });
+          imageIndex++;
+          return updatedNode;
+        } else {
+          console.warn(`[${taskType}] 图片节点 ${index} 缺少图片文件:`, {
+            nodeId: nodeInfo.nodeId,
+            imageIndex: imageIndex,
+            uploadedImagesLength: uploadedImages.length
+          });
+        }
+      } else if (nodeInfo.fieldName === 'text' || nodeInfo.fieldName === 'prompt') {
+        // 文本节点 - 查找对应的参数
+        const paramKey = nodeInfo.paramKey;
+        if (paramKey && req.body[paramKey] !== undefined) {
+          const updatedNode = {
+            ...nodeInfo,
+            fieldValue: req.body[paramKey]
+          };
+          console.log(`[${taskType}] 更新文本节点 ${index}:`, {
+            nodeId: nodeInfo.nodeId,
+            paramKey: paramKey,
+            fieldValue: req.body[paramKey]
+          });
+          return updatedNode;
+        } else {
+          // 尝试根据nodeId查找参数
+          const possibleParamKey = `prompt_${nodeInfo.nodeId}`;
+          if (req.body[possibleParamKey] !== undefined) {
+            const updatedNode = {
+              ...nodeInfo,
+              fieldValue: req.body[possibleParamKey]
+            };
+            console.log(`[${taskType}] 更新文本节点 ${index} (通过nodeId):`, {
+              nodeId: nodeInfo.nodeId,
+              paramKey: possibleParamKey,
+              fieldValue: req.body[possibleParamKey]
+            });
+            return updatedNode;
+          } else {
+            console.warn(`[${taskType}] 文本节点 ${index} 缺少参数:`, {
+              nodeId: nodeInfo.nodeId,
+              paramKey: paramKey,
+              possibleParamKey: possibleParamKey,
+              bodyParams: Object.keys(req.body)
+            });
+          }
+        }
       }
+      
       return nodeInfo;
     });
 

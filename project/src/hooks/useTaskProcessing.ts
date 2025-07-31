@@ -56,30 +56,16 @@ export function useTaskProcessing() {
         formData.append('instanceType', 'plus');
       }
       
-      // 构建nodeInfoList
+      // 构建nodeInfoList - 只包含节点信息，fieldValue由后端填充
       const nodeInfoList: any[] = [];
-      let imageIndex = 0;
       
       if (effect.nodeInfoTemplate) {
         for (const template of effect.nodeInfoTemplate) {
           const nodeInfo: any = {
             nodeId: template.nodeId,
-            fieldName: template.fieldName
+            fieldName: template.fieldName,
+            paramKey: template.paramKey // 用于后端查找对应的参数
           };
-          
-          if (template.fieldName === 'image') {
-            // 图片节点
-            if (imageIndex < imageParamFiles.length) {
-              nodeInfo.fileName = imageParamFiles[imageIndex].file.name;
-              imageIndex++;
-            }
-          } else if (template.fieldName === 'text') {
-            // 文本节点
-            const paramKey = template.paramKey;
-            if (paramKey && parameters[paramKey]) {
-              nodeInfo.text = parameters[paramKey];
-            }
-          }
           
           nodeInfoList.push(nodeInfo);
         }
