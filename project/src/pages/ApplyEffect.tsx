@@ -582,20 +582,23 @@ const ApplyEffect = () => {
               {results.length > 0 ? (
                 <div className="space-y-4">
                   {results.map((result, index) => (
-                    <div key={index} className="relative">
+                    <div 
+                      key={index} 
+                      className="relative"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                    >
                       <img
                         src={result}
                         alt={`Generated ${index + 1}`}
-                        className="w-full h-full object-cover rounded-lg cursor-default select-none"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
+                        className="w-full h-full object-cover rounded-lg cursor-default select-none pointer-events-none"
                         onDragStart={(e) => e.preventDefault()}
                       />
                       <button
                         onClick={(event) => handleDownload(event, result, index)}
-                        className="absolute top-2 right-2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition-shadow z-10"
+                        className="absolute top-2 right-2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition-shadow z-20 pointer-events-auto"
                         title="下载图片"
                       >
                         <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />

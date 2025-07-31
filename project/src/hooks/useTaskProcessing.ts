@@ -359,19 +359,7 @@ export const useTaskProcessing = () => {
                   });
                   console.log('[轮询] 处理后的结果URLs:', processedResults);
                   
-                  // 更新图片库
-                  processedResults.forEach((resultUrl: string, index: number) => {
-                    imageLibraryService.addGeneratedImage({
-                      url: resultUrl,
-                      effectId: '', // 这里需要从context获取
-                      effectName: '', // 这里需要从context获取
-                      parameters: {},
-                      originalImageName: `generated-${index + 1}.png`,
-                      processedImageName: `generated-${index + 1}.png`
-                    });
-                  });
-
-                  // 更新图片状态
+                  // 更新图片状态为完成（不创建新图片，避免重复）
                   imageLibraryService.updateImageStatus(imageId, 'completed', 100, processedResults[0]);
 
                   // 更新任务状态
