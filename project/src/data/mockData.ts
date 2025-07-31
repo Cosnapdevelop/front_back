@@ -67,7 +67,9 @@ export const mockUsers: (User & UserProfile)[] = [
 ];
 
 export const mockEffects: Effect[] = [
-  // Cosnap换背景 - AI智能背景替换
+  // ⚠️ 重要：Cosnap换背景 - AI智能背景替换
+  // 🎯 这是 RunningHub ComfyUI API 调用的示例配置
+  // 展示了如何正确配置 parameters 和 nodeInfoTemplate
   {
     id: 'cosnap-background-replace',
     name: 'Cosnap换背景 - AI智能背景替换',
@@ -85,15 +87,42 @@ export const mockEffects: Effect[] = [
     processingTime: '2-3 minutes',
     workflowId: '1949831786093264897', // 真实的Cosnap换背景工作流ID
     isTrending: true,
+    
+    // ⚠️ 重要：参数配置
+    // 📋 parameters: 定义前端表单参数，用于用户输入
+    // - name: 参数键名，必须与 nodeInfoTemplate 中的 paramKey 对应
+    // - type: 参数类型（'image' 或 'text'）
+    // - description: 用户界面显示的描述
+    // - default: 默认值（可选）
     parameters: [
       { name: 'image_240', type: 'image', description: '上传原始图片（要换背景的主体图片）' },
       { name: 'image_284', type: 'image', description: '上传背景参考图（想要的背景风格参考）' },
       { name: 'prompt_279', type: 'text', default: 'describe the style of the image and atmosphere of the image in two sentence. start your answer with Change the background to', description: 'LLM提示词指令（如何描述背景变换）' }
     ],
+    
+    // ⚠️ 重要：nodeInfoTemplate 配置
+    // 🎯 这是 RunningHub ComfyUI API 调用的核心配置
+    // 定义了要修改的工作流节点和对应的参数映射
+    //
+    // 📋 配置规则：
+    // 1. nodeId: 工作流界面中节点右上角的数字标识
+    // 2. fieldName: 对应节点inputs部分的键名（如"image", "text", "prompt"）
+    // 3. paramKey: 对应 parameters 数组中的 name，用于参数匹配
+    //
+    // 🔧 获取方法：
+    // 1. 在 RunningHub 界面点击下载图标
+    // 2. 选择 "Export Workflow API"
+    // 3. 打开下载的 JSON 文件，查看每个节点的 inputs 部分
+    // 4. 根据需要的参数配置 nodeInfoTemplate
+    //
+    // ⚠️ 注意事项：
+    // - nodeId 必须与工作流中的实际节点ID一致
+    // - fieldName 必须与节点inputs中的键名一致
+    // - paramKey 必须与 parameters 中的 name 一致
     nodeInfoTemplate: [
-      { nodeId: '240', fieldName: 'image', paramKey: 'image_240' },
-      { nodeId: '284', fieldName: 'image', paramKey: 'image_284' },
-      { nodeId: '279', fieldName: 'prompt', paramKey: 'prompt_279' }
+      { nodeId: '240', fieldName: 'image', paramKey: 'image_240' },  // LoadImage 节点 - 主体图片
+      { nodeId: '284', fieldName: 'image', paramKey: 'image_284' },  // LoadImage 节点 - 背景参考图
+      { nodeId: '279', fieldName: 'prompt', paramKey: 'prompt_279' } // 文本提示词节点
     ]
   },
   // Cosnap强控制力改 - Plus工作流版本

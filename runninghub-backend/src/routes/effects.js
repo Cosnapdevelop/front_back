@@ -167,7 +167,19 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
       }
     }
 
-    // 更新nodeInfoList中的fieldValue
+    // ⚠️ 重要：nodeInfoList fieldValue 填充逻辑
+    //
+    // 🎯 这是 RunningHub ComfyUI API 调用的核心逻辑
+    // 前端传递的 nodeInfoList 只包含节点信息，需要在这里填充 fieldValue
+    //
+    // 📋 填充规则：
+    // 1. 图片节点 (fieldName: 'image'): 使用上传后的 fileName
+    // 2. 文本节点 (fieldName: 'text'/'prompt'): 从请求体中查找对应参数
+    // 3. 按顺序处理，确保图片和参数的正确匹配
+    //
+    // 🔧 错误处理：
+    // - 如果缺少必需的 fieldValue，RunningHub 会返回 803 错误
+    // - 需要确保所有节点都有正确的 fieldValue
     let imageIndex = 0;
     const updatedNodeInfoList = parsedNodeInfoList.map((nodeInfo, index) => {
       console.log(`[${taskType}] 处理节点 ${index}:`, {

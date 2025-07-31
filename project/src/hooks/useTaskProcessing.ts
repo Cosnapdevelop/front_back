@@ -56,15 +56,27 @@ export function useTaskProcessing() {
         formData.append('instanceType', 'plus');
       }
       
-      // 构建nodeInfoList - 只包含节点信息，fieldValue由后端填充
+      // ⚠️ 重要：nodeInfoList 构建逻辑
+      // 
+      // 🎯 nodeInfoList 是 RunningHub ComfyUI API 的核心参数
+      // 它定义了要修改的工作流节点和对应的值
+      //
+      // 📋 构建规则：
+      // 1. nodeId: 工作流界面中节点右上角的数字标识
+      // 2. fieldName: 对应节点inputs部分的键名（如"image", "text", "prompt"）
+      // 3. fieldValue: 要设置的具体值（由后端填充）
+      // 4. paramKey: 用于后端查找对应的参数值
+      //
+      // 🔧 前端只构建节点信息，fieldValue由后端根据上传的文件和参数填充
+      // 这样可以确保图片文件和文本参数的正确匹配
       const nodeInfoList: any[] = [];
       
       if (effect.nodeInfoTemplate) {
         for (const template of effect.nodeInfoTemplate) {
           const nodeInfo: any = {
-            nodeId: template.nodeId,
-            fieldName: template.fieldName,
-            paramKey: template.paramKey // 用于后端查找对应的参数
+            nodeId: template.nodeId,        // 节点ID（如"240", "279"）
+            fieldName: template.fieldName,  // 字段名（如"image", "prompt"）
+            paramKey: template.paramKey     // 参数键（如"image_62", "prompt_279"）
           };
           
           nodeInfoList.push(nodeInfo);

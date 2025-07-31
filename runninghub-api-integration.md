@@ -1,298 +1,242 @@
-# RunningHub API 集成说明文档
+# RunningHub API 集成文档
 
 ## 概述
+本文档详细说明了如何与RunningHub API进行集成，包括ComfyUI工作流调用、AI应用调用、文件上传等功能。
 
-本文档详细说明如何在项目中集成RunningHub API，支持ComfyUI工作流调用（简易版和高级版）以及AI应用任务调用。
+## ComfyUI 工作流调用
 
-## API 类型
+### 简单模式
+适用于不需要修改工作流参数的场景。
 
-### 1. ComfyUI工作流调用 - 简易版
-
-**适用场景：** 直接运行工作流，不修改任何参数，相当于点击"运行"按钮。
-
-**前端调用方式：**
-```javascript
-// 在mockData.js中配置
-{
-  id: 'simple-workflow',
-  name: '简易工作流',
-  workflowId: '1949831786093264897', // 必需：工作流ID
-  // 不设置 nodeInfoTemplate，表示简易模式
-}
-
-// 前端会自动检测并使用简易模式
+**请求示例：**
+```bash
+curl -X POST "https://api.runninghub.com/task/openapi/create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "your-api-key",
+    "workflowId": "1949831786093264897",
+    "addMetadata": true
+  }'
 ```
 
-**后端API调用：**
-```javascript
-// POST https://www.runninghub.cn/task/openapi/generate
-{
-  "apiKey": "your-api-key",
-  "workflowId": "1949831786093264897"
-  // 没有 nodeInfoList 字段
-}
+### 高级模式（修改参数）
+适用于需要动态修改工作流节点参数的场景。
+
+**请求示例：**
+```bash
+curl -X POST "https://api.runninghub.com/task/openapi/create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "your-api-key",
+    "workflowId": "1949831786093264897",
+    "nodeInfoList": [
+      {
+        "nodeId": "240",
+        "fieldName": "image",
+        "fieldValue": "api/257e63ad3a23136a25511e8a205cef9caa7cb0bd5a3a0b03af842206f45e33f4.jpg"
+      },
+      {
+        "nodeId": "279",
+        "fieldName": "prompt",
+        "fieldValue": "describe the style of the image and atmosphere of the image in two sentence. start your answer with Change the background to"
+      }
+    ],
+    "addMetadata": true
+  }'
 ```
 
-### 2. ComfyUI工作流调用 - 高级版
+## ⚠️ 重要：nodeInfoList 构建规则
 
-**适用场景：** 需要动态修改工作流参数，如替换图片、修改提示词等。
+### 🎯 nodeInfoList 核心概念
 
-### 2.1. ComfyUI Plus工作流调用
+**nodeId**: 工作流界面中节点右上角的数字标识
+**fieldName**: 对应节点`inputs`部分的键名（如"image", "text", "prompt", "seed"等）
+**fieldValue**: 要设置的具体值
 
-**适用场景：** 复杂的专业级工作流，通常包含更多节点和精细控制，但API调用方式与高级版相同。
+### 📋 前端构建 nodeInfoList 的步骤
 
-**前端配置方式：**
+1. **从工作流API格式文件中获取节点信息**
+   - 在RunningHub界面点击下载图标
+   - 选择"Export Workflow API"
+   - 打开下载的JSON文件，查看每个节点的`inputs`部分
+
+2. **构建基础nodeInfoList（前端）**
+   ```javascript
+   // 前端只构建节点信息，不设置fieldValue
+   const nodeInfoList = [
+     {
+       nodeId: "240",
+       fieldName: "image",
+       paramKey: "image_62"  // 用于后端查找对应参数
+     },
+     {
+       nodeId: "279", 
+       fieldName: "prompt",
+       paramKey: "prompt_279"  // 用于后端查找对应参数
+     }
+   ];
+   ```
+
+3. **后端填充fieldValue**
+   - 图片节点：使用上传后的fileName
+   - 文本节点：从请求体中查找对应参数
+
+### 🔧 后端处理 nodeInfoList 的逻辑
+
 ```javascript
-// 在mockData.js中配置Plus工作流
-{
-  id: 'cosnap-strong-control-plus',
-  name: 'Cosnap强控制力改 - Plus工作流',
-  workflowId: '1950585019234455554', // Plus工作流ID
-  isPlusWorkflow: true, // 标记为Plus工作流
-  nodeInfoTemplate: [
-    { nodeId: '24', fieldName: 'image', paramKey: 'image_24' },
-    { nodeId: '62', fieldName: 'image', paramKey: 'image_62' },
-    { nodeId: '327', fieldName: 'prompt', paramKey: 'prompt_327' }
-  ],
-  parameters: [
-    { name: 'image_24', type: 'image', description: '上传主体图片' },
-    { name: 'image_62', type: 'image', description: '上传背景参考图' },
-    { name: 'prompt_327', type: 'text', description: 'LLM提示词' }
-  ]
-}
-```
-
-**后端API调用：**（使用48G显存机器）
-```javascript
-// POST https://www.runninghub.cn/task/openapi/create
-{
-  "apiKey": "your-api-key",
-  "workflowId": "1950585019234455554",
-  "nodeInfoList": [
-    {
-      "nodeId": "24",
-      "fieldName": "image",
-      "fieldValue": "api/uploaded-image-1.jpg"
-    },
-    {
-      "nodeId": "62", 
-      "fieldName": "image",
-      "fieldValue": "api/uploaded-image-2.jpg"
-    },
-    {
-      "nodeId": "327",
-      "fieldName": "prompt", 
-      "fieldValue": "describe the image Including atmosphere, mood & tone..."
+// 更新nodeInfoList中的fieldValue
+let imageIndex = 0;
+const updatedNodeInfoList = parsedNodeInfoList.map((nodeInfo, index) => {
+  if (nodeInfo.fieldName === 'image') {
+    // 图片节点 - 按顺序分配上传的图片
+    if (imageIndex < uploadedImages.length) {
+      return {
+        ...nodeInfo,
+        fieldValue: uploadedImages[imageIndex]
+      };
     }
-  ],
-  "instanceType": "plus",  // 🔥 关键：指定使用48G显存机器
-  "addMetadata": true
-}
-```
-
-**🔑 Plus工作流关键特性：**
-- **`instanceType: "plus"`** - 指定使用48G显存机器运行任务
-- **适用场景** - 复杂的专业级工作流，需要更大显存和计算能力
-- **处理时间** - 通常比普通工作流需要更长时间（3-5分钟）
-- **费用** - Plus工作流通常费用较高
-
-### 3. AI应用任务调用
-
-**适用场景：** 调用预构建的AI应用，通常有固定的输入输出格式。
-
-**前端配置方式：**
-```javascript
-// 在mockData.js中配置
-{
-  id: 'ai-app-task',
-  name: 'AI智能修图',
-  webappId: 'your-webapp-id', // 必需：应用ID
-  nodeInfoTemplate: [ // 根据应用页面的示例配置
-    {
-      nodeId: 'input_image',
-      fieldName: 'image', 
-      paramKey: 'input_image'
+    imageIndex++;
+  } else if (nodeInfo.fieldName === 'text' || nodeInfo.fieldName === 'prompt') {
+    // 文本节点 - 查找对应的参数
+    const paramKey = nodeInfo.paramKey;
+    if (paramKey && req.body[paramKey] !== undefined) {
+      return {
+        ...nodeInfo,
+        fieldValue: req.body[paramKey]
+      };
+    } else {
+      // 尝试根据nodeId查找参数
+      const possibleParamKey = `prompt_${nodeInfo.nodeId}`;
+      if (req.body[possibleParamKey] !== undefined) {
+        return {
+          ...nodeInfo,
+          fieldValue: req.body[possibleParamKey]
+        };
+      }
     }
-  ]
-}
+  }
+  return nodeInfo;
+});
 ```
 
-**后端API调用：**
-```javascript
-// POST https://www.runninghub.cn/task/openapi/app
-{
-  "apiKey": "your-api-key", 
-  "webappId": "your-webapp-id",
-  "nodeInfoList": [
-    {
-      "nodeId": "input_image",
-      "fieldName": "image",
-      "fieldValue": "api/uploaded-image.jpg"
+### 📝 常见 fieldName 类型
+
+- **image**: 图片输入节点（LoadImage）
+- **text**: 文本输入节点
+- **prompt**: 提示词输入节点
+- **seed**: 随机种子（KSampler）
+- **steps**: 采样步数（KSampler）
+- **cfg**: CFG值（KSampler）
+
+### ⚠️ 注意事项
+
+1. **API调用不会自动改变seed值** - 相同输入总是产生相同结果
+2. **某些fieldName只在浏览器中有效** - 如`control_after_generate`
+3. **数组类型的fieldValue通常是节点连接** - 不建议修改
+4. **图片上传必须先调用上传API** - 然后用返回的fileName作为fieldValue
+
+## AI 应用调用
+
+### 请求示例
+```bash
+curl -X POST "https://api.runninghub.com/task/webapp/create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "your-api-key",
+    "webappId": 1937084629516193794,
+    "images": ["image1.jpg", "image2.jpg"],
+    "parameters": {
+      "prompt": "your prompt here"
     }
-  ]
-}
+  }'
 ```
 
-## 参数说明
+## 文件上传
 
-### nodeInfoList 参数详解
-
-**重要说明：** webappId必须以字符串形式传递（不是数字）。
-
-```javascript
-{
-  "nodeId": "240",        // 工作流中的节点ID
-  "fieldName": "image",   // 节点的字段名（image/prompt/text等）
-  "fieldValue": "value"   // 实际的值（图片路径/文本内容等）
-}
+### 图片上传
+```bash
+curl -X POST "https://api.runninghub.com/resource/upload" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@image.jpg"
 ```
 
-### 图片上传流程（智能云存储方案）
-
-我们的系统实现了智能文件上传策略，根据文件大小自动选择最优上传方式：
-
-#### 上传策略
-- **≤ 10MB 文件：** 直接上传到RunningHub原生存储
-- **> 10MB 文件：** 自动使用云存储上传
-- **最大支持：** 100MB
-
-#### 1. **小文件上传（≤ 10MB）**
-```javascript
-// POST https://www.runninghub.cn/task/openapi/upload
-// Content-Type: multipart/form-data
-FormData: {
-  file: [图片文件],
-  apiKey: "your-api-key",
-  fileType: "image"
-}
-
-// 响应
+**响应示例：**
+```json
 {
   "code": 0,
-  "msg": "success", 
+  "msg": "success",
   "data": {
-    "fileName": "api/xxxxx.jpg", // 用于nodeInfoList
+    "fileName": "api/257e63ad3a23136a25511e8a205cef9caa7cb0bd5a3a0b03af842206f45e33f4.jpg",
     "fileType": "image"
   }
 }
 ```
 
-#### 2. **大文件上传（> 10MB）**
-```javascript
-// 自动使用云存储，无需额外配置
-// 系统后台自动处理
+## ComfyUI Plus工作流调用
 
-// 响应（返回公开URL）
+对于需要48G VRAM的Plus工作流，需要添加`instanceType`参数：
+
+```json
 {
-  "cloudUrl": "https://cdn.example.com/cosnap/large-files/xxxxx.jpg"
+  "apiKey": "your-api-key",
+  "workflowId": "1950585019234455554",
+  "instanceType": "plus",
+  "nodeInfoList": [...],
+  "addMetadata": true
 }
 ```
 
-#### 3. **在ComfyUI工作流中使用**
+## 智能云存储方案
+
+### 文件大小策略
+- **≤10MB**: 直接上传到RunningHub
+- **>10MB**: 上传到云存储（OSS/COS/S3），然后传递URL给RunningHub
+
+### 云存储配置
 ```javascript
-// 无论是小文件还是大文件，使用方式完全相同
-"nodeInfoList": [
-  {
-    "nodeId": "24",
-    "fieldName": "image",
-    "fieldValue": "api/xxxxx.jpg"          // 小文件路径
-    // 或
-    "fieldValue": "https://cdn.example.com/xxxxx.jpg" // 大文件URL  
-  }
-]
-2. **在nodeInfoList中使用**
+const CLOUD_STORAGE_CONFIG = {
+  provider: 'aliyun-oss', // 或 'tencent-cos', 'aws-s3'
+  region: 'oss-cn-hangzhou',
+  accessKeyId: 'your-access-key-id',
+  accessKeySecret: 'your-access-key-secret',
+  bucket: 'your-bucket-name',
+  cdnDomain: 'https://your-cdn-domain.com'
+};
+```
+
+### nodeInfoList中的图片处理
 ```javascript
+// 小文件：使用fileName
 {
   "nodeId": "240",
   "fieldName": "image", 
-  "fieldValue": "api/xxxxx.jpg" // 使用上传返回的fileName或cloudUrl
+  "fieldValue": "api/257e63ad3a23136a25511e8a205cef9caa7cb0bd5a3a0b03af842206f45e33f4.jpg"
+}
+
+// 大文件：使用cloudUrl
+{
+  "nodeId": "240",
+  "fieldName": "image",
+  "fieldValue": "https://your-cdn-domain.com/large-image.jpg"
 }
 ```
 
-## 状态查询与结果获取
+## 错误处理
 
-### 查询任务状态
-```javascript
-// POST https://www.runninghub.cn/task/openapi/status
-{
-  "apiKey": "your-api-key",
-  "taskId": "task-id-from-generate-response"
-}
+### 常见错误码
+- **803**: `APIKEY_INVALID_NODE_INFO` - nodeInfoList格式错误或fieldValue未正确设置
+- **802**: `APIKEY_INVALID_WORKFLOW` - 工作流ID无效
+- **801**: `APIKEY_INVALID` - API密钥无效
 
-// 响应
-{
-  "code": 0,
-  "msg": "success",
-  "data": "SUCCESS" // QUEUED/RUNNING/SUCCESS/FAILED
-}
-```
+### 调试建议
+1. 检查nodeInfoList中的fieldValue是否正确设置
+2. 确认图片文件已成功上传
+3. 验证工作流API格式文件中的节点信息
+4. 检查fieldName是否在API格式中有效
 
-### 获取任务结果
-```javascript
-// POST https://www.runninghub.cn/task/openapi/outputs
-{
-  "apiKey": "your-api-key", 
-  "taskId": "task-id"
-}
+## 文件限制
 
-// 响应
-{
-  "code": 0,
-  "msg": "success",
-  "data": [
-    {
-      "fileUrl": "https://rh-images.xiaoyaoyou.com/xxx.png",
-      "fileType": "png",
-      "taskCostTime": "121",
-      "nodeId": "221"
-    }
-  ]
-}
-```
-
-## 项目中的实现
-
-### 后端服务层
-
-- **ComfyUI服务：** `runninghub-backend/src/services/comfyUITaskService.js`
-- **AI应用服务：** `runninghub-backend/src/services/webappTaskService.js`
-- **路由处理：** `runninghub-backend/src/routes/effects.js`
-
-### 前端Hook
-
-- **任务处理Hook：** `project/src/hooks/useTaskProcessing.ts`
-- **配置文件：** `project/src/config/api.ts`
-- **模拟数据：** `project/src/data/mockData.ts`
-
-## 配置步骤
-
-1. **获取API密钥和工作流ID**
-2. **在mockData.js中配置效果**
-3. **定义nodeInfoTemplate（如需参数修改）**
-4. **配置前端表单参数**
-5. **测试任务发起、状态查询、结果获取**
-
-## 错误排查
-
-### 常见问题
-
-1. **"需要添加节点"错误**
-   - 检查nodeInfoList中的nodeId是否正确
-   - 确认所有必需参数都已提供
-   - 查看promptTips字段获取详细错误信息
-
-2. **图片上传失败**
-   - 确认图片格式支持（jpg/png等）
-   - 检查文件大小限制
-   - 验证API密钥权限
-
-3. **状态一直是RUNNING**
-   - 工作流可能较复杂，需要更长时间
-   - 检查工作流是否有错误节点
-   - 查看RunningHub平台的任务详情
-
-## 参考文档
-
-- [RunningHub官方API文档](https://www.runninghub.cn/runninghub-api-doc/)
-- [关于nodeInfoList](https://www.runninghub.cn/runninghub-api-doc/doc-6332955.md)
-- [使用须知](https://www.runninghub.cn/runninghub-api-doc/doc-6332954.md)
+- **RunningHub原生上传**: 最大32MB
+- **云存储上传**: 最大100MB
+- **支持格式**: JPEG, PNG, GIF, WebP
+- **处理时间**: 通常5-8分钟（取决于工作流复杂度）
