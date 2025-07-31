@@ -72,10 +72,12 @@ const Navbar = () => {
 
           {/* Right side actions */}
           <div className="flex items-center space-x-3">
-            {/* 地区选择器 - 桌面版 (在大屏幕上显示) */}
+            {/* 地区选择器 - 桌面版 (暂时禁用，全部使用移动版布局) */}
+            {/* 
             <div className="hidden lg:block">
               <RegionSelector showDescription={false} />
             </div>
+            */}
 
             {/* Search button removed from here, moved to secondary bar */}
             
@@ -151,7 +153,7 @@ const Navbar = () => {
 
       {/* 地区选择器 - 移动版集成到搜索按钮旁边 */}
       {!isDetailPage && (
-        <div className="lg:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+        <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
           <div className="flex justify-between items-center">
             <RegionSelector showDescription={false} />
             <button className="p-2 text-obsidian-600 dark:text-pearl-300 hover:text-mint-600 dark:hover:text-mint-400 transition-colors">
