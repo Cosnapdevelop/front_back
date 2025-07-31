@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105';
+const apiKey = process.env.RUNNINGHUB_API_KEY;
+
+// 安全检查：确保API密钥已配置
+if (!apiKey) {
+  console.error('❌ 错误：RUNNINGHUB_API_KEY环境变量未配置');
+  console.error('请在.env文件中设置RUNNINGHUB_API_KEY=your-api-key');
+  process.exit(1);
+}
 
 // 地区配置
 const REGIONS = {

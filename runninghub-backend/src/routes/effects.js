@@ -24,19 +24,56 @@ router.post('/test', (req, res) => {
   });
 });
 
+// 文件验证函数
+function validateFileType(file) {
+  const allowedTypes = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ];
+  return allowedTypes.includes(file.mimetype.toLowerCase());
+}
+
+function validateFileName(filename) {
+  // 防止路径遍历攻击
+  const dangerous = /[<>:"/\\|?*\x00-\x1f]/;
+  if (dangerous.test(filename)) {
+    return false;
+  }
+  // 限制文件名长度
+  if (filename.length > 255) {
+    return false;
+  }
+  return true;
+}
+
 // 配置multer用于处理文件上传
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB (支持云存储，大文件自动转云存储)
+    files: 10, // 最多10个文件
+    fieldSize: 1024 * 1024, // 1MB字段大小限制
   },
   fileFilter: (req, file, cb) => {
-    // 只允许图片文件
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('只允许上传图片文件'), false);
+    console.log(`[文件验证] 检查文件: ${file.originalname}, MIME: ${file.mimetype}`);
+    
+    // 验证文件类型
+    if (!validateFileType(file)) {
+      console.warn(`[文件验证] 不支持的文件类型: ${file.mimetype}`);
+      return cb(new Error(`不支持的文件类型: ${file.mimetype}。只允许 JPEG, PNG, GIF, WebP 格式`), false);
     }
+    
+    // 验证文件名
+    if (!validateFileName(file.originalname)) {
+      console.warn(`[文件验证] 不安全的文件名: ${file.originalname}`);
+      return cb(new Error('文件名包含不安全字符或过长'), false);
+    }
+    
+    console.log(`[文件验证] 文件通过验证: ${file.originalname}`);
+    cb(null, true);
   },
 });
 

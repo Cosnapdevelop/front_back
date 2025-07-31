@@ -29,11 +29,8 @@ export function getRunningHubApiUrl(): string {
   }
 }
 
-// RunningHub配置
+// RunningHub配置（前端版本 - 不包含敏感信息）
 export const RUNNING_HUB_CONFIG = {
-  // 开发环境使用本地API Key，生产环境使用环境变量
-  apiKey: import.meta.env.VITE_RUNNINGHUB_API_KEY || 'af36846844d94652bb84dc800815d1da',
-  
   // API基础URL
   baseUrl: API_BASE_URL,
   
@@ -49,7 +46,7 @@ export const RUNNING_HUB_CONFIG = {
   backgroundChangeWorkflowId: '1949831786093264897',
   
   // 文件限制
-  maxFileSize: 10 * 1024 * 1024, // 10MB
+  maxFileSize: 30 * 1024 * 1024, // 30MB (匹配后端限制)
   supportedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
   maxProcessingTime: 5 * 60 * 1000 // 5分钟
 };

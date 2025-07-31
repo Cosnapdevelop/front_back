@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import imageLibraryService from '../services/imageLibraryService';
 import { getCurrentRegionConfig } from '../config/regions';
 import { API_BASE_URL } from '../config/api';
+import { apiUpload, apiGet, apiPost } from '../utils/apiClient';
 
 export interface TaskProcessingState {
   isProcessing: boolean;
@@ -129,22 +130,14 @@ export const useTaskProcessing = () => {
 
       try {
         console.log('[任务处理] 开始发送请求...');
-        const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/apply`, {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal
+        
+        // 使用改进的API客户端（包含重试机制）
+        const result = await apiUpload(`${API_BASE_URL}/api/effects/comfyui/apply`, formData, {
+          timeout: 180000, // 3分钟超时（上传可能需要更长时间）
+          retries: 2
         });
 
-        clearTimeout(timeoutId);
-        console.log('[任务处理] 后端响应状态:', response.status, response.statusText);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('[任务处理] 后端错误响应:', errorData);
-          throw new Error(errorData.error || '处理失败');
-        }
-
-        const result = await response.json();
+        console.log('[任务处理] 后端响应成功:', result);
         console.log('[任务处理] 后端成功响应:', result);
 
         if (result.success && result.taskId) {
