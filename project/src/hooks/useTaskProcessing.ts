@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useImageLibrary } from './useImageLibrary';
 import imageLibraryService from '../services/imageLibraryService';
 import { getCurrentRegionConfig } from '../config/regions';
+import { API_BASE_URL } from '../config/api';
 
 export interface TaskProcessingState {
   isProcessing: boolean;
@@ -121,7 +122,7 @@ export const useTaskProcessing = () => {
 
       try {
         console.log('[任务处理] 开始发送请求...');
-        const response = await fetch('/api/effects/comfyui/apply', {
+        const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/apply`, {
           method: 'POST',
           body: formData,
           signal: controller.signal
@@ -272,7 +273,7 @@ export const useTaskProcessing = () => {
       console.log(`[轮询] 第${attempts}次轮询: taskId=${taskId}`);
       
       try {
-        const response = await fetch('/api/effects/comfyui/status', {
+        const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -310,7 +311,7 @@ export const useTaskProcessing = () => {
                 regionId: getCurrentRegionConfig().id
               });
               
-              const resultsResponse = await fetch('/api/effects/comfyui/results', {
+              const resultsResponse = await fetch(`${API_BASE_URL}/api/effects/comfyui/results`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -517,7 +518,7 @@ export const useTaskProcessing = () => {
       };
       console.log('[取消任务] 发送请求:', requestBody);
       
-      const response = await fetch('/api/effects/comfyui/cancel', {
+      const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

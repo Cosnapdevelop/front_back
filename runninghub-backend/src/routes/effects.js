@@ -6,6 +6,24 @@ import { startWebappTaskService, waitForWebappTaskAndGetImages, cancelWebappTask
 
 const router = express.Router();
 
+// 测试路由
+router.get('/test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Effects路由工作正常',
+    timestamp: new Date().toISOString()
+  });
+});
+
+router.post('/test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'POST方法工作正常',
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 配置multer用于处理文件上传
 const upload = multer({
   storage: multer.memoryStorage(),
