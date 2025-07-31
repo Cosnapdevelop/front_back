@@ -367,15 +367,15 @@ const ApplyEffect = () => {
     }
 
     try {
-      // 收集所有图片文件，按照nodeInfoTemplate的顺序
-      const imageFiles: File[] = [];
+      // 收集所有图片文件对象，按照nodeInfoTemplate的顺序
+      const imageFileObjects: Array<{file: File}> = [];
       
       // 首先从参数图片中获取文件，按照nodeInfoTemplate的顺序
       if (effect.nodeInfoTemplate) {
         for (const nodeInfo of effect.nodeInfoTemplate) {
           const paramKey = nodeInfo.paramKey;
           if (paramKey && imageParamFiles[paramKey] && imageParamFiles[paramKey].file) {
-            imageFiles.push(imageParamFiles[paramKey].file!);
+            imageFileObjects.push({ file: imageParamFiles[paramKey].file! });
             console.log(`[ApplyEffect] 添加参数图片: ${paramKey} -> ${imageParamFiles[paramKey].file!.name}`);
           }
         }
@@ -387,18 +387,18 @@ const ApplyEffect = () => {
         const response = await fetch(image.url);
         const blob = await response.blob();
         const file = new File([blob], image.name, { type: blob.type });
-        imageFiles.push(file);
+        imageFileObjects.push({ file });
         console.log(`[ApplyEffect] 添加上传图片: ${image.name}`);
       }
 
       console.log('[ApplyEffect] 收集到的图片文件:', {
-        totalFiles: imageFiles.length,
-        fileNames: imageFiles.map(f => f.name),
+        totalFiles: imageFileObjects.length,
+        fileNames: imageFileObjects.map(obj => obj.file.name),
         nodeInfoTemplate: effect.nodeInfoTemplate,
         imageParamFiles: Object.keys(imageParamFiles)
       });
 
-      await processTask(effect, parameters, imageFiles);
+      await processTask(effect, parameters, imageFileObjects);
     } catch (error) {
       console.error('处理失败:', error);
     }

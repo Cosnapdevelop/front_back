@@ -51,12 +51,52 @@ export function useTaskProcessing() {
       const regionConfig = getCurrentRegionConfig();
       formData.append('regionId', regionConfig.id);
       
+      // 添加Plus工作流支持
+      if (effect.isPlusWorkflow) {
+        formData.append('instanceType', 'plus');
+      }
+      
+      // 构建nodeInfoList
+      const nodeInfoList: any[] = [];
+      let imageIndex = 0;
+      
+      if (effect.nodeInfoTemplate) {
+        for (const template of effect.nodeInfoTemplate) {
+          const nodeInfo: any = {
+            nodeId: template.nodeId,
+            fieldName: template.fieldName
+          };
+          
+          if (template.fieldName === 'image') {
+            // 图片节点
+            if (imageIndex < imageParamFiles.length) {
+              nodeInfo.fileName = imageParamFiles[imageIndex].file.name;
+              imageIndex++;
+            }
+          } else if (template.fieldName === 'text') {
+            // 文本节点
+            const paramKey = template.paramKey;
+            if (paramKey && parameters[paramKey]) {
+              nodeInfo.text = parameters[paramKey];
+            }
+          }
+          
+          nodeInfoList.push(nodeInfo);
+        }
+      }
+      
+      // 添加nodeInfoList到formData
+      formData.append('nodeInfoList', JSON.stringify(nodeInfoList));
+      console.log('[任务处理] 构建的nodeInfoList:', nodeInfoList);
+      
+      // 添加用户输入的参数
       Object.entries(parameters).forEach(([key, value]) => {
         if (value) {
           formData.append(key, value as string);
         }
       });
       
+      // 添加图片文件
       imageParamFiles.forEach((fileInfo) => {
         if (fileInfo.file) {
           formData.append('images', fileInfo.file);
