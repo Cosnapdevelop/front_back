@@ -132,7 +132,7 @@ export const mockEffects: Effect[] = [
     name: '背景一键生成，风格迁移_放大_ic控光_F1修复',
     description: '全能型背景处理工作流，集成风格迁移、AI放大、IC控光、F1修复等多种技术，实现专业级背景生成与优化，适用于高质量图像制作。',
     author: mockUsers[0],
-    category: 'Professional',
+    category: 'Artistic',
     tags: ['background', 'generation', 'style-transfer', 'upscale', 'ic-light', 'flux', 'professional'],
     beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
     afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
