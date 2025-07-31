@@ -26,8 +26,12 @@ const upload = multer({
 router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
   try {
     console.log('[任务处理] 收到新的任务请求');
+    console.log('[任务处理] Headers:', req.headers);
     console.log('[任务处理] 请求体:', req.body);
     console.log('[任务处理] 文件数量:', req.files ? req.files.length : 0);
+    
+    // 设置响应头确保正确的内容类型
+    res.setHeader('Content-Type', 'application/json');
     
     const { workflowId, webappId, nodeInfoList, regionId = 'hongkong', instanceType } = req.body;
     
@@ -180,15 +184,30 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
       
     } catch (error) {
       console.error(`[${taskType}] ${taskType}任务启动失败:`, error);
-      res.status(500).json({
-        success: false,
-        error: `${taskType}任务启动失败: ` + error.message
-      });
+      console.error(`[${taskType}] 错误堆栈:`, error.stack);
+      
+      // 确保返回有效的JSON响应
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: `${taskType}任务启动失败: ` + error.message,
+          details: error.stack
+        });
+      }
     }
 
   } catch (error) {
     console.error('[任务处理] 处理任务请求失败:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('[任务处理] 错误堆栈:', error.stack);
+    
+    // 确保返回有效的JSON响应
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        details: error.stack
+      });
+    }
   }
 });
 
