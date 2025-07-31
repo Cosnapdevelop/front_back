@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
@@ -8,7 +9,9 @@
       "destination": "/index.html"
     }
   ],
-  "env": {
-    "VITE_API_BASE_URL": "https://cosnap-back.onrender.com"
+  "build": {
+    "env": {
+      "VITE_API_BASE_URL": "https://cosnap-back.onrender.com"
+    }
   }
 }
