@@ -152,10 +152,14 @@ const Navbar = () => {
         </div>
       )}
 
-      {/* 地区选择器 - 移动版（固定在顶部） */}
-      <div className="md:hidden fixed top-4 right-4 z-50">
-        <RegionSelector showDescription={false} />
-      </div>
+      {/* 地区选择器 - 移动版（在导航栏下方居中） */}
+      {!isDetailPage && (
+        <div className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+          <div className="flex justify-center">
+            <RegionSelector showDescription={false} />
+          </div>
+        </div>
+      )}
     </nav>
   );
 };
