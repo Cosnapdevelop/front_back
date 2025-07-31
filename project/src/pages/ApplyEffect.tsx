@@ -1,18 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Upload, 
   Download, 
-  Settings, 
   Play, 
   X, 
-  Check,
   AlertCircle,
   Image as ImageIcon,
-  Trash2,
-  Eye,
-  EyeOff,
   StopCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -25,11 +19,8 @@ const ApplyEffect = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string, name: string, size: number}>>([]);
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
   const [parameters, setParameters] = useState<Record<string, any>>({});
   const [imageParamFiles, setImageParamFiles] = useState<Record<string, {file?: File, url?: string, name?: string, size?: number, fileId?: string}>>({});
-  const [showImagePreview, setShowImagePreview] = useState(false);
-  const [previewImage, setPreviewImage] = useState<{url: string, name: string} | null>(null);
 
   // 简单的测试状态
   const [testState, setTestState] = useState('Component loaded');
@@ -44,8 +35,7 @@ const ApplyEffect = () => {
     isCancelled,
     activeTasks,
     processTask, 
-    cancelTask,
-    resetState
+    cancelTask
   } = useTaskProcessing();
 
   // 简单的测试函数
