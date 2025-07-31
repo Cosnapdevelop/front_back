@@ -243,6 +243,26 @@ const Effects = () => {
           <p className="text-gray-600 dark:text-gray-400">
             {filteredEffects.length} effect{filteredEffects.length !== 1 ? 's' : ''} found
           </p>
+          {/* 临时调试信息 */}
+          <div className="mt-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
+            <p><strong>调试信息:</strong></p>
+            <p>总效果数: {state.effects.length}</p>
+            <p>过滤后效果数: {filteredEffects.length}</p>
+            <p>当前类别: {state.selectedCategory}</p>
+            <p>搜索词: "{state.searchQuery}"</p>
+            <p>难度筛选: {selectedDifficulty}</p>
+            <p>排序方式: {sortBy}</p>
+            <div className="mt-2">
+              <strong>所有效果列表:</strong>
+              <ul className="list-disc list-inside mt-1">
+                {state.effects.map(effect => (
+                  <li key={effect.id} className={filteredEffects.includes(effect) ? 'text-green-600' : 'text-red-600'}>
+                    {effect.name} (类别: {effect.category}, 难度: {effect.difficulty})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
 
         {/* Effects Grid/List */}
