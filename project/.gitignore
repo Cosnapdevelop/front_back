@@ -34,3 +34,5 @@ dist-ssr
 *.key
 *.pem
 secrets.json
+
+.vercel

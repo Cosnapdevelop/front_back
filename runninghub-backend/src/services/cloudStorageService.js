@@ -2,16 +2,36 @@
 // 支持阿里云OSS、腾讯云COS、AWS S3等云存储服务
 
 import axios from 'axios';
+import OSS from 'ali-oss';
 
-// 模拟云存储配置（实际使用时需要配置真实的云存储服务）
+// 阿里云OSS配置
 const CLOUD_STORAGE_CONFIG = {
-  // 这里可以配置阿里云OSS、腾讯云COS或AWS S3
-  provider: 'mock', // 'aliyun-oss' | 'tencent-cos' | 'aws-s3' | 'mock'
-  endpoint: 'https://your-bucket.oss-cn-hangzhou.aliyuncs.com',
-  bucket: 'your-bucket-name',
-  accessKeyId: process.env.CLOUD_STORAGE_ACCESS_KEY,
-  accessKeySecret: process.env.CLOUD_STORAGE_SECRET_KEY,
-  region: 'cn-hangzhou'
+  provider: process.env.CLOUD_STORAGE_PROVIDER || 'mock',
+  
+  // 阿里云OSS配置
+  aliyunOSS: {
+    region: process.env.ALIYUN_OSS_REGION || 'oss-cn-hangzhou',
+    accessKeyId: process.env.ALIYUN_OSS_ACCESS_KEY_ID,
+    accessKeySecret: process.env.ALIYUN_OSS_ACCESS_KEY_SECRET,
+    bucket: process.env.ALIYUN_OSS_BUCKET || 'cosnap-storage',
+    // CDN域名（可选，用于加速访问）
+    customDomain: process.env.ALIYUN_OSS_CUSTOM_DOMAIN,
+  },
+  
+  // 其他云存储配置（备用）
+  tencentCOS: {
+    secretId: process.env.TENCENT_COS_SECRET_ID,
+    secretKey: process.env.TENCENT_COS_SECRET_KEY,
+    region: process.env.TENCENT_COS_REGION || 'ap-guangzhou',
+    bucket: process.env.TENCENT_COS_BUCKET || 'cosnap-storage',
+  },
+  
+  awsS3: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION || 'us-east-1',
+    bucket: process.env.AWS_S3_BUCKET || 'cosnap-storage',
+  }
 };
 
 /**
@@ -31,32 +51,31 @@ export async function uploadToCloudStorage(fileBuffer, fileName, mimeType) {
     const fileExtension = fileName.split('.').pop();
     const uniqueFileName = `cosnap/large-files/${timestamp}-${randomString}.${fileExtension}`;
     
-    if (CLOUD_STORAGE_CONFIG.provider === 'mock') {
-      // 模拟上传（开发测试用）
-      console.log(`[云存储] 模拟上传成功: ${uniqueFileName}`);
+    // 根据配置选择云存储服务商
+    switch (CLOUD_STORAGE_CONFIG.provider) {
+      case 'aliyun-oss':
+        return await uploadToAliyunOSS(fileBuffer, uniqueFileName, mimeType);
       
-      // 模拟延迟
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      case 'tencent-cos':
+        return await uploadToTencentCOS(fileBuffer, uniqueFileName, mimeType);
       
-      // 返回模拟的公开URL（实际使用时这里会是真实的云存储URL）
-      const mockPublicUrl = `https://mock-cdn.example.com/${uniqueFileName}`;
-      console.log(`[云存储] 模拟URL: ${mockPublicUrl}`);
+      case 'aws-s3':
+        return await uploadToAWSS3(fileBuffer, uniqueFileName, mimeType);
       
-      return mockPublicUrl;
+      case 'mock':
+      default:
+        // 模拟上传（开发测试用）
+        console.log(`[云存储] 模拟上传成功: ${uniqueFileName}`);
+        
+        // 模拟延迟
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 返回模拟的公开URL
+        const mockPublicUrl = `https://mock-cdn.example.com/${uniqueFileName}`;
+        console.log(`[云存储] 模拟URL: ${mockPublicUrl}`);
+        
+        return mockPublicUrl;
     }
-    
-    // 实际云存储上传逻辑
-    // 这里需要根据选择的云存储服务商实现具体的上传逻辑
-    
-    if (CLOUD_STORAGE_CONFIG.provider === 'aliyun-oss') {
-      return await uploadToAliyunOSS(fileBuffer, uniqueFileName, mimeType);
-    } else if (CLOUD_STORAGE_CONFIG.provider === 'tencent-cos') {
-      return await uploadToTencentCOS(fileBuffer, uniqueFileName, mimeType);
-    } else if (CLOUD_STORAGE_CONFIG.provider === 'aws-s3') {
-      return await uploadToAWSS3(fileBuffer, uniqueFileName, mimeType);
-    }
-    
-    throw new Error(`不支持的云存储提供商: ${CLOUD_STORAGE_CONFIG.provider}`);
     
   } catch (error) {
     console.error('[云存储] 上传失败:', error);
@@ -68,27 +87,50 @@ export async function uploadToCloudStorage(fileBuffer, fileName, mimeType) {
  * 上传到阿里云OSS
  */
 async function uploadToAliyunOSS(fileBuffer, fileName, mimeType) {
-  // 实现阿里云OSS上传逻辑
-  // 需要安装: npm install ali-oss
-  /*
-  const OSS = require('ali-oss');
-  const client = new OSS({
-    region: CLOUD_STORAGE_CONFIG.region,
-    accessKeyId: CLOUD_STORAGE_CONFIG.accessKeyId,
-    accessKeySecret: CLOUD_STORAGE_CONFIG.accessKeySecret,
-    bucket: CLOUD_STORAGE_CONFIG.bucket,
-  });
+  const config = CLOUD_STORAGE_CONFIG.aliyunOSS;
   
-  const result = await client.put(fileName, fileBuffer, {
-    headers: {
-      'Content-Type': mimeType,
-      'x-oss-object-acl': 'public-read'
+  // 检查必需的配置
+  if (!config.accessKeyId || !config.accessKeySecret) {
+    throw new Error('阿里云OSS配置不完整：缺少AccessKey信息');
+  }
+  
+  try {
+    console.log(`[阿里云OSS] 开始上传文件: ${fileName}`);
+    
+    // 创建OSS客户端
+    const client = new OSS({
+      region: config.region,
+      accessKeyId: config.accessKeyId,
+      accessKeySecret: config.accessKeySecret,
+      bucket: config.bucket,
+    });
+    
+    // 上传文件到OSS
+    const result = await client.put(fileName, fileBuffer, {
+      headers: {
+        'Content-Type': mimeType,
+        'x-oss-object-acl': 'public-read', // 设置为公开读
+        'Cache-Control': 'max-age=31536000', // 缓存1年
+      }
+    });
+    
+    // 构建公开访问URL
+    let publicUrl;
+    if (config.customDomain) {
+      // 使用自定义域名（CDN加速）
+      publicUrl = `https://${config.customDomain}/${fileName}`;
+    } else {
+      // 使用OSS默认域名
+      publicUrl = result.url.replace('http://', 'https://');
     }
-  });
-  
-  return result.url;
-  */
-  throw new Error('阿里云OSS功能需要配置后启用');
+    
+    console.log(`[阿里云OSS] 上传成功: ${publicUrl}`);
+    return publicUrl;
+    
+  } catch (error) {
+    console.error('[阿里云OSS] 上传失败:', error);
+    throw new Error(`阿里云OSS上传失败: ${error.message}`);
+  }
 }
 
 /**
