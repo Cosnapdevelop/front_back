@@ -90,13 +90,17 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
     
     const { workflowId, webappId, nodeInfoList, regionId = 'hongkong', instanceType } = req.body;
     
+    // 处理重复参数问题：如果webappId是数组，取第一个值
+    const cleanWebappId = Array.isArray(webappId) ? webappId[0] : webappId;
+    const cleanWorkflowId = Array.isArray(workflowId) ? workflowId[0] : workflowId;
+    
     // 判断任务类型 - 优先使用workflowId（ComfyUI）
-    const isComfyUI = workflowId && workflowId !== 'undefined' && workflowId !== '';
-    const isWebapp = webappId && webappId !== 'undefined' && webappId !== '' && !isComfyUI;
+    const isComfyUI = cleanWorkflowId && cleanWorkflowId !== 'undefined' && cleanWorkflowId !== '';
+    const isWebapp = cleanWebappId && cleanWebappId !== 'undefined' && cleanWebappId !== '' && !isComfyUI;
     
     console.log('[任务处理] 解析的参数:', {
-      workflowId,
-      webappId,
+      workflowId: cleanWorkflowId,
+      webappId: cleanWebappId,
       nodeInfoList,
       regionId,
       instanceType,
@@ -126,7 +130,7 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
       });
     }
     
-    const taskId = isComfyUI ? workflowId : webappId;
+    const taskId = isComfyUI ? cleanWorkflowId : cleanWebappId;
     const taskType = isComfyUI ? 'ComfyUI' : 'Webapp';
     
     console.log(`[${taskType}] 处理参数: taskId=${taskId}, regionId=${regionId}, 文件数量=${req.files.length}`);
@@ -263,9 +267,9 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
       
       let taskResult;
       if (isComfyUI) {
-        taskResult = await startComfyUITaskService(workflowId, updatedNodeInfoList, regionId, instanceType);
+        taskResult = await startComfyUITaskService(cleanWorkflowId, updatedNodeInfoList, regionId, instanceType);
       } else {
-        taskResult = await startWebappTaskService(webappId, updatedNodeInfoList, regionId);
+        taskResult = await startWebappTaskService(cleanWebappId, updatedNodeInfoList, regionId);
       }
       
       console.log(`[${taskType}] ${taskType}任务启动成功:`, taskResult);
@@ -396,9 +400,11 @@ router.post('/comfyui/status', async (req, res) => {
     console.log(`[状态查询] 查询任务状态: taskId=${taskId}, regionId=${regionId}`);
     
     // 智能判断任务类型 - 先尝试ComfyUI，再尝试Webapp
+    // 因为ComfyUI服务更稳定，优先使用ComfyUI服务
     let status;
+    
     try {
-      // 首先尝试ComfyUI服务（因为新的Cosnap任务都是ComfyUI）
+      // 首先尝试ComfyUI服务
       status = await getComfyUITaskStatus(taskId, regionId);
       console.log('[状态查询] 使用ComfyUI服务查询成功');
     } catch (error) {
@@ -415,7 +421,7 @@ router.post('/comfyui/status', async (req, res) => {
     
     res.json({
       success: true,
-      status: status.status // 提取status对象中的status字段
+      status: typeof status === 'string' ? status : status.status // 兼容字符串和对象格式
     });
     
   } catch (error) {
@@ -442,9 +448,11 @@ router.post('/comfyui/results', async (req, res) => {
     console.log(`[结果获取] 获取任务结果: taskId=${taskId}, regionId=${regionId}`);
     
     // 智能判断任务类型 - 先尝试ComfyUI，再尝试Webapp
+    // 因为ComfyUI服务更稳定，优先使用ComfyUI服务
     let results;
+    
     try {
-      // 首先尝试ComfyUI服务（因为新的Cosnap任务都是ComfyUI）
+      // 首先尝试ComfyUI服务
       results = await getComfyUITaskResult(taskId, regionId);
       console.log('[结果获取] 使用ComfyUI服务获取成功');
     } catch (error) {
@@ -501,6 +509,41 @@ router.post('/comfyui/cancel', async (req, res) => {
     
   } catch (error) {
     console.error('[ComfyUI] 取消任务失败:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// 重试任务接口
+router.post('/comfyui/retry', async (req, res) => {
+  try {
+    console.log('[ComfyUI] 收到重试任务请求');
+    
+    const { taskId, effectId, parameters, regionId = 'hongkong' } = req.body;
+    
+    if (!taskId || !effectId || !parameters) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '缺少必要参数：taskId, effectId, parameters' 
+      });
+    }
+    
+    console.log(`[ComfyUI] 开始重试任务: taskId=${taskId}, effectId=${effectId}, regionId=${regionId}`);
+    
+    // 这里可以添加重试逻辑
+    // 由于重试实际上是重新创建任务，我们可以返回成功状态
+    // 前端会重新调用 apply 接口
+    
+    res.json({ 
+      success: true, 
+      message: '重试请求已接收，请重新提交任务',
+      data: { taskId, effectId }
+    });
+    
+  } catch (error) {
+    console.error('[ComfyUI] 重试任务失败:', error);
     res.status(500).json({ 
       success: false, 
       error: error.message 
