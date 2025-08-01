@@ -1,4 +1,5 @@
 import { getCurrentRegionConfig } from './regions';
+import { createError, errorUtils } from '../types/errors';
 
 // API配置文件 - 支持开发和生产环境
 const isDevelopment = import.meta.env.DEV;
@@ -24,6 +25,8 @@ export function getRunningHubApiUrl(): string {
     const currentRegion = getCurrentRegionConfig();
     return currentRegion.apiDomain;
   } catch (error) {
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    errorUtils.logError(errorObj, '获取RunningHub API URL');
     // 如果localStorage不可用（服务器端渲染），返回默认值
     return 'https://www.runninghub.ai';
   }
@@ -60,6 +63,8 @@ export const ENV_INFO = {
     try {
       return getCurrentRegionConfig();
     } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '获取当前地区配置');
       return {
         id: 'hongkong',
         name: '香港/澳门/台湾',

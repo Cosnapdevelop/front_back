@@ -1,3 +1,5 @@
+import { createError, errorUtils } from '../types/errors';
+
 // 地区配置
 export interface RegionConfig {
   id: string;
@@ -40,6 +42,8 @@ function getLocalStorageItem(key: string, defaultValue: string): string {
     }
     return defaultValue;
   } catch (error) {
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    errorUtils.logError(errorObj, '获取localStorage');
     return defaultValue;
   }
 }
@@ -51,7 +55,8 @@ function setLocalStorageItem(key: string, value: string): void {
       window.localStorage.setItem(key, value);
     }
   } catch (error) {
-    console.warn('无法访问localStorage:', error);
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    errorUtils.logError(errorObj, '设置localStorage');
   }
 }
 
@@ -70,6 +75,7 @@ export function setRegion(regionId: string): void {
       window.dispatchEvent(new CustomEvent('regionChanged', { detail: regionId }));
     }
   } catch (error) {
-    console.warn('无法触发地区更改事件:', error);
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+    errorUtils.logError(errorObj, '触发地区更改事件');
   }
 }
