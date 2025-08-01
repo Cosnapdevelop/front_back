@@ -43,13 +43,6 @@ export function useTaskProcessing() {
     try {
       const formData = new FormData();
       
-      if (effect.workflowId) {
-        formData.append('workflowId', effect.workflowId);
-      }
-      if (effect.webappId) {
-        formData.append('webappId', effect.webappId.toString());
-      }
-      
       const regionConfig = getCurrentRegionConfig();
       formData.append('regionId', regionConfig.id);
       
