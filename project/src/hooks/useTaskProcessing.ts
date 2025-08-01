@@ -136,6 +136,12 @@ export function useTaskProcessing() {
         
         taskManagementService.addTask(taskInfo);
         
+        // 同步到本地的activeTasks状态
+        setState(prev => ({
+          ...prev,
+          activeTasks: new Map(prev.activeTasks).set(result.taskId, taskInfo)
+        }));
+        
         // 立即在图片库中创建占位图片
         const placeholderImage = {
           taskId: result.taskId,
@@ -222,45 +228,69 @@ export function useTaskProcessing() {
                   // 更新图片库中的图片
                   imageLibraryService.updateImageStatus(imageId, 'completed', 100, processedResults[0]);
                   
-                  setState(prev => ({
-                    ...prev,
-                    isProcessing: false,
-                    status: 'completed',
-                    progress: 100,
-                    results: processedResults
-                  }));
+                  // 从activeTasks中移除已完成的任务
+                  setState(prev => {
+                    const newActiveTasks = new Map(prev.activeTasks);
+                    newActiveTasks.delete(taskId);
+                    return {
+                      ...prev,
+                      isProcessing: false,
+                      status: 'completed',
+                      progress: 100,
+                      results: processedResults,
+                      activeTasks: newActiveTasks
+                    };
+                  });
                 } else {
                   taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '未获取到有效结果');
                   imageLibraryService.updateImageStatus(imageId, 'failed');
                   
-                  setState(prev => ({
-                    ...prev,
-                    isProcessing: false,
-                    status: 'failed',
-                    error: '未获取到有效结果'
-                  }));
+                  // 从activeTasks中移除失败的任务
+                  setState(prev => {
+                    const newActiveTasks = new Map(prev.activeTasks);
+                    newActiveTasks.delete(taskId);
+                    return {
+                      ...prev,
+                      isProcessing: false,
+                      status: 'failed',
+                      error: '未获取到有效结果',
+                      activeTasks: newActiveTasks
+                    };
+                  });
                 }
               } else {
                 taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '获取结果失败');
                 imageLibraryService.updateImageStatus(imageId, 'failed');
                 
-                setState(prev => ({
-                  ...prev,
-                  isProcessing: false,
-                  status: 'failed',
-                  error: '获取结果失败'
-                }));
+                // 从activeTasks中移除失败的任务
+                setState(prev => {
+                  const newActiveTasks = new Map(prev.activeTasks);
+                  newActiveTasks.delete(taskId);
+                  return {
+                    ...prev,
+                    isProcessing: false,
+                    status: 'failed',
+                    error: '获取结果失败',
+                    activeTasks: newActiveTasks
+                  };
+                });
               }
             } catch (error) {
               taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '获取结果失败');
               imageLibraryService.updateImageStatus(imageId, 'failed');
               
-              setState(prev => ({
-                ...prev,
-                isProcessing: false,
-                status: 'failed',
-                error: '获取结果失败'
-              }));
+              // 从activeTasks中移除失败的任务
+              setState(prev => {
+                const newActiveTasks = new Map(prev.activeTasks);
+                newActiveTasks.delete(taskId);
+                return {
+                  ...prev,
+                  isProcessing: false,
+                  status: 'failed',
+                  error: '获取结果失败',
+                  activeTasks: newActiveTasks
+                };
+              });
             }
             
             clearInterval(pollInterval);
@@ -269,12 +299,18 @@ export function useTaskProcessing() {
             taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '任务处理失败');
             imageLibraryService.updateImageStatus(imageId, 'failed');
             
-            setState(prev => ({
-              ...prev,
-              isProcessing: false,
-              status: 'failed',
-              error: '任务处理失败'
-            }));
+            // 从activeTasks中移除失败的任务
+            setState(prev => {
+              const newActiveTasks = new Map(prev.activeTasks);
+              newActiveTasks.delete(taskId);
+              return {
+                ...prev,
+                isProcessing: false,
+                status: 'failed',
+                error: '任务处理失败',
+                activeTasks: newActiveTasks
+              };
+            });
             clearInterval(pollInterval);
             return;
           } else {
@@ -290,12 +326,18 @@ export function useTaskProcessing() {
         console.error(`[轮询] 第${attempts}次轮询失败:`, error);
         
         if (attempts >= maxAttempts) {
-          setState(prev => ({
-            ...prev,
-            isProcessing: false,
-            status: 'failed',
-            error: '任务处理超时'
-          }));
+          // 从activeTasks中移除超时的任务
+          setState(prev => {
+            const newActiveTasks = new Map(prev.activeTasks);
+            newActiveTasks.delete(taskId);
+            return {
+              ...prev,
+              isProcessing: false,
+              status: 'failed',
+              error: '任务处理超时',
+              activeTasks: newActiveTasks
+            };
+          });
           clearInterval(pollInterval);
         }
       }
@@ -310,21 +352,33 @@ export function useTaskProcessing() {
         body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id })
       });
 
-      setState(prev => ({
-        ...prev,
-        isProcessing: false,
-        status: 'cancelled',
-        error: null,
-        isCancelled: true
-      }));
+      // 从activeTasks中移除已取消的任务
+      setState(prev => {
+        const newActiveTasks = new Map(prev.activeTasks);
+        newActiveTasks.delete(taskId);
+        return {
+          ...prev,
+          isProcessing: false,
+          status: 'cancelled',
+          error: null,
+          isCancelled: true,
+          activeTasks: newActiveTasks
+        };
+      });
     } catch (error) {
-      setState(prev => ({
-        ...prev,
-        isProcessing: false,
-        status: 'cancelled',
-        error: null,
-        isCancelled: true
-      }));
+      // 即使取消失败，也从activeTasks中移除任务
+      setState(prev => {
+        const newActiveTasks = new Map(prev.activeTasks);
+        newActiveTasks.delete(taskId);
+        return {
+          ...prev,
+          isProcessing: false,
+          status: 'cancelled',
+          error: null,
+          isCancelled: true,
+          activeTasks: newActiveTasks
+        };
+      });
     }
   }, []);
 
