@@ -10,13 +10,17 @@ import {
   X,
   Share2,
   StopCircle,
-  Loader2
+  Loader2,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { GeneratedImage } from '../types';
 import imageLibraryService, { ExtendedGeneratedImage } from '../services/imageLibraryService';
 import { useImageLibrary } from '../hooks/useImageLibrary';
 import { getCurrentRegionConfig } from '../config/regions';
+import { taskManagementService, TaskStatus } from '../services/taskManagementService';
+import { LoadingSpinner, TaskStatusIndicator } from '../components/LoadingSpinner';
 
 const ImageLibrary = () => {
   const navigate = useNavigate();
@@ -84,40 +88,47 @@ const ImageLibrary = () => {
       return;
     }
 
+    if (!window.confirm('确定要取消这个任务吗？取消后无法恢复。')) {
+      return;
+    }
+
     try {
       console.log(`[ImageLibrary] 开始取消任务: taskId=${image.taskId}`);
       
-      const currentRegion = getCurrentRegionConfig();
-      const requestBody = {
-        taskId: image.taskId,
-        regionId: currentRegion.id
-      };
-      
-      const response = await fetch('/api/effects/comfyui/cancel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log(`[ImageLibrary] 取消任务成功: taskId=${image.taskId}`, responseData);
-        
-        // 更新图片状态为已取消
+      const success = await taskManagementService.cancelTask(image.taskId);
+      if (success) {
+        // 更新本地图片状态
         imageLibraryService.updateImageStatus(image.id, 'cancelled');
-        
-        // 刷新图片库
-        setImages(imageLibraryService.getGeneratedImages());
+        loadImages(); // 重新加载图片列表
       } else {
-        const errorData = await response.json();
-        console.error(`[ImageLibrary] 取消任务失败: taskId=${image.taskId}`, errorData);
-        alert('取消任务失败: ' + (errorData.error || '服务器错误'));
+        alert('取消任务失败，请重试');
       }
     } catch (error) {
-      console.error(`[ImageLibrary] 取消任务异常: taskId=${image.taskId}`, error);
-      alert('取消任务失败: ' + (error instanceof Error ? error.message : '未知错误'));
+      console.error('[ImageLibrary] 取消任务异常:', error);
+      alert('取消任务时发生错误，请重试');
+    }
+  };
+
+  const handleRetryTask = async (image: ExtendedGeneratedImage) => {
+    if (!image.taskId) {
+      console.error('[ImageLibrary] 图片没有taskId，无法重试');
+      return;
+    }
+
+    try {
+      console.log(`[ImageLibrary] 开始重试任务: taskId=${image.taskId}`);
+      
+      const success = await taskManagementService.retryTask(image.taskId);
+      if (success) {
+        // 更新本地图片状态
+        imageLibraryService.updateImageStatus(image.id, 'processing');
+        loadImages(); // 重新加载图片列表
+      } else {
+        alert('重试任务失败，请重试');
+      }
+    } catch (error) {
+      console.error('[ImageLibrary] 重试任务异常:', error);
+      alert('重试任务时发生错误，请重试');
     }
   };
 
@@ -241,88 +252,145 @@ const ImageLibrary = () => {
                 transition={{ delay: index * 0.1 }}
                 className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden"
               >
-                {/* Image */}
+                {/* Image Container */}
                 <div className="relative aspect-square overflow-hidden">
                   {image.status === 'processing' ? (
-                    // 处理中状态
-                    <div className="w-full h-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                    // 处理中状态 - 改进的加载动画
+                    <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center">
                       <div className="text-center">
-                        <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 dark:text-gray-400">处理中...</p>
+                        <LoadingSpinner 
+                          size="lg" 
+                          color="primary" 
+                          text="AI处理中..."
+                          progress={image.progress}
+                        />
                         {image.progress !== undefined && (
-                          <div className="mt-2 w-16 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto">
+                          <div className="mt-3 w-24 h-2 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto overflow-hidden">
                             <div 
-                              className="h-1 bg-blue-500 rounded-full transition-all duration-300"
+                              className="h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500 ease-out"
                               style={{ width: `${image.progress}%` }}
                             ></div>
                           </div>
                         )}
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          预计剩余时间: {image.progress ? Math.max(1, Math.round((100 - image.progress) / 10)) : '3-5'} 分钟
+                        </p>
+                      </div>
+                    </div>
+                  ) : image.status === 'pending' ? (
+                    // 等待中状态
+                    <div className="w-full h-full bg-gradient-to-br from-yellow-50 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/20 flex items-center justify-center">
+                      <div className="text-center">
+                        <LoadingSpinner 
+                          size="lg" 
+                          color="secondary" 
+                          text="等待处理..."
+                        />
+                        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                          排队中，请稍候
+                        </p>
                       </div>
                     </div>
                   ) : image.status === 'failed' ? (
-                    // 失败状态
-                    <div className="w-full h-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+                    // 失败状态 - 改进的错误显示
+                    <div className="w-full h-full bg-gradient-to-br from-red-50 to-pink-100 dark:from-red-900/20 dark:to-pink-900/20 flex items-center justify-center">
                       <div className="text-center">
-                        <X className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                        <p className="text-sm text-red-600 dark:text-red-400">处理失败</p>
+                        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
+                          处理失败
+                        </p>
+                        {image.errorMessage && (
+                          <p className="text-xs text-red-500 dark:text-red-400 mb-3 px-2">
+                            {image.errorMessage}
+                          </p>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRetryTask(image);
+                          }}
+                          className="px-3 py-1 text-xs bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors flex items-center mx-auto"
+                        >
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          重试
+                        </button>
                       </div>
                     </div>
                   ) : image.status === 'cancelled' ? (
                     // 已取消状态
-                    <div className="w-full h-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                    <div className="w-full h-full bg-gradient-to-br from-gray-50 to-slate-100 dark:from-gray-800 dark:to-slate-800 flex items-center justify-center">
                       <div className="text-center">
-                        <StopCircle className="w-8 h-8 text-gray-500 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600 dark:text-gray-400">已取消</p>
+                        <StopCircle className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                          已取消
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          任务已被用户取消
+                        </p>
                       </div>
                     </div>
                   ) : (
-                    // 正常图片
-                    <img
-                      src={image.url}
-                      alt={image.effectName}
-                      className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                      onClick={() => handlePreview(image)}
-                      onError={(e) => {
-                        console.error('[ImageLibrary] 图片加载失败:', image.url);
-                        // 图片加载失败时显示错误状态
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent) {
-                          parent.innerHTML = `
-                            <div class="w-full h-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                              <div class="text-center">
-                                <ImageIcon class="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                <p class="text-sm text-gray-500 dark:text-gray-400">图片加载失败</p>
-                                <button 
-                                  class="mt-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                                  onclick="window.open('${image.url}', '_blank')"
-                                >
-                                  在新窗口打开
-                                </button>
+                    // 正常图片 - 添加状态指示器
+                    <div className="relative w-full h-full">
+                      <img
+                        src={image.url}
+                        alt={image.effectName}
+                        className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                        onClick={() => handlePreview(image)}
+                        onError={(e) => {
+                          console.error('[ImageLibrary] 图片加载失败:', image.url);
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                                <div class="text-center">
+                                  <ImageIcon class="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                  <p class="text-sm text-gray-500 dark:text-gray-400">图片加载失败</p>
+                                  <button 
+                                    class="mt-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    onclick="window.open('${image.url}', '_blank')"
+                                  >
+                                    在新窗口打开
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          `;
-                        }
-                      }}
-                      onLoad={() => {
-                        console.log('[ImageLibrary] 图片加载成功:', image.url);
-                      }}
-                    />
+                            `;
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log('[ImageLibrary] 图片加载成功:', image.url);
+                        }}
+                      />
+                    </div>
                   )}
                   
+                  {/* 操作按钮 */}
                   <div className="absolute top-2 right-2 flex space-x-1">
-                    {image.status === 'processing' ? (
-                      // 处理中显示取消按钮
+                    {image.status === 'processing' || image.status === 'pending' ? (
+                      // 处理中/等待中显示取消按钮
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCancelTask(image);
                         }}
-                        className="p-1.5 bg-red-500 hover:bg-red-600 rounded-full transition-colors"
+                        className="p-1.5 bg-red-500 hover:bg-red-600 rounded-full transition-colors shadow-lg"
                         title="取消任务"
                       >
                         <StopCircle className="w-4 h-4 text-white" />
+                      </button>
+                    ) : image.status === 'failed' ? (
+                      // 失败状态显示重试按钮
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRetryTask(image);
+                        }}
+                        className="p-1.5 bg-blue-500 hover:bg-blue-600 rounded-full transition-colors shadow-lg"
+                        title="重试任务"
+                      >
+                        <RefreshCw className="w-4 h-4 text-white" />
                       </button>
                     ) : image.status === 'completed' ? (
                       // 完成状态显示正常按钮
@@ -332,7 +400,7 @@ const ImageLibrary = () => {
                             e.stopPropagation();
                             handlePreview(image);
                           }}
-                          className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+                          className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors shadow-lg"
                           title="预览"
                         >
                           <Eye className="w-4 h-4 text-white" />
@@ -342,7 +410,7 @@ const ImageLibrary = () => {
                             e.stopPropagation();
                             handleDownload(image);
                           }}
-                          className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+                          className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full transition-colors shadow-lg"
                           title="下载"
                         >
                           <Download className="w-4 h-4 text-white" />
@@ -350,12 +418,13 @@ const ImageLibrary = () => {
                       </>
                     ) : null}
                     
+                    {/* 删除按钮 - 所有状态都显示 */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDelete(image.id);
                       }}
-                      className="p-1.5 bg-black/50 hover:bg-red-600 rounded-full transition-colors"
+                      className="p-1.5 bg-black/50 hover:bg-red-600 rounded-full transition-colors shadow-lg"
                       title="删除"
                     >
                       <Trash2 className="w-4 h-4 text-white" />
@@ -365,9 +434,17 @@ const ImageLibrary = () => {
 
                 {/* Info */}
                 <div className="p-4">
-                  <h3 className="font-medium text-gray-900 dark:text-white mb-1 truncate">
-                    {image.effectName}
-                  </h3>
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-medium text-gray-900 dark:text-white truncate flex-1">
+                      {image.effectName}
+                    </h3>
+                    {/* 状态指示器 */}
+                    <TaskStatusIndicator 
+                      status={image.status as any} 
+                      progress={image.progress}
+                      className="ml-2 flex-shrink-0"
+                    />
+                  </div>
                   <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
                     <Calendar className="w-4 h-4 mr-1" />
                     {formatDate(image.createdAt)}
@@ -386,92 +463,45 @@ const ImageLibrary = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
             onClick={() => setShowPreview(false)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
+              initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-gray-800 rounded-lg overflow-hidden"
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="relative max-w-4xl max-h-full"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Close Button */}
+              <img
+                src={selectedImage.url}
+                alt={selectedImage.effectName}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+              
+              {/* Close button */}
               <button
                 onClick={() => setShowPreview(false)}
-                className="absolute top-4 right-4 z-10 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
+                className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
               >
-                <X className="w-5 h-5 text-white" />
+                <X className="w-6 h-6" />
               </button>
-
-              {/* Image */}
-              <div className="relative">
-                <img
-                  src={selectedImage.url}
-                  alt={selectedImage.effectName}
-                  className="w-full h-auto max-h-[70vh] object-contain"
-                />
-              </div>
-
-              {/* Info */}
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                      {selectedImage.effectName}
-                    </h2>
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {formatDate(selectedImage.createdAt)}
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleShare(selectedImage)}
-                      className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      <Share2 className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDownload(selectedImage)}
-                      className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      <Download className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleDelete(selectedImage.id);
-                        setShowPreview(false);
-                      }}
-                      className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Parameters */}
-                {Object.keys(selectedImage.parameters).length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      使用参数
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {Object.entries(selectedImage.parameters).map(([key, value]) => (
-                        <div key={key} className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">{key}:</span>
-                          <span className="text-gray-900 dark:text-white font-medium">
-                            {typeof value === 'string' && value.length > 20 
-                              ? `${value.substring(0, 20)}...` 
-                              : String(value)
-                            }
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              
+              {/* Download button */}
+              <button
+                onClick={() => handleDownload(selectedImage)}
+                className="absolute top-4 right-16 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
+              >
+                <Download className="w-6 h-6" />
+              </button>
+              
+              {/* Share button */}
+              <button
+                onClick={() => handleShare(selectedImage)}
+                className="absolute top-4 right-28 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
+              >
+                <Share2 className="w-6 h-6" />
+              </button>
             </motion.div>
           </motion.div>
         )}

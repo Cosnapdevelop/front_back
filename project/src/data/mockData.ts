@@ -183,6 +183,40 @@ export const mockEffects: Effect[] = [
       { nodeId: '84', fieldName: 'image', paramKey: 'image_84' },
       { nodeId: '257', fieldName: 'text', paramKey: 'prompt_257' }
     ]
+  },
+  // 一键去除人物还原背景
+  {
+    id: 'remove-person-restore-background',
+    name: '一键去除人物还原背景',
+    description: '智能人物去除与背景还原技术，自动识别并移除图片中的人物，同时智能生成或还原原始背景，适用于产品展示、场景重建等应用场景。',
+    author: mockUsers[0],
+    category: 'Artistic',
+    tags: ['person-removal', 'background-restoration', 'AI', 'inpainting', 'scene-reconstruction'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 634,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-05-01',
+    difficulty: 'Advanced',
+    processingTime: '3-5 minutes',
+    webappId: '1904892320519475201', // 从API调用中获取的webappId
+    isWebapp: true, // 标记为AI应用任务
+    isTrending: true,
+    parameters: [
+      { name: 'image_65', type: 'image', description: '上传包含人物的图片（要处理的原始图片）' },
+      { name: 'prompt_842', type: 'text', default: 'human', description: '人物识别提示词（用于识别要移除的人物类型）' },
+      { name: 'text_799', type: 'text', default: 'empty scene blur', description: '背景描述提示词（描述期望的背景场景）' },
+      { name: 'text_800', type: 'text', default: 'person,woman,man,boy,girl,human', description: '人物类型识别词（用于精确识别要移除的人物）' },
+      { name: 'text_825', type: 'text', default: '', description: '额外背景描述（可选，用于更精确的背景生成）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '65', fieldName: 'image', paramKey: 'image_65' },      // 输入图片
+      { nodeId: '842', fieldName: 'prompt', paramKey: 'prompt_842' },  // 人物识别提示词
+      { nodeId: '799', fieldName: 'text', paramKey: 'text_799' },      // 背景描述
+      { nodeId: '800', fieldName: 'text', paramKey: 'text_800' },      // 人物类型识别
+      { nodeId: '825', fieldName: 'text', paramKey: 'text_825' }       // 额外背景描述
+    ]
   }
 ];
 

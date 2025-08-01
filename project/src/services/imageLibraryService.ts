@@ -5,7 +5,7 @@ const MAX_IMAGES = 10;
 
 // 扩展图片类型，支持处理中状态
 export interface ExtendedGeneratedImage extends GeneratedImage {
-  status?: 'processing' | 'completed' | 'failed' | 'cancelled';
+  status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
   taskId?: string;
   progress?: number;
 }
@@ -78,7 +78,7 @@ class ImageLibraryService {
     }
   }
 
-  // 添加新生成的图片（完成状态）
+  // 添加新生成的图片（支持自定义状态）
   addGeneratedImage(image: Omit<GeneratedImage, 'id' | 'createdAt'>): void {
     try {
       const images = this.getGeneratedImages();
@@ -86,7 +86,7 @@ class ImageLibraryService {
         ...image,
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         createdAt: new Date().toISOString(),
-        status: 'completed'
+        status: (image as any).status || 'completed' // 使用传入的状态，默认为completed
       };
 
       // 添加到开头（最新的在前面）

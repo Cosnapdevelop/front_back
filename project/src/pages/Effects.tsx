@@ -17,6 +17,13 @@ const Effects = () => {
   const filteredEffects = useMemo(() => {
     let filtered = state.effects;
 
+    // 调试信息：打印所有特效
+    console.log('[Effects页面] 所有特效数量:', state.effects.length);
+    console.log('[Effects页面] 所有特效名称:', state.effects.map(e => e.name));
+    console.log('[Effects页面] 当前类别:', state.selectedCategory);
+    console.log('[Effects页面] 当前难度:', selectedDifficulty);
+    console.log('[Effects页面] 搜索词:', state.searchQuery);
+
     // Filter by search query
     if (state.searchQuery) {
       filtered = filtered.filter(effect =>
@@ -50,6 +57,9 @@ const Effects = () => {
       default:
         break;
     }
+
+    console.log('[Effects页面] 过滤后特效数量:', filtered.length);
+    console.log('[Effects页面] 过滤后特效名称:', filtered.map(e => e.name));
 
     return filtered;
   }, [state.effects, state.searchQuery, state.selectedCategory, selectedDifficulty, sortBy]);

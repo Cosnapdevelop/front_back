@@ -1,6 +1,8 @@
 ﻿import { useState, useCallback } from 'react';
 import { getCurrentRegionConfig } from '../config/regions';
 import { API_BASE_URL } from '../config/api';
+import { taskManagementService, TaskStatus } from '../services/taskManagementService';
+import imageLibraryService from '../services/imageLibraryService';
 
 export interface TaskProcessingState {
   isProcessing: boolean;
@@ -83,6 +85,17 @@ export function useTaskProcessing() {
         }
       }
       
+      // 根据任务类型添加相应的ID
+      if (effect.isWebapp && effect.webappId) {
+        formData.append('webappId', effect.webappId);
+        console.log('[任务处理] 使用webappId:', effect.webappId);
+      } else if (effect.workflowId) {
+        formData.append('workflowId', effect.workflowId);
+        console.log('[任务处理] 使用workflowId:', effect.workflowId);
+      } else {
+        throw new Error('缺少workflowId或webappId配置');
+      }
+      
       // 添加nodeInfoList到formData
       formData.append('nodeInfoList', JSON.stringify(nodeInfoList));
       console.log('[任务处理] 构建的nodeInfoList:', nodeInfoList);
@@ -115,7 +128,36 @@ export function useTaskProcessing() {
 
       if (result.success && result.taskId) {
         console.log('[任务处理] 收到taskId:', result.taskId);
-        startPollingTask(result.taskId);
+        
+        // 创建任务信息并添加到任务管理服务
+        const taskInfo = {
+          taskId: result.taskId,
+          effectId: effect.id,
+          effectName: effect.name,
+          status: TaskStatus.PENDING,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          progress: 0,
+          parameters: { ...parameters, imageParamFiles }
+        };
+        
+        taskManagementService.addTask(taskInfo);
+        
+        // 立即在图片库中创建占位图片
+        const placeholderImage = {
+          taskId: result.taskId,
+          effectId: effect.id,
+          effectName: effect.name,
+          progress: 0,
+          url: '', // 暂时为空
+          parameters: parameters
+        };
+        
+        // 使用 addProcessingImage 方法，确保状态正确
+        const imageId = imageLibraryService.addProcessingImage(placeholderImage, result.taskId);
+        
+        // 开始轮询任务状态
+        startPollingTask(result.taskId, imageId);
         setState(prev => ({ ...prev, progress: 25 }));
       } else {
         throw new Error(result.error || '任务创建失败');
@@ -131,7 +173,7 @@ export function useTaskProcessing() {
     }
   }, []);
 
-  const startPollingTask = useCallback((taskId: string) => {
+  const startPollingTask = useCallback((taskId: string, imageId: string) => {
     let attempts = 0;
     const maxAttempts = 120;
     
@@ -153,9 +195,14 @@ export function useTaskProcessing() {
 
         if (result.success) {
           const status = result.status;
-          console.log(`[轮询] 任务状态: ${status}`);
+          const progress = result.progress || 0;
+          console.log(`[轮询] 任务状态: ${status}, 进度: ${progress}%`);
           
-          if (status === 'SUCCESS' || status === 'success' || status === 'COMPLETED' || status === 'completed') {
+          // 更新任务管理服务中的状态
+          if (status === 'RUNNING' || status === 'running') {
+            taskManagementService.updateTaskStatus(taskId, TaskStatus.PROCESSING, progress);
+            imageLibraryService.updateImageStatus(imageId, 'processing', progress);
+          } else if (status === 'SUCCESS' || status === 'success' || status === 'COMPLETED' || status === 'completed') {
             console.log('[轮询] 任务完成，开始获取结果');
             
             try {
@@ -176,6 +223,12 @@ export function useTaskProcessing() {
                     return result;
                   });
                   
+                  // 更新任务管理服务
+                  taskManagementService.updateTaskStatus(taskId, TaskStatus.COMPLETED, 100, undefined, processedResults);
+                  
+                  // 更新图片库中的图片
+                  imageLibraryService.updateImageStatus(imageId, 'completed', 100, processedResults[0]);
+                  
                   setState(prev => ({
                     ...prev,
                     isProcessing: false,
@@ -184,6 +237,9 @@ export function useTaskProcessing() {
                     results: processedResults
                   }));
                 } else {
+                  taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '未获取到有效结果');
+                  imageLibraryService.updateImageStatus(imageId, 'failed');
+                  
                   setState(prev => ({
                     ...prev,
                     isProcessing: false,
@@ -192,6 +248,9 @@ export function useTaskProcessing() {
                   }));
                 }
               } else {
+                taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '获取结果失败');
+                imageLibraryService.updateImageStatus(imageId, 'failed');
+                
                 setState(prev => ({
                   ...prev,
                   isProcessing: false,
@@ -200,6 +259,9 @@ export function useTaskProcessing() {
                 }));
               }
             } catch (error) {
+              taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '获取结果失败');
+              imageLibraryService.updateImageStatus(imageId, 'failed');
+              
               setState(prev => ({
                 ...prev,
                 isProcessing: false,
@@ -211,6 +273,9 @@ export function useTaskProcessing() {
             clearInterval(pollInterval);
             return;
           } else if (status === 'FAILED' || status === 'failed' || status === 'ERROR' || status === 'error') {
+            taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '任务处理失败');
+            imageLibraryService.updateImageStatus(imageId, 'failed');
+            
             setState(prev => ({
               ...prev,
               isProcessing: false,
@@ -220,7 +285,11 @@ export function useTaskProcessing() {
             clearInterval(pollInterval);
             return;
           } else {
+            // 更新进度
             const progressValue = Math.min(25 + (attempts * 2), 90);
+            taskManagementService.updateTaskStatus(taskId, TaskStatus.PROCESSING, progressValue);
+            imageLibraryService.updateImageStatus(imageId, 'processing', progressValue);
+            
             setState(prev => ({ ...prev, progress: progressValue }));
           }
         }

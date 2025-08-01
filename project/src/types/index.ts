@@ -30,6 +30,7 @@ export interface Effect {
   webappId?: string; // Webapp ID
   isTrending?: boolean;
   isPlusWorkflow?: boolean; // 标记是否为Plus工作流
+  isWebapp?: boolean; // 标记是否为AI应用任务
 }
 
 export interface EffectParameter {
