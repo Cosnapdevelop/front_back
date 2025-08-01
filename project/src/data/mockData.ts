@@ -217,6 +217,39 @@ export const mockEffects: Effect[] = [
       { nodeId: '800', fieldName: 'text', paramKey: 'text_800' },      // 人物类型识别
       { nodeId: '825', fieldName: 'text', paramKey: 'text_825' }       // 额外背景描述
     ]
+  },
+  // 高级图像处理工作流 - 多节点复杂处理
+  {
+    id: 'advanced-image-processing-workflow',
+    name: '高级图像处理工作流 - 多节点复杂处理',
+    description: '专业级图像处理工作流，集成VAE加载、图像缩放、风格模型、CLIP视觉、ControlNet、深度处理、颜色匹配等多种先进技术，适用于高质量图像生成和处理。',
+    author: mockUsers[2],
+    category: 'Professional',
+    tags: ['advanced', 'image-processing', 'vae', 'clip', 'controlnet', 'depth', 'color-matching', 'flux', 'professional'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 445,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-05-15',
+    difficulty: 'Expert',
+    processingTime: '8-12 minutes',
+    workflowId: '1951208640185311234', // 你提供的workflowId
+    isTrending: false,
+    parameters: [
+      { name: 'image_4', type: 'image', description: '上传主要输入图片（要处理的主体图片）' },
+      { name: 'image_5', type: 'image', description: '上传辅助输入图片（用于对比或参考的图片）' },
+      { name: 'prompt_396', type: 'text', default: 'MAN,', description: '主要提示词（描述要生成的内容）' },
+      { name: 'text_1171', type: 'text', default: 'Follow the perspective from right.', description: '视角指导提示词（描述图像视角和方向）' },
+      { name: 'seed_587', type: 'text', default: '679932141276277', description: '随机种子（控制生成结果的随机性）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '4', fieldName: 'image', paramKey: 'image_4' },        // LoadImage 节点 - 主要输入图片
+      { nodeId: '5', fieldName: 'image', paramKey: 'image_5' },        // LoadImage 节点 - 辅助输入图片
+      { nodeId: '396', fieldName: 'prompt', paramKey: 'prompt_396' },  // RH_Translator 节点 - 主要提示词
+      { nodeId: '1171', fieldName: 'text', paramKey: 'text_1171' },    // Text 节点 - 视角指导
+      { nodeId: '587', fieldName: 'seed', paramKey: 'seed_587' }       // EasySeed 节点 - 随机种子
+    ]
   }
 ];
 
