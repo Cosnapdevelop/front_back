@@ -1,187 +1,154 @@
-// API客户端工具类 - 统一错误处理、重试机制和请求拦截
+import { API_BASE_URL } from '../config/api';
 
-export interface ApiError extends Error {
-  status?: number;
-  response?: Response;
-  isRetryable?: boolean;
-}
-
-export interface RequestConfig {
-  timeout?: number;
-  retries?: number;
-  retryDelay?: number;
-  retryCondition?: (error: ApiError) => boolean;
-}
-
-const DEFAULT_CONFIG: Required<RequestConfig> = {
-  timeout: 30000, // 30秒
-  retries: 3,
+// 重试配置
+const RETRY_CONFIG = {
+  maxRetries: 3,
   retryDelay: 1000, // 1秒
-  retryCondition: (error: ApiError) => {
-    // 网络错误或服务器错误可重试
-    return !error.status || error.status >= 500 || error.status === 408;
-  }
+  timeout: 30000, // 30秒
 };
 
-/**
- * 延迟函数
- */
-function delay(ms: number): Promise<void> {
+// 延迟函数
+export const delay = (ms: number): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
+};
 
-/**
- * 指数退避算法
- */
-function calculateBackoffDelay(attempt: number, baseDelay: number): number {
-  return Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 1000, 30000);
-}
-
-/**
- * 创建带超时的fetch请求
- */
-function fetchWithTimeout(url: string, options: RequestInit, timeout: number): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-      reject(new Error(`Request timeout after ${timeout}ms`));
-    }, timeout);
-
-    fetch(url, {
-      ...options,
-      signal: controller.signal
-    })
-      .then(resolve)
-      .catch(reject)
-      .finally(() => clearTimeout(timeoutId));
-  });
-}
-
-/**
- * 带重试机制的API请求
- */
-export async function apiRequest<T = any>(
-  url: string,
-  options: RequestInit = {},
-  config: RequestConfig = {}
-): Promise<T> {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
-  let lastError: ApiError;
-
-  for (let attempt = 0; attempt <= finalConfig.retries; attempt++) {
-    try {
-      console.log(`[API请求] 尝试 ${attempt + 1}/${finalConfig.retries + 1}: ${url}`);
-
-      const response = await fetchWithTimeout(url, options, finalConfig.timeout);
-      
-      if (!response.ok) {
-        const error: ApiError = new Error(`HTTP ${response.status}: ${response.statusText}`);
-        error.status = response.status;
-        error.response = response;
-        error.isRetryable = finalConfig.retryCondition(error);
-        throw error;
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (contentType?.includes('application/json')) {
-        return await response.json();
-      } else {
-        return response as any;
-      }
-
-    } catch (error) {
-      lastError = error as ApiError;
-      
-      console.warn(`[API请求] 第${attempt + 1}次尝试失败:`, lastError.message);
-
-      // 如果是最后一次尝试或错误不可重试，直接抛出
-      if (attempt === finalConfig.retries || !finalConfig.retryCondition(lastError)) {
-        break;
-      }
-
-      // 计算退避延迟
-      const delayMs = calculateBackoffDelay(attempt, finalConfig.retryDelay);
-      console.log(`[API请求] ${delayMs}ms后进行第${attempt + 2}次重试...`);
-      await delay(delayMs);
-    }
-  }
-
-  console.error(`[API请求] 所有重试均失败，URL: ${url}`);
-  throw lastError;
-}
-
-/**
- * GET请求
- */
-export function apiGet<T = any>(url: string, config?: RequestConfig): Promise<T> {
-  return apiRequest<T>(url, { method: 'GET' }, config);
-}
-
-/**
- * POST请求
- */
-export function apiPost<T = any>(
+// 带重试的fetch包装器
+export async function fetchWithRetry(
   url: string, 
-  data?: any, 
-  config?: RequestConfig
-): Promise<T> {
-  const options: RequestInit = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  };
-
-  if (data) {
-    if (data instanceof FormData) {
-      // FormData不需要设置Content-Type
-      delete options.headers;
-      options.body = data;
-    } else {
-      options.body = JSON.stringify(data);
+  options: RequestInit = {}, 
+  retryConfig = RETRY_CONFIG
+): Promise<Response> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= retryConfig.maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), retryConfig.timeout);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // 如果响应成功，直接返回
+      if (response.ok) {
+        return response;
+      }
+      
+      // 如果是客户端错误（4xx），不重试
+      if (response.status >= 400 && response.status < 500) {
+        return response;
+      }
+      
+      // 服务器错误（5xx）或网络错误，继续重试
+      lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+      
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+      
+      // 如果是AbortError（超时），不重试
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('请求超时');
+      }
+    }
+    
+    // 如果不是最后一次尝试，等待后重试
+    if (attempt < retryConfig.maxRetries) {
+      const delayTime = retryConfig.retryDelay * Math.pow(2, attempt); // 指数退避
+      console.log(`[API] 第${attempt + 1}次请求失败，${delayTime}ms后重试:`, lastError?.message);
+      await delay(delayTime);
     }
   }
-
-  return apiRequest<T>(url, options, config);
+  
+  throw lastError!;
 }
 
-/**
- * 上传文件的POST请求（更长的超时时间）
- */
-export function apiUpload<T = any>(
-  url: string,
-  formData: FormData,
-  config?: RequestConfig
+// 统一的API错误处理
+export class APIError extends Error {
+  constructor(
+    message: string,
+    public status?: number,
+    public code?: string,
+    public details?: any
+  ) {
+    super(message);
+    this.name = 'APIError';
+  }
+}
+
+// 处理API响应
+export async function handleAPIResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let errorData: any = {};
+    try {
+      errorData = await response.json();
+    } catch {
+      // 如果无法解析JSON，使用状态文本
+      errorData = { message: response.statusText };
+    }
+    
+    throw new APIError(
+      errorData.error || errorData.message || `HTTP ${response.status}`,
+      response.status,
+      errorData.code,
+      errorData
+    );
+  }
+  
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new APIError('响应解析失败', response.status);
+  }
+}
+
+// 通用的API调用函数
+export async function apiCall<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  retryConfig = RETRY_CONFIG
 ): Promise<T> {
-  const uploadConfig: RequestConfig = {
-    timeout: 180000, // 3分钟超时
-    retries: 2, // 减少重试次数（上传通常不需要太多重试）
-    retryDelay: 2000,
-    ...config
-  };
-
-  return apiRequest<T>(url, {
-    method: 'POST',
-    body: formData
-  }, uploadConfig);
+  const url = `${API_BASE_URL}${endpoint}`;
+  
+  try {
+    const response = await fetchWithRetry(url, options, retryConfig);
+    return await handleAPIResponse<T>(response);
+  } catch (error) {
+    if (error instanceof APIError) {
+      throw error;
+    }
+    throw new APIError(error instanceof Error ? error.message : '网络请求失败');
+  }
 }
 
-/**
- * 健康检查请求（快速失败）
- */
-export function healthCheck(url: string): Promise<any> {
-  return apiRequest(url, { method: 'GET' }, {
-    timeout: 5000,
-    retries: 1,
-    retryDelay: 500
-  });
-}
-
-export default {
-  request: apiRequest,
-  get: apiGet,
-  post: apiPost,
-  upload: apiUpload,
-  healthCheck
+// 任务相关的API调用
+export const taskAPI = {
+  // 获取任务状态
+  async getStatus(taskId: string, regionId: string) {
+    return apiCall('/api/effects/comfyui/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, regionId })
+    });
+  },
+  
+  // 获取任务结果
+  async getResults(taskId: string, regionId: string) {
+    return apiCall('/api/effects/comfyui/results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, regionId })
+    });
+  },
+  
+  // 取消任务
+  async cancelTask(taskId: string, regionId: string) {
+    return apiCall('/api/effects/comfyui/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, regionId })
+    });
+  }
 };

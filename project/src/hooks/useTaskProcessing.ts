@@ -1,4 +1,4 @@
-﻿import { useState, useCallback } from 'react';
+﻿import { useState, useCallback, useEffect, useRef } from 'react';
 import { getCurrentRegionConfig } from '../config/regions';
 import { API_BASE_URL } from '../config/api';
 import { taskManagementService, TaskStatus } from '../services/taskManagementService';
@@ -26,6 +26,17 @@ const initialState: TaskProcessingState = {
 
 export function useTaskProcessing() {
   const [state, setState] = useState<TaskProcessingState>(initialState);
+  const activeIntervalsRef = useRef<Set<number>>(new Set());
+  
+  // 组件卸载时清理所有轮询
+  useEffect(() => {
+    return () => {
+      activeIntervalsRef.current.forEach(interval => {
+        clearInterval(interval);
+      });
+      activeIntervalsRef.current.clear();
+    };
+  }, []);
 
   const processTask = useCallback(async (effect: any, parameters: any, imageParamFiles: any[]) => {
     console.log('[任务处理] 开始处理任务:', { effect, parameters, imageParamFiles });
@@ -175,8 +186,16 @@ export function useTaskProcessing() {
   const startPollingTask = useCallback((taskId: string, imageId: string) => {
     let attempts = 0;
     const maxAttempts = 120;
+    let isPollingActive = true; // 添加轮询状态控制
     
     const pollInterval = setInterval(async () => {
+      // 添加到活跃轮询集合
+      activeIntervalsRef.current.add(pollInterval);
+      // 检查轮询是否应该继续
+      if (!isPollingActive) {
+        clearInterval(pollInterval);
+        return;
+      }
       attempts++;
       console.log(`[轮询] 第${attempts}次轮询: taskId=${taskId}`);
       
@@ -293,7 +312,9 @@ export function useTaskProcessing() {
               });
             }
             
+            isPollingActive = false;
             clearInterval(pollInterval);
+            activeIntervalsRef.current.delete(pollInterval);
             return;
           } else if (status === 'FAILED' || status === 'failed' || status === 'ERROR' || status === 'error') {
             taskManagementService.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '任务处理失败');
@@ -311,7 +332,9 @@ export function useTaskProcessing() {
                 activeTasks: newActiveTasks
               };
             });
+            isPollingActive = false;
             clearInterval(pollInterval);
+            activeIntervalsRef.current.delete(pollInterval);
             return;
           } else {
             // 更新进度
@@ -338,7 +361,9 @@ export function useTaskProcessing() {
               activeTasks: newActiveTasks
             };
           });
+          isPollingActive = false;
           clearInterval(pollInterval);
+          activeIntervalsRef.current.delete(pollInterval);
         }
       }
     }, 5000);
