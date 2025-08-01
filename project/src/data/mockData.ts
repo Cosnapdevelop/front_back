@@ -218,11 +218,11 @@ export const mockEffects: Effect[] = [
       { nodeId: '825', fieldName: 'text', paramKey: 'text_825' }       // 额外背景描述
     ]
   },
-  // 高级图像处理工作流 - 多节点复杂处理
+  // Cosnap换背景置换参考背景
   {
-    id: 'advanced-image-processing-workflow',
-    name: '高级图像处理工作流 - 多节点复杂处理',
-    description: '专业级图像处理工作流，集成VAE加载、图像缩放、风格模型、CLIP视觉、ControlNet、深度处理、颜色匹配等多种先进技术，适用于高质量图像生成和处理。',
+    id: 'cosnap-background-replacement-reference',
+    name: 'Cosnap换背景置换参考背景',
+    description: '专业级背景置换工作流，集成VAE加载、图像缩放、风格模型、CLIP视觉、ControlNet、深度处理、颜色匹配等多种先进技术，支持参考背景图片进行智能背景置换，适用于高质量图像处理。',
     author: mockUsers[2],
     category: 'Professional',
     tags: ['advanced', 'image-processing', 'vae', 'clip', 'controlnet', 'depth', 'color-matching', 'flux', 'professional'],
