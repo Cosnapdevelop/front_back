@@ -168,4 +168,51 @@ console.log('[Effects页面] 所有特效名称:', state.effects.map(e => e.name
 **记录人**: AI Assistant  
 **记录时间**: 2025-08-01  
 **问题状态**: ✅ 已解决  
-**影响范围**: 前端特效显示功能 
+**影响范围**: 前端特效显示功能
+
+---
+
+## ⏱️ **轮询配置说明**
+
+### 轮询间隔设置
+**根据 RunningHub 网站管理员推荐，所有轮询间隔已设置为 5 秒**
+
+#### 前端轮询配置
+**文件**: `project/src/hooks/useTaskProcessing.ts`
+```typescript
+const pollInterval = setInterval(async () => {
+  // 轮询逻辑
+}, 5000); // 5秒间隔
+```
+
+#### 后端轮询配置
+**文件**: `runninghub-backend/src/services/webappTaskService.js`
+```javascript
+const interval = 5000; // 5秒轮询一次
+await new Promise(resolve => setTimeout(resolve, interval));
+```
+
+**文件**: `runninghub-backend/src/services/comfyUITaskService.js`
+```javascript
+async function waitForComfyUITaskAndGetImages(taskId, { 
+  interval = 5000, // 5秒间隔
+  maxAttempts = 150, 
+  regionId = DEFAULT_REGION 
+} = {}) {
+  // 轮询逻辑
+}
+```
+
+### 轮询配置验证
+- ✅ **前端**: 5秒间隔 (`setInterval(..., 5000)`)
+- ✅ **后端 Webapp**: 5秒间隔 (`interval = 5000`)
+- ✅ **后端 ComfyUI**: 5秒间隔 (`interval = 5000`)
+
+### 管理员建议
+**RunningHub 网站管理员明确建议**: 
+- 轮询间隔设置为 5 秒
+- 避免过于频繁的请求
+- 确保服务器负载合理
+
+**更新时间**: 2025-08-01  
+**配置状态**: ✅ 已按管理员建议配置 
