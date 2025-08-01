@@ -208,7 +208,7 @@ export const mockEffects: Effect[] = [
       { name: 'prompt_842', type: 'text', default: 'human', description: '人物识别提示词（用于识别要移除的人物类型）' },
       { name: 'text_799', type: 'text', default: 'empty scene blur', description: '背景描述提示词（描述期望的背景场景）' },
       { name: 'text_800', type: 'text', default: 'person,woman,man,boy,girl,human', description: '人物类型识别词（用于精确识别要移除的人物）' },
-      { name: 'text_825', type: 'text', default: '', description: '额外背景描述（可选，用于更精确的背景生成）' }
+      { name: 'text_825', type: 'text', default: 'empty scene', description: '额外背景描述（可选，用于更精确的背景生成）' }
     ],
     nodeInfoTemplate: [
       { nodeId: '65', fieldName: 'image', paramKey: 'image_65' },      // 输入图片
