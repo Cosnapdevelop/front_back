@@ -143,6 +143,7 @@ export const mockEffects: Effect[] = [
     processingTime: '3-5 minutes',
     workflowId: '1950585019234455554', // Plus工作流ID
     isPlusWorkflow: true, // 标记为Plus工作流
+    isHidden: true, // 隐藏该效果
     isTrending: false,
     parameters: [
       { name: 'image_24', type: 'image', description: '上传主体图片（要处理的原始图片）' },

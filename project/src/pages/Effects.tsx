@@ -17,8 +17,12 @@ const Effects = () => {
   const filteredEffects = useMemo(() => {
     let filtered = state.effects;
 
+    // 过滤掉隐藏的效果
+    filtered = filtered.filter(effect => !effect.isHidden);
+
     // 调试信息：打印所有特效
     console.log('[Effects页面] 所有特效数量:', state.effects.length);
+    console.log('[Effects页面] 过滤隐藏后特效数量:', filtered.length);
     console.log('[Effects页面] 所有特效名称:', state.effects.map(e => e.name));
     console.log('[Effects页面] 当前类别:', state.selectedCategory);
     console.log('[Effects页面] 当前难度:', selectedDifficulty);
@@ -213,7 +217,7 @@ const Effects = () => {
 
         {/* Trending Effects */}
         {(() => {
-          const trendingEffects = state.effects.filter(effect => effect.isTrending);
+          const trendingEffects = state.effects.filter(effect => effect.isTrending && !effect.isHidden);
           if (trendingEffects.length > 0) {
             return (
               <div className="mb-12">
