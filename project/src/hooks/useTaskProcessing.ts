@@ -3,6 +3,7 @@ import { getCurrentRegionConfig } from '../config/regions';
 import { API_BASE_URL } from '../config/api';
 import { taskManagementService, TaskStatus } from '../services/taskManagementService';
 import imageLibraryService from '../services/imageLibraryService';
+import { createError, errorUtils, ErrorCode } from '../types/errors';
 
 export interface TaskProcessingState {
   isProcessing: boolean;
@@ -97,7 +98,7 @@ export function useTaskProcessing() {
         formData.append('workflowId', effect.workflowId);
         console.log('[任务处理] 使用workflowId:', effect.workflowId);
       } else {
-        throw new Error('缺少workflowId或webappId配置');
+        throw createError.config('缺少workflowId或webappId配置', 'effect.config');
       }
       
       // 添加nodeInfoList到formData
@@ -124,7 +125,7 @@ export function useTaskProcessing() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw createError.api(`HTTP ${response.status}: ${response.statusText}`, response.status);
       }
 
       const result = await response.json();
@@ -170,15 +171,16 @@ export function useTaskProcessing() {
         startPollingTask(result.taskId, imageId);
         setState(prev => ({ ...prev, progress: 25 }));
       } else {
-        throw new Error(result.error || '任务创建失败');
+        throw createError.task(result.error || '任务创建失败', ErrorCode.TASK_CREATION_FAILED);
       }
     } catch (error) {
-      console.error('[任务处理] 错误:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '任务处理');
       setState(prev => ({
         ...prev,
         isProcessing: false,
         status: 'failed',
-        error: error instanceof Error ? error.message : '未知错误'
+        error: errorUtils.getUserMessage(errorObj)
       }));
     }
   }, []);
@@ -206,7 +208,7 @@ export function useTaskProcessing() {
           body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id })
         });
 
-        if (!response.ok) throw new Error('状态查询失败');
+        if (!response.ok) throw createError.task('状态查询失败', ErrorCode.TASK_STATUS_FAILED, taskId);
 
         const result = await response.json();
         console.log('[轮询] 状态查询结果:', result);
@@ -346,7 +348,8 @@ export function useTaskProcessing() {
           }
         }
       } catch (error) {
-        console.error(`[轮询] 第${attempts}次轮询失败:`, error);
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        errorUtils.logError(errorObj, `轮询第${attempts}次`);
         
         if (attempts >= maxAttempts) {
           // 从activeTasks中移除超时的任务
@@ -357,7 +360,7 @@ export function useTaskProcessing() {
               ...prev,
               isProcessing: false,
               status: 'failed',
-              error: '任务处理超时',
+              error: errorUtils.getUserMessage(createError.task('任务处理超时', ErrorCode.TASK_TIMEOUT, taskId)),
               activeTasks: newActiveTasks
             };
           });
@@ -391,6 +394,9 @@ export function useTaskProcessing() {
         };
       });
     } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '取消任务');
+      
       // 即使取消失败，也从activeTasks中移除任务
       setState(prev => {
         const newActiveTasks = new Map(prev.activeTasks);

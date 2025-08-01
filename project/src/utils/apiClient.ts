@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api';
+import { createError, errorUtils, APIError as BaseAPIError, TimeoutError, NetworkError } from '../types/errors';
 
 // 重试配置
 const RETRY_CONFIG = {
@@ -50,7 +51,7 @@ export async function fetchWithRetry(
       
       // 如果是AbortError（超时），不重试
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('请求超时');
+        throw createError.timeout('请求超时');
       }
     }
     
@@ -62,19 +63,23 @@ export async function fetchWithRetry(
     }
   }
   
-  throw lastError!;
+  // 将普通错误转换为网络错误
+  if (lastError instanceof Error) {
+    throw createError.network(lastError.message, true, { originalError: lastError });
+  }
+  throw createError.unknown('未知网络错误');
 }
 
-// 统一的API错误处理
-export class APIError extends Error {
+// 统一的API错误处理 - 使用新的错误类型系统
+export class APIError extends BaseAPIError {
   constructor(
     message: string,
-    public status?: number,
-    public code?: string,
-    public details?: any
+    status?: number,
+    apiCode?: string,
+    retryable = false,
+    details?: any
   ) {
-    super(message);
-    this.name = 'APIError';
+    super(message, status, apiCode, retryable, details);
   }
 }
 
@@ -89,10 +94,12 @@ export async function handleAPIResponse<T>(response: Response): Promise<T> {
       errorData = { message: response.statusText };
     }
     
+    const isRetryable = response.status >= 500 || response.status === 408;
     throw new APIError(
       errorData.error || errorData.message || `HTTP ${response.status}`,
       response.status,
       errorData.code,
+      isRetryable,
       errorData
     );
   }
@@ -119,7 +126,10 @@ export async function apiCall<T>(
     if (error instanceof APIError) {
       throw error;
     }
-    throw new APIError(error instanceof Error ? error.message : '网络请求失败');
+    if (error instanceof BaseError) {
+      throw error;
+    }
+    throw createError.network(error instanceof Error ? error.message : '网络请求失败', true, { originalError: error });
   }
 }
 

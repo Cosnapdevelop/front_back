@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../config/api';
+import { createError, errorUtils, ErrorCode } from '../types/errors';
 
 // 任务状态枚举
 export enum TaskStatus {
@@ -97,11 +98,13 @@ class TaskManagementService {
         console.log(`[任务管理] 任务取消成功: ${taskId}`);
         return true;
       } else {
-        console.error(`[任务管理] 任务取消失败: ${taskId}`, response.statusText);
+        const error = createError.task(`任务取消失败: ${response.statusText}`, ErrorCode.TASK_CANCELLATION_FAILED, taskId);
+        errorUtils.logError(error, '任务管理');
         return false;
       }
     } catch (error) {
-      console.error(`[任务管理] 任务取消异常: ${taskId}`, error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '任务管理');
       return false;
     }
   }
@@ -110,7 +113,8 @@ class TaskManagementService {
   async retryTask(taskId: string): Promise<boolean> {
     const task = this.activeTasks.get(taskId);
     if (!task || task.status !== TaskStatus.FAILED) {
-      console.error(`[任务管理] 无法重试任务: ${taskId}`, task?.status);
+      const error = createError.task(`无法重试任务: ${taskId}`, ErrorCode.TASK_CREATION_FAILED, taskId);
+      errorUtils.logError(error, '任务管理');
       return false;
     }
 
@@ -136,12 +140,14 @@ class TaskManagementService {
         return true;
       } else {
         this.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '重试失败');
-        console.error(`[任务管理] 任务重试失败: ${taskId}`, response.statusText);
+        const error = createError.task(`任务重试失败: ${response.statusText}`, ErrorCode.TASK_CREATION_FAILED, taskId);
+        errorUtils.logError(error, '任务管理');
         return false;
       }
     } catch (error) {
       this.updateTaskStatus(taskId, TaskStatus.FAILED, undefined, '重试异常');
-      console.error(`[任务管理] 任务重试异常: ${taskId}`, error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '任务管理');
       return false;
     }
   }

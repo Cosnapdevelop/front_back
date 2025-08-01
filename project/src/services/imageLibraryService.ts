@@ -1,4 +1,5 @@
 import { GeneratedImage } from '../types';
+import { createError, errorUtils } from '../types/errors';
 
 const STORAGE_KEY = 'generated_images';
 const MAX_IMAGES = 10;
@@ -17,7 +18,8 @@ class ImageLibraryService {
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.error('Error loading generated images:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '加载图片库');
       return [];
     }
   }
@@ -49,7 +51,8 @@ class ImageLibraryService {
       
       return newImage.id;
     } catch (error) {
-      console.error('Error saving processing image:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '保存处理中图片');
       return '';
     }
   }
@@ -74,7 +77,8 @@ class ImageLibraryService {
         window.dispatchEvent(new CustomEvent('imageLibraryUpdate'));
       }
     } catch (error) {
-      console.error('Error updating image status:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '更新图片状态');
     }
   }
 
@@ -101,7 +105,8 @@ class ImageLibraryService {
       // 触发自定义事件通知其他组件
       window.dispatchEvent(new CustomEvent('imageLibraryUpdate'));
     } catch (error) {
-      console.error('Error saving generated image:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '保存生成图片');
     }
   }
 
@@ -114,7 +119,8 @@ class ImageLibraryService {
       // 触发自定义事件通知其他组件
       window.dispatchEvent(new CustomEvent('imageLibraryUpdate'));
     } catch (error) {
-      console.error('Error removing generated image:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '删除图片');
     }
   }
 
@@ -125,7 +131,8 @@ class ImageLibraryService {
       // 触发自定义事件通知其他组件
       window.dispatchEvent(new CustomEvent('imageLibraryUpdate'));
     } catch (error) {
-      console.error('Error clearing generated images:', error);
+      const errorObj = error instanceof Error ? error : new Error(String(error));
+      errorUtils.logError(errorObj, '清空图片库');
     }
   }
 
