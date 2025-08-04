@@ -253,6 +253,27 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
             });
           }
         }
+      } else if (nodeInfo.fieldName === 'select') {
+        // select节点 - 查找对应的参数
+        const paramKey = nodeInfo.paramKey;
+        if (paramKey && req.body[paramKey] !== undefined) {
+          const updatedNode = {
+            ...nodeInfo,
+            fieldValue: parseInt(req.body[paramKey]) // select值需要转换为整数
+          };
+          console.log(`[${taskType}] 更新select节点 ${index}:`, {
+            nodeId: nodeInfo.nodeId,
+            paramKey: paramKey,
+            fieldValue: parseInt(req.body[paramKey])
+          });
+          return updatedNode;
+        } else {
+          console.warn(`[${taskType}] select节点 ${index} 缺少参数:`, {
+            nodeId: nodeInfo.nodeId,
+            paramKey: paramKey,
+            bodyParams: Object.keys(req.body)
+          });
+        }
       }
       
       return nodeInfo;

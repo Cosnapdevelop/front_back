@@ -91,13 +91,24 @@ export const mockEffects: Effect[] = [
     // ⚠️ 重要：参数配置
     // 📋 parameters: 定义前端表单参数，用于用户输入
     // - name: 参数键名，必须与 nodeInfoTemplate 中的 paramKey 对应
-    // - type: 参数类型（'image' 或 'text'）
+    // - type: 参数类型（'image' 或 'text' 或 'select'）
     // - description: 用户界面显示的描述
     // - default: 默认值（可选）
+    // - options: 选择项（当type为'select'时使用）
     parameters: [
       { name: 'image_240', type: 'image', description: '上传原始图片（要换背景的主体图片）' },
       { name: 'image_284', type: 'image', description: '上传背景参考图（想要的背景风格参考）' },
-      { name: 'prompt_279', type: 'text', default: 'describe the style of the image and atmosphere of the image in two sentence. start your answer with Change the background to', description: 'LLM提示词指令（如何描述背景变换）' }
+      { name: 'prompt_279', type: 'text', default: 'describe the style of the image and atmosphere of the image in two sentence. start your answer with Change the background to', description: 'LLM提示词指令（如何描述背景变换）' },
+      { 
+        name: 'select_351', 
+        type: 'select', 
+        default: '2',
+        description: '背景处理模式选择',
+        options: [
+          { value: '1', label: '适合场照大面积更改背景' },
+          { value: '2', label: '适合外景小程度修改背景' }
+        ]
+      }
     ],
     
     // ⚠️ 重要：nodeInfoTemplate 配置
@@ -122,7 +133,8 @@ export const mockEffects: Effect[] = [
     nodeInfoTemplate: [
       { nodeId: '240', fieldName: 'image', paramKey: 'image_240' },  // LoadImage 节点 - 主体图片
       { nodeId: '284', fieldName: 'image', paramKey: 'image_284' },  // LoadImage 节点 - 背景参考图
-      { nodeId: '279', fieldName: 'prompt', paramKey: 'prompt_279' } // 文本提示词节点
+      { nodeId: '279', fieldName: 'prompt', paramKey: 'prompt_279' }, // 文本提示词节点
+      { nodeId: '351', fieldName: 'select', paramKey: 'select_351' }  // Switch节点 - 背景处理模式选择
     ]
   },
   // Cosnap强控制力改 - Plus工作流版本
