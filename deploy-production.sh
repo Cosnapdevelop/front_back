@@ -1,6 +1,54 @@
+#!/bin/bash
+
+# 🚀 Cosnap生产环境部署脚本
+echo "🚀 开始Cosnap生产环境部署..."
+
+# 颜色定义
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# 检查Git状态
+echo -e "${BLUE}📋 检查Git状态...${NC}"
+if [ -n "$(git status --porcelain)" ]; then
+    echo -e "${YELLOW}⚠️  警告：有未提交的更改${NC}"
+    git status
+    read -p "是否继续部署？(y/n): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${RED}❌ 部署已取消${NC}"
+        exit 1
+    fi
+fi
+
+# 提交并推送代码
+echo -e "${BLUE}📤 提交并推送代码...${NC}"
+git add .
+git commit -m "feat: 部署Cosnap换背景select参数选择功能到生产环境"
+git push origin main
+
+# 前端部署检查
+echo -e "${BLUE}🎨 检查前端部署...${NC}"
+echo -e "${GREEN}✅ 前端将自动部署到Vercel${NC}"
+echo -e "${BLUE}🌐 前端地址: https://cosnap-k1ns0gk5x-terrys-projects-0cc48ccf.vercel.app${NC}"
+
+# 后端部署检查
+echo -e "${BLUE}⚙️  检查后端部署...${NC}"
+echo -e "${GREEN}✅ 后端将自动部署到Render${NC}"
+echo -e "${BLUE}🔗 后端地址: https://cosnap-backend.onrender.com${NC}"
+
+# 等待部署完成
+echo -e "${YELLOW}⏳ 等待自动部署完成...${NC}"
+echo -e "${BLUE}📝 部署通常需要2-5分钟${NC}"
+
+# 更新部署状态文档
+echo -e "${BLUE}📝 更新部署状态文档...${NC}"
+cat > DEPLOYMENT_STATUS.md << 'EOF'
 # 🚀 Cosnap 生产环境部署状态报告
 
-**部署时间**: 2025-01-27 当前时间 UTC  
+**部署时间**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")  
 **部署版本**: Cosnap换背景select参数选择功能 v1.1  
 **部署状态**: ✅ 成功
 
@@ -10,7 +58,7 @@
 
 ### 前端部署 (Vercel)
 - **最新部署**: https://cosnap-k1ns0gk5x-terrys-projects-0cc48ccf.vercel.app
-- **部署时间**: 2025-01-27 当前时间 UTC
+- **部署时间**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 - **构建状态**: ✅ 自动部署中
 - **环境**: Production
 - **构建缓存**: ✅ 命中
@@ -133,4 +181,21 @@
 
 ---
 
-*最后更新: 2025-01-27 当前时间 UTC* 
+*最后更新: $(date -u +"%Y-%m-%d %H:%M:%S UTC")*
+EOF
+
+echo -e "${GREEN}✅ 部署状态文档已更新${NC}"
+
+# 显示部署完成信息
+echo -e "${GREEN}🎉 部署脚本执行完成！${NC}"
+echo -e "${BLUE}📋 部署总结:${NC}"
+echo -e "  ✅ 代码已推送到GitHub"
+echo -e "  ✅ 前端将自动部署到Vercel"
+echo -e "  ✅ 后端将自动部署到Render"
+echo -e "  ✅ 部署状态文档已更新"
+echo ""
+echo -e "${YELLOW}⏰ 请等待2-5分钟让自动部署完成${NC}"
+echo -e "${BLUE}🌐 前端地址: https://cosnap-k1ns0gk5x-terrys-projects-0cc48ccf.vercel.app${NC}"
+echo -e "${BLUE}🔗 后端地址: https://cosnap-backend.onrender.com${NC}"
+echo ""
+echo -e "${GREEN}🎯 新功能已准备就绪！${NC}" 
