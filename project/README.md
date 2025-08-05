@@ -22,9 +22,19 @@
 - **修复前**：`fieldValue: parseFloat(value)` ❌
 - **修复后**：`fieldValue: String(value)` ✅
 
+#### 3. workflowId 字符串类型修复
+
+**RunningHub API要求workflowId必须是字符串类型**
+
+这个修复解决了ComfyUI工作流启动失败的问题。
+
+- **修复前**：`workflowId: workflowId` ❌ (可能是数字类型)
+- **修复后**：`workflowId: String(workflowId)` ✅ (确保字符串类型)
+
 #### 相关文件
 - `runninghub-backend/src/services/webappTaskService.js` - webappId修复
 - `runninghub-backend/src/routes/effects.js` - fieldValue类型修复
+- `runninghub-backend/src/services/comfyUITaskService.js` - workflowId字符串类型修复
 - `runninghub-backend/test-all-effects.js` - 测试脚本
 - `src/data/mockData.ts` - 前端特效配置
 - `RunningHub-API-Fix.md` - 详细修复文档

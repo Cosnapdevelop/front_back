@@ -1,5 +1,29 @@
 # RunningHub API 修复文档
 
+## ⚠️ 关键修复点：参数类型转换
+
+**RunningHub API 严格要求所有参数都必须是字符串类型！**
+
+### 修复前的问题
+- `workflowId` 没有转换为字符串类型
+- `fieldValue` 数值型参数没有转换为字符串
+- 导致 `APIKEY_INVALID_NODE_INFO` 错误
+
+### 修复后的正确做法
+```javascript
+// ✅ 正确的参数传递
+requestBody = {
+  apiKey: apiKey,
+  workflowId: String(workflowId), // ⚠️ 必须转换为字符串！
+  nodeInfoList: nodeInfoList.map(item => ({
+    nodeId: String(item.nodeId), // ⚠️ 必须转换为字符串！
+    fieldName: String(item.fieldName), // ⚠️ 必须转换为字符串！
+    fieldValue: String(item.fieldValue) // ⚠️ 必须转换为字符串！
+  })),
+  addMetadata: true
+};
+```
+
 ## 问题描述
 
 在使用"Cosnap重新打光"特效时出现 `APIKEY_INVALID_NODE_INFO` 错误，原因是 `fieldValue` 参数类型不正确。

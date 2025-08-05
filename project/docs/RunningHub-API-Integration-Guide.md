@@ -1,5 +1,25 @@
 # RunningHub API 集成指南
 
+## ⚠️ 重要提醒：参数类型要求
+
+**RunningHub API 严格要求所有参数都必须是字符串类型！**
+
+- `workflowId`: 必须是字符串
+- `nodeId`: 必须是字符串  
+- `fieldName`: 必须是字符串
+- `fieldValue`: 必须是字符串（即使数值型参数也要转换）
+
+**错误示例：**
+```javascript
+// ❌ 错误 - 数字类型
+workflowId: 1952448857223442433
+fieldValue: 0.5
+
+// ✅ 正确 - 字符串类型
+workflowId: "1952448857223442433"
+fieldValue: "0.5"
+```
+
 ## 概述
 
 本文档详细说明了如何正确集成RunningHub API，特别是ComfyUI任务的处理流程和常见问题解决方案。
