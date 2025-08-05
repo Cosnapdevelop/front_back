@@ -83,6 +83,8 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
     console.log('[任务处理] 收到新的任务请求');
     console.log('[任务处理] Headers:', req.headers);
     console.log('[任务处理] 请求体:', req.body);
+    console.log('[任务处理] 请求体参数详情:', Object.keys(req.body).map(key => `${key}: ${req.body[key]} (类型: ${typeof req.body[key]})`));
+    console.log('[任务处理] 完整的请求体:', JSON.stringify(req.body, null, 2));
     console.log('[任务处理] 文件数量:', req.files ? req.files.length : 0);
     
     // 设置响应头确保正确的内容类型
@@ -274,9 +276,69 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
             bodyParams: Object.keys(req.body)
           });
         }
+      } else {
+        // 处理其他类型的字段（如shape, X_offset, Y_offset, scale, rotation等）
+        const paramKey = nodeInfo.paramKey;
+        if (paramKey && req.body[paramKey] !== undefined) {
+          let fieldValue = req.body[paramKey];
+          
+          // 根据字段类型进行适当的类型转换
+          if (nodeInfo.fieldName === 'scale' || 
+              nodeInfo.fieldName === 'X_offset' || 
+              nodeInfo.fieldName === 'Y_offset' || 
+              nodeInfo.fieldName === 'rotation') {
+            // 数值类型字段，转换为数字
+            fieldValue = parseFloat(fieldValue);
+            if (isNaN(fieldValue)) {
+              console.warn(`[${taskType}] 数值字段转换失败:`, {
+                nodeId: nodeInfo.nodeId,
+                fieldName: nodeInfo.fieldName,
+                paramKey: paramKey,
+                originalValue: req.body[paramKey]
+              });
+              fieldValue = 0; // 使用默认值
+            }
+          }
+          
+          const updatedNode = {
+            ...nodeInfo,
+            fieldValue: fieldValue
+          };
+          console.log(`[${taskType}] 更新其他类型节点 ${index}:`, {
+            nodeId: nodeInfo.nodeId,
+            fieldName: nodeInfo.fieldName,
+            paramKey: paramKey,
+            fieldValue: fieldValue
+          });
+          return updatedNode;
+        } else {
+          console.warn(`[${taskType}] 其他类型节点 ${index} 缺少参数:`, {
+            nodeId: nodeInfo.nodeId,
+            fieldName: nodeInfo.fieldName,
+            paramKey: paramKey,
+            bodyParams: Object.keys(req.body)
+          });
+          // 返回带有默认值的节点，避免fieldValue为undefined
+          let defaultValue;
+          if (nodeInfo.fieldName === 'scale' || 
+              nodeInfo.fieldName === 'X_offset' || 
+              nodeInfo.fieldName === 'Y_offset' || 
+              nodeInfo.fieldName === 'rotation') {
+            defaultValue = 0; // 数值类型默认值
+          } else if (nodeInfo.fieldName === 'shape') {
+            defaultValue = 'triangle'; // shape字段默认值
+          } else {
+            defaultValue = ''; // 其他字段默认值
+          }
+          
+          const defaultNode = {
+            ...nodeInfo,
+            fieldValue: defaultValue
+          };
+          console.warn(`[${taskType}] 使用默认值:`, defaultNode);
+          return defaultNode;
+        }
       }
-      
-      return nodeInfo;
     });
 
     console.log(`[${taskType}] 更新后的nodeInfoList:`, updatedNodeInfoList);
