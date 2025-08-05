@@ -67,7 +67,7 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
         // 简易模式：直接运行工作流，不修改任何参数
         requestBody = {
           apiKey: apiKey,
-          workflowId: workflowId,
+          workflowId: String(workflowId), // 确保workflowId是字符串类型
           addMetadata: true
         };
         console.log(`[ComfyUI] 使用简易模式（无参数修改）`);
@@ -75,7 +75,7 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
         // 高级模式：修改工作流参数
         requestBody = {
           apiKey: apiKey,
-          workflowId: workflowId,
+          workflowId: String(workflowId), // 确保workflowId是字符串类型
           nodeInfoList: nodeInfoList.map(item => ({
             nodeId: item.nodeId,
             fieldName: item.fieldName,
