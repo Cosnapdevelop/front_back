@@ -282,26 +282,17 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
         if (paramKey && req.body[paramKey] !== undefined) {
           let fieldValue = req.body[paramKey];
           
-          // 根据字段类型进行适当的类型转换
-          if (nodeInfo.fieldName === 'scale' || 
-              nodeInfo.fieldName === 'X_offset' || 
-              nodeInfo.fieldName === 'Y_offset' || 
-              nodeInfo.fieldName === 'rotation') {
-            // 数值类型字段，转换为数字
-            fieldValue = parseFloat(fieldValue);
-            if (isNaN(fieldValue)) {
-              console.warn(`[${taskType}] 数值字段转换失败:`, {
-                nodeId: nodeInfo.nodeId,
-                fieldName: nodeInfo.fieldName,
-                paramKey: paramKey,
-                originalValue: req.body[paramKey]
-              });
-              fieldValue = 0; // 使用默认值
-            }
-          } else if (nodeInfo.fieldName === 'shape') {
-            // shape字段保持字符串类型
-            fieldValue = String(fieldValue);
-          }
+          // RunningHub API要求所有fieldValue都是字符串类型
+          fieldValue = String(fieldValue);
+          
+          console.log(`[${taskType}] 参数转换:`, {
+            nodeId: nodeInfo.nodeId,
+            fieldName: nodeInfo.fieldName,
+            paramKey: paramKey,
+            originalValue: req.body[paramKey],
+            convertedValue: fieldValue,
+            convertedType: typeof fieldValue
+          });
           
           const updatedNode = {
             ...nodeInfo,
@@ -322,12 +313,13 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
             bodyParams: Object.keys(req.body)
           });
           // 返回带有默认值的节点，避免fieldValue为undefined
+          // RunningHub API要求所有fieldValue都是字符串类型
           let defaultValue;
           if (nodeInfo.fieldName === 'scale' || 
               nodeInfo.fieldName === 'X_offset' || 
               nodeInfo.fieldName === 'Y_offset' || 
               nodeInfo.fieldName === 'rotation') {
-            defaultValue = 0; // 数值类型默认值
+            defaultValue = '0'; // 数值类型默认值，字符串形式
           } else if (nodeInfo.fieldName === 'shape') {
             defaultValue = 'triangle'; // shape字段默认值
           } else {
