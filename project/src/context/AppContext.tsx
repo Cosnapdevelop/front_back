@@ -57,10 +57,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_USER':
       return { ...state, user: action.payload };
-    case 'TOGGLE_THEME':
+    case 'TOGGLE_THEME': {
       const newTheme = state.theme === 'light' ? 'dark' : 'light';
       localStorage.setItem('theme', newTheme);
       return { ...state, theme: newTheme };
+    }
     case 'TOGGLE_NOTIFICATIONS':
       return { ...state, showNotifications: !state.showNotifications };
     case 'ADD_NOTIFICATION':
@@ -83,7 +84,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, searchQuery: action.payload };
     case 'SET_CATEGORY':
       return { ...state, selectedCategory: action.payload };
-    case 'LIKE_EFFECT':
+    case 'LIKE_EFFECT': {
       // Add notification when someone likes an effect
       const likedEffect = state.effects.find(e => e.id === action.payload);
       const likeNotification: Notification = {
@@ -111,6 +112,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
         notifications: likedEffect && !likedEffect.isLiked ? [likeNotification, ...state.notifications].slice(0, 50) : state.notifications,
       };
+    }
     case 'BOOKMARK_EFFECT':
       return {
         ...state,
@@ -120,12 +122,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
             : effect
         ),
       };
-    case 'VIEW_EFFECT':
+    case 'VIEW_EFFECT': {
       const updatedRecentlyViewed = [
         action.payload,
         ...state.recentlyViewed.filter(effect => effect.id !== action.payload.id)
       ].slice(0, 10);
       return { ...state, recentlyViewed: updatedRecentlyViewed };
+    }
     case 'LIKE_POST':
       return {
         ...state,
@@ -180,7 +183,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
             : effect
         ),
       };
-    case 'FOLLOW_USER':
+    case 'FOLLOW_USER': {
       // Find the author being followed
       const authorToFollow = state.effects.find(e => e.author.id === action.payload)?.author ||
                             state.posts.find(p => p.user.id === action.payload)?.user;
@@ -230,6 +233,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
         notifications: authorToFollow && !authorToFollow.isFollowing ? [followNotification, ...state.notifications].slice(0, 50) : state.notifications,
       };
+    }
     case 'ADD_POST':
       return {
         ...state,
