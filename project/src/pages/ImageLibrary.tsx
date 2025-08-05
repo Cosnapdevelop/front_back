@@ -21,6 +21,7 @@ import { useImageLibrary } from '../hooks/useImageLibrary';
 import { getCurrentRegionConfig } from '../config/regions';
 import { taskManagementService, TaskStatus } from '../services/taskManagementService';
 import { LoadingSpinner, TaskStatusIndicator } from '../components/LoadingSpinner';
+import ImageCarousel from '../components/ImageCarousel';
 
 const ImageLibrary = () => {
   const navigate = useNavigate();
@@ -140,6 +141,19 @@ const ImageLibrary = () => {
     
     setSelectedImage(image);
     setShowPreview(true);
+  };
+
+  // 获取图片的所有URL（支持多张图片）
+  const getImageUrls = (image: ExtendedGeneratedImage): string[] => {
+    if (image.status !== 'completed') return [];
+    
+    // 如果有allUrls字段，使用它
+    if ((image as any).allUrls && Array.isArray((image as any).allUrls)) {
+      return (image as any).allUrls;
+    }
+    
+    // 否则只返回单张图片
+    return image.url ? [image.url] : [];
   };
 
   const formatDate = (dateString: string) => {
@@ -330,44 +344,25 @@ const ImageLibrary = () => {
                       </div>
                     </div>
                   ) : (
-                    // 正常图片 - 添加状态指示器
+                    // 正常图片 - 使用轮播组件
                     <div className="relative w-full h-full">
-                      <img
-                        src={image.url}
-                        alt={image.effectName}
-                        className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                      <ImageCarousel
+                        images={getImageUrls(image)}
+                        onDownload={undefined} // 在图片库中不显示下载按钮，避免重复
+                        className="w-full h-full"
+                        showIndicators={false}
+                        showNavigation={getImageUrls(image).length > 1}
+                        autoPlay={false}
+                      />
+                      <div 
+                        className="absolute inset-0 cursor-pointer hover:scale-105 transition-transform duration-300"
                         onClick={() => handlePreview(image)}
-                        onError={(e) => {
-                          console.error('[ImageLibrary] 图片加载失败:', image.url);
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.innerHTML = `
-                              <div class="w-full h-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                                <div class="text-center">
-                                  <ImageIcon class="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                  <p class="text-sm text-gray-500 dark:text-gray-400">图片加载失败</p>
-                                  <button 
-                                    class="mt-2 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                                    onclick="window.open('${image.url}', '_blank')"
-                                  >
-                                    在新窗口打开
-                                  </button>
-                                </div>
-                              </div>
-                            `;
-                          }
-                        }}
-                        onLoad={() => {
-                          console.log('[ImageLibrary] 图片加载成功:', image.url);
-                        }}
                       />
                     </div>
                   )}
                   
-                  {/* 操作按钮 */}
-                  <div className="absolute top-2 right-2 flex space-x-1">
+                  {/* 操作按钮 - 重新布局避免重叠 */}
+                  <div className="absolute top-2 right-2 flex flex-col space-y-1">
                     {image.status === 'processing' || image.status === 'pending' ? (
                       // 处理中/等待中显示取消按钮
                       <button
@@ -473,35 +468,39 @@ const ImageLibrary = () => {
               className="relative max-w-4xl max-h-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <img
-                src={selectedImage.url}
-                alt={selectedImage.effectName}
-                className="max-w-full max-h-full object-contain rounded-lg"
+              <ImageCarousel
+                images={getImageUrls(selectedImage)}
+                onDownload={(imageUrl, index) => {
+                  // 创建临时图片对象用于下载
+                  const tempImage = { ...selectedImage, url: imageUrl };
+                  handleDownload(tempImage);
+                }}
+                className="max-w-full max-h-full"
+                showIndicators={true}
+                showNavigation={true}
+                autoPlay={false}
               />
               
-              {/* Close button */}
-              <button
-                onClick={() => setShowPreview(false)}
-                className="absolute top-4 right-4 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              
-              {/* Download button */}
-              <button
-                onClick={() => handleDownload(selectedImage)}
-                className="absolute top-4 right-16 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
-              >
-                <Download className="w-6 h-6" />
-              </button>
-              
-              {/* Share button */}
-              <button
-                onClick={() => handleShare(selectedImage)}
-                className="absolute top-4 right-28 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-75 transition-colors"
-              >
-                <Share2 className="w-6 h-6" />
-              </button>
+              {/* 模态框操作按钮 - 重新布局避免重叠 */}
+              <div className="absolute top-4 right-4 flex flex-col space-y-2 z-30">
+                {/* Share button */}
+                <button
+                  onClick={() => handleShare(selectedImage)}
+                  className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                  title="分享"
+                >
+                  <Share2 className="w-6 h-6" />
+                </button>
+                
+                {/* Close button */}
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                  title="关闭"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

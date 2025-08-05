@@ -9,7 +9,10 @@
 ## 📊 部署概览
 
 ### 前端部署 (Vercel)
-- **最新部署**: https://cosnap-k1ns0gk5x-terrys-projects-0cc48ccf.vercel.app
+- **最新部署**: https://cosnap.vercel.app
+- **备用地址**: 
+  - https://cosnap-terrys-projects-0cc48ccf.vercel.app
+  - https://cosnap-git-main-terrys-projects-0cc48ccf.vercel.app
 - **部署时间**: 2025-01-27 当前时间 UTC
 - **构建状态**: ✅ 自动部署中
 - **环境**: Production

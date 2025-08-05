@@ -1,5 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
@@ -7,6 +17,10 @@
     }
   ],
   "env": {
-    "VITE_API_BASE_URL": "https://cosnap-back.onrender.com"
+    "VITE_API_BASE_URL": "https://cosnap-backend.onrender.com"
+  },
+  "github": {
+    "enabled": true,
+    "silent": false
   }
 }

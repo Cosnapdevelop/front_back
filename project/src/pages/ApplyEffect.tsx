@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useTaskProcessing } from '../hooks/useTaskProcessing';
+import ImageCarousel from '../components/ImageCarousel';
 
 const ApplyEffect = () => {
   const { id } = useParams();
@@ -185,19 +186,25 @@ const ApplyEffect = () => {
   };
 
   const handleParameterChange = (paramName: string, value: any) => {
-    setParameters(prev => ({ ...prev, [paramName]: value }));
+    // 对于scale参数，确保转换为数值
+    if (paramName === 'scale_65') {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue)) {
+        setParameters(prev => ({ ...prev, [paramName]: numValue }));
+      } else {
+        setParameters(prev => ({ ...prev, [paramName]: value }));
+      }
+    } else {
+      setParameters(prev => ({ ...prev, [paramName]: value }));
+    }
   };
 
-  const handleDownload = async (event: React.MouseEvent, result: string, index: number) => {
-    // 阻止事件冒泡，避免触发图片预览
-    event.preventDefault();
-    event.stopPropagation();
-    
+  const handleDownload = async (imageUrl: string, index: number) => {
     try {
-      console.log('[下载] 开始下载图片:', result);
+      console.log('[下载] 开始下载图片:', imageUrl);
       
       // 使用 fetch + blob 下载，避免页面跳转
-      const response = await fetch(result);
+      const response = await fetch(imageUrl);
       if (!response.ok) {
         throw new Error('下载失败');
       }
@@ -283,11 +290,12 @@ const ApplyEffect = () => {
         </div>
       );
       case 'range':
+      case 'slider':
         return (
           <div key={param.name} className="space-y-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               {param.label || param.name}: {parameters[param.name]}
-              </label>
+            </label>
             <input
               type="range"
               min={param.min}
@@ -571,30 +579,14 @@ const ApplyEffect = () => {
               
               {results.length > 0 ? (
                 <div className="space-y-4">
-                  {results.map((result, index) => (
-                    <div 
-                      key={index} 
-                      className="relative"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                    >
-                      <img
-                        src={result}
-                        alt={`Generated ${index + 1}`}
-                        className="w-full h-full object-cover rounded-lg cursor-default select-none pointer-events-none"
-                        onDragStart={(e) => e.preventDefault()}
-                      />
-                      <button
-                        onClick={(event) => handleDownload(event, result, index)}
-                        className="absolute top-2 right-2 bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:shadow-xl transition-shadow z-20 pointer-events-auto"
-                        title="下载图片"
-                      >
-                        <Download className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                      </button>
-                    </div>
-                  ))}
+                  <ImageCarousel
+                    images={results}
+                    onDownload={handleDownload}
+                    className="w-full"
+                    showIndicators={true}
+                    showNavigation={true}
+                    autoPlay={false}
+                  />
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">

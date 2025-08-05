@@ -58,7 +58,7 @@ class ImageLibraryService {
   }
 
   // 更新图片状态
-  updateImageStatus(imageId: string, status: 'processing' | 'completed' | 'failed' | 'cancelled', progress?: number, url?: string): void {
+  updateImageStatus(imageId: string, status: 'processing' | 'completed' | 'failed' | 'cancelled', progress?: number, url?: string, allUrls?: string[]): void {
     try {
       const images = this.getGeneratedImages();
       const imageIndex = images.findIndex(img => img.id === imageId);
@@ -70,6 +70,10 @@ class ImageLibraryService {
         }
         if (url) {
           images[imageIndex].url = url;
+        }
+        // 保存所有图片URL
+        if (allUrls && allUrls.length > 0) {
+          (images[imageIndex] as any).allUrls = allUrls;
         }
         
         localStorage.setItem(STORAGE_KEY, JSON.stringify(images));

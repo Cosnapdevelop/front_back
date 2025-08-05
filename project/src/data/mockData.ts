@@ -263,6 +263,122 @@ export const mockEffects: Effect[] = [
       { nodeId: '1171', fieldName: 'text', paramKey: 'text_1171' },    // Text 节点 - 视角指导
       { nodeId: '587', fieldName: 'seed', paramKey: 'seed_587' }       // EasySeed 节点 - 随机种子
     ]
+  },
+  // Cosnap脸部细节还原修复
+  {
+    id: 'cosnap-face-detail-restoration',
+    name: 'Cosnap脸部细节还原修复',
+    description: '专业级脸部细节还原与修复技术，使用Florence2模型进行智能图像分析，结合FLUX模型进行高质量脸部细节增强，适用于人像摄影、证件照优化、社交媒体头像美化等场景。',
+    author: mockUsers[0],
+    category: 'Portrait',
+    tags: ['face', 'detail', 'restoration', 'enhancement', 'portrait', 'florence2', 'flux', 'professional'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 567,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2024-08-05',
+    difficulty: 'Advanced',
+    processingTime: '4-6 minutes',
+    workflowId: '1952457929792401409', // 脸部细节还原修复工作流ID
+    isTrending: true,
+    parameters: [
+      { name: 'image_90', type: 'image', description: '上传原图（要处理的人像图片）' },
+      { name: 'image_118', type: 'image', description: '上传参考面部信息图片（用于面部细节参考）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '90', fieldName: 'image', paramKey: 'image_90' },        // LoadImage 节点 - 原图
+      { nodeId: '118', fieldName: 'image', paramKey: 'image_118' }       // LoadImage 节点 - 参考面部信息
+    ]
+  },
+  // Cosnap重新打光
+  {
+    id: 'cosnap-relighting',
+    name: 'Cosnap重新打光',
+    description: '专业级图像重新打光技术，使用IC-Light模型进行智能光源控制，支持自定义光源形状、位置、角度和强度，适用于人像摄影、产品摄影、场景重建等需要精确控制光照效果的场景。',
+    author: mockUsers[0],
+    category: 'Lighting',
+    tags: ['relighting', 'lighting', 'ic-light', 'professional', 'photography', 'light-control'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 423,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2025-08-05',
+    difficulty: 'Advanced',
+    processingTime: '3-5 minutes',
+    workflowId: '1952448857223442433', // 重新打光工作流ID
+    isTrending: true,
+    parameters: [
+      { name: 'image_19', type: 'image', description: '上传主图（要重新打光的图片）' },
+      { 
+        name: 'prompt_85', 
+        type: 'text', 
+        default: '', 
+        description: '光源提示词（描述期望的光照效果，如"warm sunlight from left", "dramatic side lighting"等）' 
+      },
+      // IC-Light Light Shape 节点65参数配置
+      { 
+        name: 'shape_65', 
+        type: 'select', 
+        default: 'triangle', 
+        description: '光源形状（改变光源的形状）',
+        options: [
+          { value: 'circle', label: '圆形' },
+          { value: 'square', label: '正方形' },
+          { value: 'semicircle', label: '半圆形' },
+          { value: 'quarter_circle', label: '四分之一圆' },
+          { value: 'ellipse', label: '椭圆形' },
+          { value: 'triangle', label: '三角形' },
+          { value: 'cross', label: '十字形' },
+          { value: 'star', label: '星形' },
+          { value: 'radial', label: '径向' }
+        ]
+      },
+      { 
+        name: 'X_offset_65', 
+        type: 'slider', 
+        default: 0, 
+        description: 'X轴偏移（负数：光源从左边打过来，正数：光源从右边打过来）',
+        min: -1024,
+        max: 1024,
+        step: 32
+      },
+      { 
+        name: 'Y_offset_65', 
+        type: 'slider', 
+        default: -512, 
+        description: 'Y轴偏移（负数：光源从上方打过来，正数：光源从下方打过来）',
+        min: -1024,
+        max: 1024,
+        step: 32
+      },
+      { 
+        name: 'scale_65', 
+        type: 'text', 
+        default: '1', 
+        description: '光源大小（可以键盘输入数值，默认1）'
+      },
+      { 
+        name: 'rotation_65', 
+        type: 'slider', 
+        default: 0, 
+        description: '光源角度（0-359度）',
+        min: 0,
+        max: 359,
+        step: 1
+      }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '19', fieldName: 'image', paramKey: 'image_19' },        // LoadImage 节点 - 主图
+      { nodeId: '85', fieldName: 'prompt', paramKey: 'prompt_85' },      // RH_Translator 节点 - 光源提示词
+      // IC-Light Light Shape 节点65参数映射
+      { nodeId: '65', fieldName: 'shape', paramKey: 'shape_65' },        // 光源形状
+      { nodeId: '65', fieldName: 'X_offset', paramKey: 'X_offset_65' },  // X轴偏移
+      { nodeId: '65', fieldName: 'Y_offset', paramKey: 'Y_offset_65' },  // Y轴偏移
+      { nodeId: '65', fieldName: 'scale', paramKey: 'scale_65' },        // 光源大小
+      { nodeId: '65', fieldName: 'rotation', paramKey: 'rotation_65' }   // 光源角度
+    ]
   }
 ];
 

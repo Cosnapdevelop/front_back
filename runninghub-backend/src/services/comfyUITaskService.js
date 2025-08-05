@@ -114,7 +114,6 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
       if (response.data?.data?.promptTips) {
         try {
           const promptTips = JSON.parse(response.data.data.promptTips);
-          console.log(`[ComfyUI] 工作流校验信息:`, promptTips);
           
           if (promptTips.error || (promptTips.node_errors && Object.keys(promptTips.node_errors).length > 0)) {
             console.error(`[ComfyUI] 工作流校验失败:`, {
@@ -122,10 +121,15 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
               node_errors: promptTips.node_errors
             });
             throw new Error(`工作流校验失败: ${JSON.stringify(promptTips)}`);
+          } else {
+            // 只在调试模式下显示成功的校验信息
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[ComfyUI] 工作流校验通过，将执行 ${promptTips.outputs_to_execute?.length || 0} 个节点`);
+            }
           }
         } catch (parseError) {
-          console.log(`[ComfyUI] promptTips解析失败:`, parseError.message);
-          console.log(`[ComfyUI] 原始promptTips:`, response.data.data.promptTips);
+          console.error(`[ComfyUI] promptTips解析失败:`, parseError.message);
+          console.error(`[ComfyUI] 原始promptTips:`, response.data.data.promptTips);
         }
       }
       

@@ -246,8 +246,8 @@ export function useTaskProcessing() {
                   // 更新任务管理服务
                   taskManagementService.updateTaskStatus(taskId, TaskStatus.COMPLETED, 100, undefined, processedResults);
                   
-                  // 更新图片库中的图片
-                  imageLibraryService.updateImageStatus(imageId, 'completed', 100, processedResults[0]);
+                  // 更新图片库中的图片，保存所有结果
+                  imageLibraryService.updateImageStatus(imageId, 'completed', 100, processedResults[0], processedResults);
                   
                   // 从activeTasks中移除已完成的任务
                   setState(prev => {
