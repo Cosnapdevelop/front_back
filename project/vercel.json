@@ -1,15 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/(.*)",
@@ -22,11 +15,6 @@
   "github": {
     "enabled": true,
     "silent": false
-  },
-  "functions": {
-    "app/api/**/*.js": {
-      "maxDuration": 30
-    }
   },
   "headers": [
     {
