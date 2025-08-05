@@ -291,14 +291,14 @@ export const mockEffects: Effect[] = [
       { nodeId: '118', fieldName: 'image', paramKey: 'image_118' }       // LoadImage 节点 - 参考面部信息
     ]
   },
-  // Cosnap重新打光 (暂时禁用 - 工作流ID不存在)
+  // Cosnap重新打光
   {
     id: 'cosnap-relighting',
-    name: 'Cosnap重新打光 (维护中)',
-    description: '专业级图像重新打光技术，使用IC-Light模型进行智能光源控制，支持自定义光源形状、位置、角度和强度，适用于人像摄影、产品摄影、场景重建等需要精确控制光照效果的场景。⚠️ 当前正在维护中，请稍后再试。',
+    name: 'Cosnap重新打光',
+    description: '专业级图像重新打光技术，使用IC-Light模型进行智能光源控制，支持自定义光源形状、位置、角度和强度，适用于人像摄影、产品摄影、场景重建等需要精确控制光照效果的场景。',
     author: mockUsers[0],
     category: 'Lighting',
-    tags: ['relighting', 'lighting', 'ic-light', 'professional', 'photography', 'light-control', 'maintenance'],
+    tags: ['relighting', 'lighting', 'ic-light', 'professional', 'photography', 'light-control'],
     beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
     afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
     likesCount: 423,
@@ -307,8 +307,8 @@ export const mockEffects: Effect[] = [
     createdAt: '2025-08-05',
     difficulty: 'Advanced',
     processingTime: '3-5 minutes',
-    workflowId: '1952448857223442433', // 重新打光工作流ID (需要更新)
-    isTrending: false, // 暂时禁用
+    workflowId: '1952448857223442433', // 重新打光工作流ID
+    isTrending: true,
     parameters: [
       { name: 'image_19', type: 'image', description: '上传主图（要重新打光的图片）' },
       { 
