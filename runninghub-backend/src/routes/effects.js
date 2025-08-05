@@ -298,6 +298,9 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
               });
               fieldValue = 0; // 使用默认值
             }
+          } else if (nodeInfo.fieldName === 'shape') {
+            // shape字段保持字符串类型
+            fieldValue = String(fieldValue);
           }
           
           const updatedNode = {
