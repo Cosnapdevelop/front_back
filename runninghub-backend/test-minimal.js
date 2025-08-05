@@ -13,7 +13,6 @@ async function testMinimal() {
     
     // 只测试一个参数
     const nodeInfoList = [
-      { nodeId: '19', fieldName: 'image', paramKey: 'image_19' },
       { nodeId: '85', fieldName: 'prompt', paramKey: 'prompt_85' }
     ];
     

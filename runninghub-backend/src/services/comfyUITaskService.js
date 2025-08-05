@@ -44,6 +44,14 @@ function createRunningHubAxiosInstance(regionId = DEFAULT_REGION) {
   });
 }
 
+/**
+ * 启动ComfyUI任务服务
+ * ⚠️ 重要：RunningHub API要求所有参数都必须是字符串类型！
+ * @param {string} workflowId - 工作流ID (必须转换为字符串)
+ * @param {Array} nodeInfoList - 节点信息列表
+ * @param {string} regionId - 地区ID
+ * @param {string} instanceType - 实例类型
+ */
 async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFAULT_REGION, instanceType = null) {
   console.log(`[ComfyUI] 开始发起任务 (地区: ${getRegionConfig(regionId).name}): workflowId=${workflowId}, instanceType=${instanceType}`);
   
@@ -60,6 +68,8 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
       
       console.log(`[ComfyUI] 发起任务尝试 ${attempt}/${maxRetries} (超时: ${timeout}ms)`);
       
+      // ⚠️ 重要提醒：RunningHub API要求所有参数都必须是字符串类型！
+      // workflowId, nodeId, fieldName, fieldValue 都必须转换为字符串
       // 根据nodeInfoList是否为空来决定使用简易模式还是高级模式
       let requestBody;
       
@@ -67,7 +77,7 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
         // 简易模式：直接运行工作流，不修改任何参数
         requestBody = {
           apiKey: apiKey,
-          workflowId: String(workflowId), // 确保workflowId是字符串类型
+          workflowId: String(workflowId), // ⚠️ 必须转换为字符串！RunningHub API要求
           addMetadata: true
         };
         console.log(`[ComfyUI] 使用简易模式（无参数修改）`);
@@ -75,11 +85,11 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
         // 高级模式：修改工作流参数
         requestBody = {
           apiKey: apiKey,
-          workflowId: String(workflowId), // 确保workflowId是字符串类型
+          workflowId: String(workflowId), // ⚠️ 必须转换为字符串！RunningHub API要求
           nodeInfoList: nodeInfoList.map(item => ({
-            nodeId: item.nodeId,
-            fieldName: item.fieldName,
-            fieldValue: item.fieldValue
+            nodeId: String(item.nodeId), // ⚠️ 必须转换为字符串！
+            fieldName: String(item.fieldName), // ⚠️ 必须转换为字符串！
+            fieldValue: String(item.fieldValue) // ⚠️ 必须转换为字符串！RunningHub API要求
           })),
           addMetadata: true
         };

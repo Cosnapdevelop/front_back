@@ -186,6 +186,8 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
     // 🔧 错误处理：
     // - 如果缺少必需的 fieldValue，RunningHub 会返回 803 错误
     // - 需要确保所有节点都有正确的 fieldValue
+    // ⚠️ 重要提醒：RunningHub API要求所有fieldValue都必须是字符串类型！
+    // 即使数值型参数（如scale, X_offset, Y_offset, rotation）也必须转换为字符串
     let imageIndex = 0;
     const updatedNodeInfoList = parsedNodeInfoList.map((nodeInfo, index) => {
       console.log(`[${taskType}] 处理节点 ${index}:`, {
@@ -224,7 +226,7 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
         if (paramKey && req.body[paramKey] !== undefined) {
           const updatedNode = {
             ...nodeInfo,
-            fieldValue: req.body[paramKey]
+            fieldValue: String(req.body[paramKey]) // ⚠️ 必须转换为字符串！
           };
           console.log(`[${taskType}] 更新文本节点 ${index}:`, {
             nodeId: nodeInfo.nodeId,
@@ -238,7 +240,7 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
           if (req.body[possibleParamKey] !== undefined) {
             const updatedNode = {
               ...nodeInfo,
-              fieldValue: req.body[possibleParamKey]
+              fieldValue: String(req.body[possibleParamKey]) // ⚠️ 必须转换为字符串！
             };
             console.log(`[${taskType}] 更新文本节点 ${index} (通过nodeId):`, {
               nodeId: nodeInfo.nodeId,
@@ -261,12 +263,12 @@ router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
         if (paramKey && req.body[paramKey] !== undefined) {
           const updatedNode = {
             ...nodeInfo,
-            fieldValue: parseInt(req.body[paramKey]) // select值需要转换为整数
+            fieldValue: String(parseInt(req.body[paramKey])) // ⚠️ select值先转整数再转字符串！
           };
           console.log(`[${taskType}] 更新select节点 ${index}:`, {
             nodeId: nodeInfo.nodeId,
             paramKey: paramKey,
-            fieldValue: parseInt(req.body[paramKey])
+            fieldValue: String(parseInt(req.body[paramKey]))
           });
           return updatedNode;
         } else {
