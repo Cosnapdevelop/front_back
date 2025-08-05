@@ -71,6 +71,7 @@ const ApplyEffect = () => {
     effect.parameters.forEach(param => {
       defaultParams[param.name] = param.default;
     });
+    console.log('[ApplyEffect] 初始化默认参数:', defaultParams);
     setParameters(defaultParams);
   }, [effect.parameters]);
 
@@ -186,16 +187,25 @@ const ApplyEffect = () => {
   };
 
   const handleParameterChange = (paramName: string, value: any) => {
-    // 对于scale参数，确保转换为数值
-    if (paramName === 'scale_65') {
+    console.log(`[参数变更] ${paramName}: ${value} (类型: ${typeof value})`);
+    
+    // 对于数值类型参数，确保转换为数字
+    // 使用精确匹配，避免误判
+    if (paramName === 'scale_65' || 
+        paramName === 'X_offset_65' || 
+        paramName === 'Y_offset_65' || 
+        paramName === 'rotation_65') {
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
         setParameters(prev => ({ ...prev, [paramName]: numValue }));
+        console.log(`[参数变更] 数值转换: ${paramName} = ${numValue}`);
       } else {
         setParameters(prev => ({ ...prev, [paramName]: value }));
+        console.log(`[参数变更] 数值转换失败，保持原值: ${paramName} = ${value}`);
       }
     } else {
       setParameters(prev => ({ ...prev, [paramName]: value }));
+      console.log(`[参数变更] 普通参数: ${paramName} = ${value}`);
     }
   };
 
@@ -405,6 +415,9 @@ const ApplyEffect = () => {
         nodeInfoTemplate: effect.nodeInfoTemplate,
         imageParamFiles: Object.keys(imageParamFiles)
       });
+
+      console.log('[ApplyEffect] 最终参数:', parameters);
+      console.log('[ApplyEffect] 参数详情:', Object.entries(parameters).map(([key, value]) => `${key}: ${value} (类型: ${typeof value})`));
 
       await processTask(effect, parameters, imageFileObjects);
     } catch (error) {

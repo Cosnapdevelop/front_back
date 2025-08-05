@@ -106,9 +106,14 @@ export function useTaskProcessing() {
       console.log('[任务处理] 构建的nodeInfoList:', nodeInfoList);
       
       // 添加用户输入的参数
+      console.log('[任务处理] 用户输入的参数:', parameters);
       Object.entries(parameters).forEach(([key, value]) => {
-        if (value) {
+        console.log(`[任务处理] 处理参数: ${key} = ${value} (类型: ${typeof value})`);
+        if (value !== undefined && value !== null && value !== '') {
           formData.append(key, value as string);
+          console.log(`[任务处理] 已添加参数到formData: ${key} = ${value}`);
+        } else {
+          console.warn(`[任务处理] 跳过空参数: ${key} = ${value}`);
         }
       });
       
