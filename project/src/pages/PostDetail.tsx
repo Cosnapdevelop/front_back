@@ -17,6 +17,7 @@ import { useApp } from '../context/AppContext';
 import { Post, Comment, User } from '../types';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -35,19 +36,15 @@ const PostDetail = () => {
   // 向后兼容：如果post.images不存在但post.image存在，则创建一个单元素数组
   const postImages = post?.images || (post?.image ? [post.image] : []);
 
-  useEffect(() => {
-    (async () => {
-      if (!postId) return;
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}`);
-        const data = await res.json();
-        if (data.success) setPost(data.post);
-        else setPost(null);
-      } catch {
-        setPost(null);
-      }
-    })();
-  }, [postId]);
+  const { data } = useQuery({
+    queryKey: ['post', postId],
+    enabled: !!postId,
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}`);
+      return res.json();
+    }
+  });
+  useEffect(() => { if (data?.success) setPost(data.post); }, [data]);
 
   if (!post) {
     return (

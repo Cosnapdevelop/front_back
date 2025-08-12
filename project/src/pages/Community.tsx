@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/Cards/PostCard';
 import { API_BASE_URL } from '../config/api';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const Community = () => {
   const { state, dispatch } = useApp();
@@ -37,25 +38,16 @@ const Community = () => {
     }
   };
 
-  const [remotePosts, setRemotePosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ['posts', { page: 1 }],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE_URL}/api/community/posts`);
+      return res.json();
+    }
+  });
+  const remotePosts = data?.posts || [];
   const filteredPosts = remotePosts.length > 0 ? remotePosts : getFilteredPosts();
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_BASE_URL}/api/community/posts`);
-        const data = await res.json();
-        if (data.success) setRemotePosts(data.posts);
-      } catch (e) {
-        console.warn('Load posts failed, fallback to mock list');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -98,10 +90,13 @@ const Community = () => {
       });
       const data = await res.json();
       if (data.success) {
-        setRemotePosts(prev => [
-          { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0 },
-          ...prev
-        ]);
+        queryClient.setQueryData<any>(['posts', { page: 1 }], (old) => ({
+          success: true,
+          posts: [
+            { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0 },
+            ...(old?.posts || [])
+          ]
+        }));
       }
       
       // Reset form and close modal
