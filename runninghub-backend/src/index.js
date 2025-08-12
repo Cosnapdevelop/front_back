@@ -4,9 +4,11 @@ import effectsRoutes from './routes/effects.js';
 import authRouter from './routes/auth.js';
 import communityRouter from './routes/community.js';
 import { warmupConnection } from './services/comfyUITaskService.js';
+import { PrismaClient } from '@prisma/client';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const prisma = new PrismaClient();
 
 // 环境变量配置
 const isProduction = process.env.NODE_ENV === 'production';
@@ -58,6 +60,34 @@ app.use('/api/community', communityRouter);
 // 健康检查端点
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 数据库连通性检查
+app.get('/health/db', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok' });
+  } catch (e) {
+    console.error('[健康检查] 数据库不可用:', e);
+    res.status(500).json({ status: 'db_error', error: e.message });
+  }
+});
+
+// 全局错误处理中间件，避免连接被意外关闭
+// 必须放在路由之后
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[全局错误]', err);
+  if (res.headersSent) return;
+  res.status(500).json({ success: false, error: err?.message || '服务器错误' });
+});
+
+// 进程级错误兜底
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
 });
 
 // 启动服务器
