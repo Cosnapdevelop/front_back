@@ -51,21 +51,39 @@ const Community = () => {
   const remotePosts = data?.posts || [];
   const filteredPosts = remotePosts.length > 0 ? remotePosts : getFilteredPosts();
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const presign = async (ext: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/effects/upload/presign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+      },
+      body: JSON.stringify({ ext, dir: 'cosnap/community' })
+    });
+    return res.json();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Limit to 5 images
     const maxImages = 5;
     const filesToProcess = files.slice(0, maxImages - selectedImages.length);
 
-    filesToProcess.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSelectedImages(prev => [...prev, e.target?.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of filesToProcess) {
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const presignResp = await presign(ext);
+      if (presignResp.success && presignResp.provider === 'aliyun-oss') {
+        const formData = new FormData();
+        Object.entries(presignResp.form).forEach(([k, v]) => formData.append(k, v as string));
+        formData.append('key', presignResp.form.key);
+        formData.append('file', file);
+        await fetch(presignResp.uploadUrl, { method: 'POST', body: formData });
+        setSelectedImages(prev => [...prev, presignResp.publicUrl]);
+      } else if (presignResp.success && presignResp.provider === 'mock') {
+        setSelectedImages(prev => [...prev, presignResp.publicUrl]);
+      }
+    }
   };
 
   const removeImage = (index: number) => {

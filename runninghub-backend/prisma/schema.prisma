@@ -78,4 +78,23 @@ model PostLike {
   @@index([userId])
 }
 
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   // 接收通知的人
+  actorId   String   // 触发通知的人（点赞/评论者）
+  type      String   // like | comment | reply
+  postId    String?
+  commentId String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User @relation(fields: [userId], references: [id])
+  actor  User @relation("NotificationActor", fields: [actorId], references: [id])
+
+  @@index([userId])
+  @@index([actorId])
+  @@index([postId])
+  @@index([commentId])
+}
+
 

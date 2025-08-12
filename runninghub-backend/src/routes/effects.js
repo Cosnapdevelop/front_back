@@ -1,5 +1,6 @@
 import express from 'express';
 import { auth } from '../middleware/auth.js';
+import crypto from 'crypto';
 import multer from 'multer';
 import { uploadImageService } from '../services/uploadImageService.js';
 import { startComfyUITaskService, waitForComfyUITaskAndGetImages, cancelComfyUITask, getComfyUITaskStatus, getComfyUITaskResult } from '../services/comfyUITaskService.js';
@@ -633,3 +634,52 @@ router.post('/comfyui/retry', auth, async (req, res) => {
 });
 
 export default router; 
+
+// 预签名直传（阿里云OSS）
+router.post('/upload/presign', auth, async (req, res) => {
+  try {
+    const provider = process.env.CLOUD_STORAGE_PROVIDER || 'mock';
+    const ext = (req.body?.ext || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase();
+    const dir = (req.body?.dir || 'cosnap/uploads').replace(/\.{2,}/g, '');
+    const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${ext}`;
+    const objectKey = `${dir}/${filename}`;
+
+    if (provider === 'aliyun-oss') {
+      const bucket = process.env.ALIYUN_OSS_BUCKET;
+      const region = process.env.ALIYUN_OSS_REGION || 'oss-cn-hangzhou';
+      const accessKeyId = process.env.ALIYUN_OSS_ACCESS_KEY_ID;
+      const accessKeySecret = process.env.ALIYUN_OSS_ACCESS_KEY_SECRET;
+      const host = `https://${bucket}.${region}.aliyuncs.com`;
+
+      const expiration = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+      const policyText = {
+        expiration,
+        conditions: [
+          ['content-length-range', 0, 20 * 1024 * 1024],
+          ['starts-with', '$key', dir + '/']
+        ]
+      };
+      const policy = Buffer.from(JSON.stringify(policyText)).toString('base64');
+      const signature = crypto
+        .createHmac('sha1', accessKeySecret)
+        .update(policy)
+        .digest('base64');
+
+      const form = {
+        key: objectKey,
+        policy,
+        OSSAccessKeyId: accessKeyId,
+        Signature: signature,
+        success_action_status: '200',
+      };
+      const cdnDomain = process.env.ALIYUN_OSS_CUSTOM_DOMAIN;
+      const publicUrl = cdnDomain ? `https://${cdnDomain}/${objectKey}` : `${host}/${objectKey}`;
+      return res.json({ success: true, provider, uploadUrl: host, form, objectKey, publicUrl });
+    }
+
+    // mock: 返回模拟URL
+    return res.json({ success: true, provider: 'mock', uploadUrl: '', form: {}, objectKey, publicUrl: `https://mock-cdn.example.com/${objectKey}` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});

@@ -74,6 +74,13 @@ router.post('/posts/:id/like', auth, async (req, res) => {
   try {
     await prisma.postLike.create({ data: { postId: id, userId: req.user.id } });
     await prisma.post.update({ where: { id }, data: { likesCount: { increment: 1 } } });
+    // 通知帖子作者
+    const post = await prisma.post.findUnique({ where: { id }, select: { userId: true } });
+    if (post && post.userId !== req.user.id) {
+      await prisma.notification.create({
+        data: { userId: post.userId, actorId: req.user.id, type: 'like', postId: id }
+      });
+    }
     res.json({ success: true });
   } catch (e) {
     // 已点过赞则忽略
@@ -97,7 +104,40 @@ router.post('/posts/:id/comments', auth, async (req, res) => {
     data: { postId: id, userId: req.user.id, content, parentId: parentId || null },
     include: { user: { select: { id: true, username: true, avatar: true } } }
   });
+  // 通知帖子作者或被回复者
+  const post = await prisma.post.findUnique({ where: { id }, select: { userId: true } });
+  const parentComment = parentId ? await prisma.comment.findUnique({ where: { id: parentId }, select: { userId: true } }) : null;
+  const notifyUserId = parentComment?.userId || post?.userId;
+  if (notifyUserId && notifyUserId !== req.user.id) {
+    await prisma.notification.create({
+      data: { userId: notifyUserId, actorId: req.user.id, type: parentId ? 'reply' : 'comment', postId: id, commentId: comment.id }
+    });
+  }
   res.json({ success: true, comment });
+});
+
+// 获取通知（需登录）
+router.get('/notifications', auth, async (req, res) => {
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+  const [items, total] = await Promise.all([
+    prisma.notification.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: { actor: { select: { id: true, username: true, avatar: true } } }
+    }),
+    prisma.notification.count({ where: { userId: req.user.id } })
+  ]);
+  res.json({ success: true, items, meta: { page, limit, total, hasNext: page * limit < total } });
+});
+
+// 标记已读（需登录）
+router.post('/notifications/:id/read', auth, async (req, res) => {
+  const { id } = req.params;
+  await prisma.notification.updateMany({ where: { id, userId: req.user.id }, data: { isRead: true } });
+  res.json({ success: true });
 });
 
 export default router;
