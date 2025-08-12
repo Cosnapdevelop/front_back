@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, TrendingUp, Clock, Users, X, Upload, Image as ImageIcon, Send, Camera, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/Cards/PostCard';
 
 const Community = () => {
   const { state, dispatch } = useApp();
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<'trending' | 'recent' | 'following'>('trending');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -131,7 +133,13 @@ const Community = () => {
           </div>
           
           <button 
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              if (!isAuthenticated) {
+                alert('请先登录');
+                return;
+              }
+              setShowCreateModal(true);
+            }}
             className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105"
           >
             <Plus className="h-5 w-5" />

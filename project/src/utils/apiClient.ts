@@ -120,10 +120,34 @@ export async function apiCall<T>(
   const url = `${API_BASE_URL}${endpoint}`;
   
   try {
-    const response = await fetchWithRetry(url, options, retryConfig);
+    const accessToken = localStorage.getItem('cosnap_access_token');
+    const headers: any = { ...(options.headers || {}) };
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+    const response = await fetchWithRetry(url, { ...options, headers }, retryConfig);
     return await handleAPIResponse<T>(response);
   } catch (error) {
     if (error instanceof APIError) {
+      // 401时尝试刷新一次
+      if (error.status === 401) {
+        const refreshToken = localStorage.getItem('cosnap_refresh_token');
+        if (refreshToken) {
+          try {
+            const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              localStorage.setItem('cosnap_access_token', data.accessToken);
+              const retryHeaders: any = { ...(options.headers || {}) };
+              retryHeaders['Authorization'] = `Bearer ${data.accessToken}`;
+              const retryRes = await fetchWithRetry(url, { ...options, headers: retryHeaders }, retryConfig);
+              return await handleAPIResponse<T>(retryRes);
+            }
+          } catch {}
+        }
+      }
       throw error;
     }
     if (error instanceof BaseError) {
