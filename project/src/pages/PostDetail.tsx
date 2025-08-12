@@ -67,14 +67,20 @@ const PostDetail = () => {
     );
   }
 
-  const handleLike = () => {
+  const handleLike = async () => {
+    if (!isAuthenticated) { alert('请先登录'); return; }
+    try {
+      await fetch(`${API_BASE_URL}/api/community/posts/${post.id}/like`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }
+      });
+    } catch {}
     dispatch({ type: 'LIKE_POST', payload: post.id });
-    // 不需要手动更新本地状态，useEffect 会自动同步
   };
 
   const handleBookmark = () => {
+    if (!isAuthenticated) { alert('请先登录'); return; }
     dispatch({ type: 'BOOKMARK_POST', payload: post.id });
-    // 不需要手动更新本地状态，useEffect 会自动同步
   };
 
   const handleSubmitComment = async () => {
@@ -219,6 +225,21 @@ const PostDetail = () => {
   const prevModalImage = () => {
     if (postImages.length > 0) {
       setModalImageIndex((prev) => (prev - 1 + postImages.length) % postImages.length);
+    }
+  };
+
+  const [commentPage, setCommentPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
+
+  const loadMoreComments = async () => {
+    if (!postId) return;
+    const next = commentPage + 1;
+    const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}?page=${next}&limit=20`);
+    const data = await res.json();
+    if (data.success) {
+      setPost(prev => prev ? { ...prev, comments: [...prev.comments, ...data.post.comments] } : prev);
+      setCommentPage(next);
+      setHasMoreComments(data.meta?.hasNext);
     }
   };
 
@@ -523,6 +544,11 @@ const PostDetail = () => {
                     </div>
                   </div>
                 ))}
+                {hasMoreComments && (
+                  <div className="flex justify-center mt-4">
+                    <button onClick={loadMoreComments} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">加载更多评论</button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-8 text-center">

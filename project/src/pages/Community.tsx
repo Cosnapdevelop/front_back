@@ -39,10 +39,12 @@ const Community = () => {
   };
 
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const limit = 10;
   const { data, isLoading } = useQuery({
-    queryKey: ['posts', { page: 1 }],
+    queryKey: ['posts', { page, limit }],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/api/community/posts`);
+      const res = await fetch(`${API_BASE_URL}/api/community/posts?page=${page}&limit=${limit}`);
       return res.json();
     }
   });
@@ -90,7 +92,7 @@ const Community = () => {
       });
       const data = await res.json();
       if (data.success) {
-        queryClient.setQueryData<any>(['posts', { page: 1 }], (old) => ({
+        queryClient.setQueryData<any>(['posts', { page, limit }], (old) => ({
           success: true,
           posts: [
             { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0 },
@@ -209,6 +211,14 @@ const Community = () => {
         )}
 
         {/* Load More */}
+        {data?.meta?.hasNext && (
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              className="px-6 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >加载更多</button>
+          </div>
+        )}
       </div>
 
       {/* Create Post Modal */}
