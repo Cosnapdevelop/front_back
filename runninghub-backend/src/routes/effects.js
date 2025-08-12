@@ -1,4 +1,5 @@
 import express from 'express';
+import { auth } from '../middleware/auth.js';
 import multer from 'multer';
 import { uploadImageService } from '../services/uploadImageService.js';
 import { startComfyUITaskService, waitForComfyUITaskAndGetImages, cancelComfyUITask, getComfyUITaskStatus, getComfyUITaskResult } from '../services/comfyUITaskService.js';
@@ -78,7 +79,7 @@ const upload = multer({
 });
 
 // 通用的任务处理接口（支持ComfyUI和Webapp）
-router.post('/comfyui/apply', upload.array('images', 10), async (req, res) => {
+router.post('/comfyui/apply', auth, upload.array('images', 10), async (req, res) => {
   try {
     console.log('[任务处理] 收到新的任务请求');
     console.log('[任务处理] Headers:', req.headers);
@@ -466,7 +467,7 @@ router.post('/apply', upload.single('image'), async (req, res) => {
 });
 
 // 查询任务状态接口
-router.post('/comfyui/status', async (req, res) => {
+router.post('/comfyui/status', auth, async (req, res) => {
   try {
     const { taskId, regionId = 'hongkong' } = req.body;
     
@@ -514,7 +515,7 @@ router.post('/comfyui/status', async (req, res) => {
 });
 
 // 获取任务结果接口
-router.post('/comfyui/results', async (req, res) => {
+router.post('/comfyui/results', auth, async (req, res) => {
   try {
     const { taskId, regionId = 'hongkong' } = req.body;
     
@@ -562,7 +563,7 @@ router.post('/comfyui/results', async (req, res) => {
 });
 
 // 取消任务接口
-router.post('/comfyui/cancel', async (req, res) => {
+router.post('/comfyui/cancel', auth, async (req, res) => {
   try {
     console.log('[ComfyUI] 收到取消任务请求');
     
@@ -597,7 +598,7 @@ router.post('/comfyui/cancel', async (req, res) => {
 });
 
 // 重试任务接口
-router.post('/comfyui/retry', async (req, res) => {
+router.post('/comfyui/retry', auth, async (req, res) => {
   try {
     console.log('[ComfyUI] 收到重试任务请求');
     

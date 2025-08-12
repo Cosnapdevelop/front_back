@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import effectsRoutes from './routes/effects.js';
+import authRouter from './routes/auth.js';
 import { warmupConnection } from './services/comfyUITaskService.js';
 
 const app = express();
@@ -49,6 +50,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // 路由
+app.use('/auth', authRouter);
 app.use('/api/effects', effectsRoutes);
 
 // 健康检查端点
