@@ -113,7 +113,7 @@ const Community = () => {
         queryClient.setQueryData<any>(['posts', { page, limit }], (old) => ({
           success: true,
           posts: [
-            { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0 },
+            { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0, images: data.post.images || selectedImages },
             ...(old?.posts || [])
           ]
         }));

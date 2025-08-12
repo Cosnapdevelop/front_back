@@ -19,6 +19,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   
   // 向后兼容：如果post.images不存在但post.image存在，则创建一个单元素数组
   const postImages = post.images || (post.image ? [post.image] : []);
+  const effectName = post.effect?.name;
 
   const handleLike = async () => {
     if (!isAuthenticated) {
@@ -83,13 +84,16 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center space-x-3">
           <img
-            src={post.user.avatar}
-            alt={post.user.username}
+            src={post.user?.avatar || 'https://via.placeholder.com/80x80?text=User'}
+            alt={post.user?.username || 'user'}
             className="h-10 w-10 rounded-full object-cover"
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/80x80?text=User';
+            }}
           />
           <div>
             <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
-              @{post.user.username}
+              @{post.user?.username || 'anonymous'}
             </h4>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {formatDate(post.createdAt)}
@@ -108,6 +112,9 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           alt="Post"
           className="w-full h-64 sm:h-80 object-cover cursor-pointer"
           onClick={handleImageClick}
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Image+Unavailable';
+          }}
         />
         
         {/* Image Navigation for Multiple Images */}
@@ -139,9 +146,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           </>
         )}
         
-        <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
-          {post.effect.name}
-        </div>
+        {effectName && (
+          <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
+            {effectName}
+          </div>
+        )}
       </div>
 
       {/* Actions */}
