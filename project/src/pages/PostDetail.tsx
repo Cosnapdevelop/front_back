@@ -96,8 +96,10 @@ const PostDetail = () => {
       if (data.success) {
         setPost(prev => prev ? {
           ...prev,
-          comments: [...prev.comments, data.comment],
-          commentsCount: (prev.commentsCount || 0) + 1
+          comments: replyingTo
+            ? prev.comments.map(c => c.id === replyingTo ? { ...c, replies: [ ...(c.replies || []), data.comment ] } : c)
+            : [...prev.comments, data.comment],
+          commentsCount: replyingTo ? prev.commentsCount : (prev.commentsCount || 0) + 1
         } : null);
         setNewComment('');
       }

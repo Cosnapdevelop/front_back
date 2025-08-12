@@ -55,10 +55,14 @@ model Comment {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   content   String
+  parentId  String? 
+  parent    Comment? @relation("CommentToReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentToReplies")
   createdAt DateTime @default(now())
 
   @@index([postId])
   @@index([userId])
+  @@index([parentId])
 }
 
 model PostLike {
