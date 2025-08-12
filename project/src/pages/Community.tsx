@@ -79,7 +79,12 @@ const Community = () => {
         Object.entries(presignResp.form).forEach(([k, v]) => formData.append(k, v as string));
         if (!formData.has('key')) formData.append('key', presignResp.form.key);
         formData.append('file', file);
-        await fetch(presignResp.uploadUrl, { method: 'POST', body: formData });
+        const resp = await fetch(presignResp.uploadUrl, { method: 'POST', body: formData });
+        if (!resp.ok) {
+          console.error('OSS upload failed', await resp.text());
+          alert('图片直传失败，请稍后重试');
+          continue;
+        }
         setSelectedImages(prev => [...prev, presignResp.publicUrl]);
       } else if (presignResp.success && presignResp.provider === 'mock') {
         setSelectedImages(prev => [...prev, presignResp.publicUrl]);

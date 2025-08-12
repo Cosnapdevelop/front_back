@@ -267,9 +267,10 @@ const PostDetail = () => {
           <div className="flex items-center justify-between p-4 pb-2">
             <div className="flex items-center space-x-3">
               <img
-                src={post.user.avatar}
-                alt={post.user.username}
+                src={post.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`}
+                alt={post.user?.username || 'user'}
                 className="h-10 w-10 rounded-full object-cover"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = `${API_BASE_URL}/assets/placeholder-user.png`; }}
               />
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white text-sm">
@@ -317,9 +318,11 @@ const PostDetail = () => {
               )}
               
               {/* Effect Badge */}
-              <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
-                {post.effect.name}
-              </div>
+               {post.effect?.name && (
+                 <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
+                   {post.effect.name}
+                 </div>
+               )}
             </div>
 
             {/* Image Thumbnails */}
@@ -339,6 +342,7 @@ const PostDetail = () => {
                       src={image}
                       alt={`Thumbnail ${index + 1}`}
                       className="w-full h-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = `${API_BASE_URL}/assets/placeholder-image-400x300.png`; }}
                     />
                   </button>
                 ))}
