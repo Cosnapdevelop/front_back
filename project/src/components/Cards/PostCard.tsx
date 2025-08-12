@@ -84,11 +84,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center space-x-3">
           <img
-            src={post.user?.avatar || 'https://via.placeholder.com/80x80?text=User'}
+            src={post.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`}
             alt={post.user?.username || 'user'}
             className="h-10 w-10 rounded-full object-cover"
             onError={(e) => {
-              (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/80x80?text=User';
+              (e.currentTarget as HTMLImageElement).src = `${API_BASE_URL}/assets/placeholder-user.png`;
             }}
           />
           <div>
@@ -108,12 +108,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {/* Image */}
       <div className="relative">
         <img
-          src={postImages[currentImageIndex] || 'https://via.placeholder.com/400x300?text=No+Image'}
+          src={postImages[currentImageIndex] || `${API_BASE_URL}/assets/placeholder-image-400x300.png`}
           alt="Post"
           className="w-full h-64 sm:h-80 object-cover cursor-pointer"
           onClick={handleImageClick}
           onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Image+Unavailable';
+            (e.currentTarget as HTMLImageElement).src = `${API_BASE_URL}/assets/placeholder-image-400x300.png`;
           }}
         />
         

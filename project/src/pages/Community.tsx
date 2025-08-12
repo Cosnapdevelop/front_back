@@ -75,8 +75,9 @@ const Community = () => {
       const presignResp = await presign(ext);
       if (presignResp.success && presignResp.provider === 'aliyun-oss') {
         const formData = new FormData();
+        // 注意：OSS 表单键值必须先附加 policy 相关字段，再附加 file
         Object.entries(presignResp.form).forEach(([k, v]) => formData.append(k, v as string));
-        formData.append('key', presignResp.form.key);
+        if (!formData.has('key')) formData.append('key', presignResp.form.key);
         formData.append('file', file);
         await fetch(presignResp.uploadUrl, { method: 'POST', body: formData });
         setSelectedImages(prev => [...prev, presignResp.publicUrl]);

@@ -656,7 +656,10 @@ router.post('/upload/presign', auth, async (req, res) => {
         expiration,
         conditions: [
           ['content-length-range', 0, 20 * 1024 * 1024],
-          ['starts-with', '$key', dir + '/']
+          ['starts-with', '$key', dir + '/'],
+          { 'x-oss-object-acl': 'public-read' },
+          ['starts-with', '$Content-Type', 'image/'],
+          ['starts-with', '$Cache-Control', '']
         ]
       };
       const policy = Buffer.from(JSON.stringify(policyText)).toString('base64');
@@ -670,6 +673,9 @@ router.post('/upload/presign', auth, async (req, res) => {
         policy,
         OSSAccessKeyId: accessKeyId,
         Signature: signature,
+        'x-oss-object-acl': 'public-read',
+        'Content-Type': 'image/*',
+        'Cache-Control': 'max-age=31536000',
         success_action_status: '200',
       };
       const cdnDomain = process.env.ALIYUN_OSS_CUSTOM_DOMAIN;

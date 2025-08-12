@@ -56,6 +56,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/auth', authRouter);
 app.use('/api/effects', effectsRoutes);
 app.use('/api/community', communityRouter);
+// 静态占位资源
+app.use('/assets', express.static('public'));
 
 // 健康检查端点
 app.get('/health', (req, res) => {
