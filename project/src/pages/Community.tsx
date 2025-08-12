@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, TrendingUp, Clock, Users, X, Upload, Image as ImageIcon, Send, Camera, Trash2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/Cards/PostCard';
+import { API_BASE_URL } from '../config/api';
 
 const Community = () => {
   const { state, dispatch } = useApp();
@@ -36,7 +37,25 @@ const Community = () => {
     }
   };
 
-  const filteredPosts = getFilteredPosts();
+  const [remotePosts, setRemotePosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const filteredPosts = remotePosts.length > 0 ? remotePosts : getFilteredPosts();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`${API_BASE_URL}/api/community/posts`);
+        const data = await res.json();
+        if (data.success) setRemotePosts(data.posts);
+      } catch (e) {
+        console.warn('Load posts failed, fallback to mock list');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -65,34 +84,25 @@ const Community = () => {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Find the selected effect
+      if (!isAuthenticated) { alert('请先登录'); setIsSubmitting(false); return; }
       const effect = state.effects.find(e => e.id === selectedEffect);
-      if (!effect || !state.user) return;
-      
-      // Create new post
-      const newPost = {
-        id: Date.now().toString(),
-        user: state.user,
-        effect: effect,
-        images: selectedImages,
-        caption: postCaption,
-        likesCount: 0,
-        commentsCount: 0,
-        isLiked: false,
-        isBookmarked: false,
-        createdAt: new Date().toISOString(),
-        comments: [],
-      };
-      
-      // Add post to state (you would normally send this to your backend)
-      // For now, we'll just log it and show success
-      console.log('Creating post:', newPost);
-      
-      // Add the post to the app state
-      dispatch({ type: 'ADD_POST', payload: newPost });
+      if (!effect || !state.user) { setIsSubmitting(false); return; }
+
+      const res = await fetch(`${API_BASE_URL}/api/community/posts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+        },
+        body: JSON.stringify({ images: selectedImages, caption: postCaption, effectId: effect.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRemotePosts(prev => [
+          { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0 },
+          ...prev
+        ]);
+      }
       
       // Reset form and close modal
       setSelectedImages([]);

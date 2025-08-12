@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Heart, MessageCircle, Bookmark, Share, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Post } from '../../types';
+import { API_BASE_URL } from '../../config/api';
+import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,17 +13,32 @@ interface PostCardProps {
 
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { dispatch } = useApp();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   // 向后兼容：如果post.images不存在但post.image存在，则创建一个单元素数组
   const postImages = post.images || (post.image ? [post.image] : []);
 
-  const handleLike = () => {
-    dispatch({ type: 'LIKE_POST', payload: post.id });
+  const handleLike = async () => {
+    if (!isAuthenticated) {
+      alert('请先登录');
+      return;
+    }
+    try {
+      await fetch(`${API_BASE_URL}/api/community/posts/${post.id}/like`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }
+      });
+    } catch (e) {
+      console.warn('like failed', e);
+    } finally {
+      dispatch({ type: 'LIKE_POST', payload: post.id });
+    }
   };
 
   const handleBookmark = () => {
+    if (!isAuthenticated) { alert('请先登录'); return; }
     dispatch({ type: 'BOOKMARK_POST', payload: post.id });
   };
 

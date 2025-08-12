@@ -16,6 +16,9 @@ model User {
   avatar        String?
   createdAt     DateTime       @default(now())
   refreshTokens RefreshToken[]
+  posts         Post[]
+  comments      Comment[]
+  postLikes     PostLike[]
 }
 
 model RefreshToken {
@@ -27,6 +30,47 @@ model RefreshToken {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
 
+  @@index([userId])
+}
+
+model Post {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  effectId   String?
+  images     String[]
+  caption    String
+  likesCount Int       @default(0)
+  comments   Comment[]
+  likes      PostLike[]
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@index([userId])
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
   @@index([userId])
 }
 

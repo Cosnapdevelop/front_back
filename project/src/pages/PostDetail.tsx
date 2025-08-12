@@ -15,11 +15,14 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Post, Comment, User } from '../types';
+import { API_BASE_URL } from '../config/api';
+import { useAuth } from '../context/AuthContext';
 
 const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const { isAuthenticated } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,26 +36,18 @@ const PostDetail = () => {
   const postImages = post?.images || (post?.image ? [post.image] : []);
 
   useEffect(() => {
-    if (postId) {
-      const foundPost = state.posts.find(p => p.id === postId);
-      if (foundPost) {
-        // 保留本地的评论，只更新其他属性
-        setPost(prevPost => {
-          if (prevPost && prevPost.comments.length > foundPost.comments.length) {
-            // 如果本地有更多评论，保留本地评论
-            return {
-              ...foundPost,
-              comments: prevPost.comments,
-              commentsCount: prevPost.commentsCount
-            };
-          }
-          return foundPost;
-        });
-      } else {
+    (async () => {
+      if (!postId) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}`);
+        const data = await res.json();
+        if (data.success) setPost(data.post);
+        else setPost(null);
+      } catch {
         setPost(null);
       }
-    }
-  }, [postId, state.posts]);
+    })();
+  }, [postId]);
 
   if (!post) {
     return (
@@ -86,31 +81,29 @@ const PostDetail = () => {
   };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim() || !state.user) return;
+    if (!newComment.trim()) return;
+    if (!isAuthenticated) { alert('请先登录'); return; }
     
     setIsSubmitting(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const comment: Comment = {
-        id: Date.now().toString(),
-        user: state.user as User, // UserProfile extends User
-        content: newComment.trim(),
-        createdAt: new Date().toISOString(),
-        likesCount: 0,
-        isLiked: false,
-        replies: [],
-      };
-      
-      // 暂时只更新本地状态，稍后会添加全局状态同步
-      setPost(prev => prev ? {
-        ...prev,
-        comments: [...prev.comments, comment],
-        commentsCount: prev.commentsCount + 1
-      } : null);
-      
-      setNewComment('');
+      const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+        },
+        body: JSON.stringify({ content: newComment.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPost(prev => prev ? {
+          ...prev,
+          comments: [...prev.comments, data.comment],
+          commentsCount: (prev.commentsCount || 0) + 1
+        } : null);
+        setNewComment('');
+      }
     } catch (error) {
       console.error('Error adding comment:', error);
     } finally {
