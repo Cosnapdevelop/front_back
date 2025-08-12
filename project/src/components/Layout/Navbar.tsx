@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Sparkles, Users, User, Bell, Search, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import NotificationDropdown from './NotificationDropdown';
 import { useImageLibrary } from '../../hooks/useImageLibrary';
 import { RegionSelector } from '../RegionSelector';
@@ -11,6 +12,7 @@ const Navbar = () => {
   const location = useLocation();
   const { state, dispatch } = useApp();
   const { imageCount } = useImageLibrary();
+  const { isAuthenticated, logout } = useAuth();
 
   const navigation = [
     { name: 'Home', href: '/', icon: Home },
@@ -112,15 +114,26 @@ const Navbar = () => {
               <NotificationDropdown />
             </div>
 
-            {/* User avatar */}
-            {state.user && (
-              <Link to="/profile" className="flex items-center space-x-2">
-                <img
-                  src={state.user.avatar}
-                  alt={state.user.username}
-                  className="h-8 w-8 rounded-full object-cover ring-2 ring-mint-500 ring-offset-2 dark:ring-offset-obsidian-900 hover:ring-cosmic-500 transition-all duration-300"
-                />
-              </Link>
+            {/* Auth actions */}
+            {isAuthenticated ? (
+              <>
+                <Link to="/profile" className="flex items-center space-x-2">
+                  <img
+                    src={state.user?.avatar}
+                    alt={state.user?.username || 'me'}
+                    className="h-8 w-8 rounded-full object-cover ring-2 ring-mint-500 ring-offset-2 dark:ring-offset-obsidian-900 hover:ring-cosmic-500 transition-all duration-300"
+                  />
+                </Link>
+                <button
+                  onClick={logout}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >退出</button>
+              </>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Link to="/login" className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">登录</Link>
+                <Link to="/register" className="px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700">注册</Link>
+              </div>
             )}
           </div>
         </div>
