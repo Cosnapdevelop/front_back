@@ -19,6 +19,8 @@ model User {
   posts         Post[]
   comments      Comment[]
   postLikes     PostLike[]
+  notificationsReceived Notification[] @relation("NotificationReceiver")
+  notificationsSent     Notification[] @relation("NotificationActor")
 }
 
 model RefreshToken {
@@ -88,7 +90,7 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation("NotificationReceiver", fields: [userId], references: [id])
   actor  User @relation("NotificationActor", fields: [actorId], references: [id])
 
   @@index([userId])
