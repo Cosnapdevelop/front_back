@@ -5,6 +5,7 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    preDeployCommand: npx prisma generate && npx prisma migrate deploy || true
     envVars:
       - key: NODE_ENV
         value: production
