@@ -65,7 +65,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </h1>
               
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                抱歉，页面遇到了意外错误。您可以尝试刷新页面或返回首页。
+                抱歉，页面遇到了意外错误。如果你是从社区进入帖子详情，请返回社区后再进入；如问题持续，请将此页面的错误信息截图发我。
               </p>
 
               <div className="space-y-3">
