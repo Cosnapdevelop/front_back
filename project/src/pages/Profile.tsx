@@ -49,6 +49,36 @@ const Profile = () => {
   };
 
   const renderTabContent = () => {
+    switch (activeTab) {
+      case 'history':
+        return (
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+              Recently Viewed Effects
+            </h3>
+            {state.recentlyViewed.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {state.recentlyViewed.map((effect) => (
+                  <EffectCard key={effect.id} effect={effect} />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-400">
+                  No recent activity yet. Start exploring effects!
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'bookmarks':
+        return (
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+              Bookmarked Effects
+            </h3>
       case 'posts':
         return (
           <div>
@@ -100,36 +130,6 @@ const Profile = () => {
             )}
           </div>
         );
-    switch (activeTab) {
-      case 'history':
-        return (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-              Recently Viewed Effects
-            </h3>
-            {state.recentlyViewed.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {state.recentlyViewed.map((effect) => (
-                  <EffectCard key={effect.id} effect={effect} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">
-                  No recent activity yet. Start exploring effects!
-                </p>
-              </div>
-            )}
-          </div>
-        );
-
-      case 'bookmarks':
-        return (
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-              Bookmarked Effects
-            </h3>
             {bookmarkedEffects.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {bookmarkedEffects.map((effect) => (
