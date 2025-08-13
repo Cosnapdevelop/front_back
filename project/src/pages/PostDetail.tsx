@@ -32,26 +32,41 @@ const PostDetail = () => {
   const [modalImageIndex, setModalImageIndex] = useState(0);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
+  const [commentPage, setCommentPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(true);
   
   // 向后兼容：如果post.images不存在但post.image存在，则创建一个单元素数组
   const postImages = post?.images || (post?.image ? [post.image] : []);
 
   const queryClient = useQueryClient();
   useEffect(() => {
-    let mounted = true;
+    let aborted = false;
     (async () => {
       if (!postId) return;
+      setPost('loading');
       try {
         const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}`);
         const json = await res.json();
-        if (!mounted) return;
-        if (json?.success) setPost(json.post);
-        else setPost(null);
+        if (aborted) return;
+        if (json?.success && json.post) {
+          // 规范化数据，确保必要字段存在
+          const safe = {
+            ...json.post,
+            user: json.post.user || { id: '', username: 'Unknown', avatar: '' },
+            images: Array.isArray(json.post.images) ? json.post.images : [],
+            comments: Array.isArray(json.post.comments) ? json.post.comments : [],
+            likesCount: json.post.likesCount ?? 0,
+            commentsCount: json.post.commentsCount ?? (json.post.comments?.length || 0)
+          } as Post;
+          setPost(safe);
+        } else {
+          setPost(null);
+        }
       } catch {
-        if (mounted) setPost(null);
+        if (!aborted) setPost(null);
       }
     })();
-    return () => { mounted = false; };
+    return () => { aborted = true; };
   }, [postId]);
 
   if (post === 'loading') {
@@ -294,8 +309,6 @@ const PostDetail = () => {
     }
   };
 
-  const [commentPage, setCommentPage] = useState(1);
-  const [hasMoreComments, setHasMoreComments] = useState(true);
 
   const loadMoreComments = async () => {
     if (!postId) return;
@@ -333,8 +346,8 @@ const PostDetail = () => {
           <div className="flex items-center justify-between p-4 pb-2">
             <div className="flex items-center space-x-3">
               <img
-                src={post.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`}
-                alt={post.user?.username || 'user'}
+                src={(post.user && post.user.avatar) ? post.user.avatar : `${API_BASE_URL}/assets/placeholder-user.png`}
+                alt={(post.user && post.user.username) ? post.user.username : 'user'}
                 className="h-10 w-10 rounded-full object-cover"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).src = `${API_BASE_URL}/assets/placeholder-user.png`; }}
               />
@@ -384,9 +397,9 @@ const PostDetail = () => {
               )}
               
               {/* Effect Badge */}
-               {post.effect?.name && (
+               {(post as any).effect?.name && (
                  <div className="absolute bottom-3 left-3 bg-black/70 text-white px-2 py-1 rounded-lg text-xs">
-                   {post.effect.name}
+                   {(post as any).effect.name}
                  </div>
                )}
             </div>
