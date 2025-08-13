@@ -7,51 +7,67 @@ const router = express.Router();
 
 // 列表（未登录可访问） with pagination & sorting
 router.get('/posts', async (req, res) => {
-  const page = Math.max(parseInt(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
-  const sort = (req.query.sort || 'createdAt:desc').toString();
-  const [sortField, sortDir] = sort.split(':');
-  const orderBy = [{ [sortField || 'createdAt']: (sortDir === 'asc' ? 'asc' : 'desc') }];
+  try {
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
+    const sort = (req.query.sort || 'createdAt:desc').toString();
+    const [sortField, sortDir] = sort.split(':');
+    const orderBy = [{ [sortField || 'createdAt']: (sortDir === 'asc' ? 'asc' : 'desc') }];
 
-  const [posts, total] = await Promise.all([
-    prisma.post.findMany({
-      orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        user: { select: { id: true, username: true, avatar: true } },
-        comments: { select: { id: true, content: true, createdAt: true, user: { select: { id: true, username: true, avatar: true } } }, take: 3, orderBy: { createdAt: 'desc' } },
-      }
-    }),
-    prisma.post.count()
-  ]);
-  res.json({ success: true, posts, meta: { page, limit, total, hasNext: page * limit < total } });
-});
-
-// 详情（未登录可访问） with comments pagination
-router.get('/posts/:id', async (req, res) => {
-  const { id } = req.params;
-  const page = Math.max(parseInt(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
-  const post = await prisma.post.findUnique({
-    where: { id },
-    include: {
-      user: { select: { id: true, username: true, avatar: true } },
-      comments: {
-        where: { parentId: null },
-        orderBy: { createdAt: 'asc' },
+    const [posts, total] = await Promise.all([
+      prisma.post.findMany({
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
         include: {
           user: { select: { id: true, username: true, avatar: true } },
-          replies: { orderBy: { createdAt: 'asc' }, include: { user: { select: { id: true, username: true, avatar: true } } } }
+          comments: { select: { id: true, content: true, createdAt: true, user: { select: { id: true, username: true, avatar: true } } }, take: 3, orderBy: { createdAt: 'desc' } },
         }
-      },
-    }
-  });
-  if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
+      }),
+      prisma.post.count()
+    ]);
+    res.json({ success: true, posts, meta: { page, limit, total, hasNext: page * limit < total } });
+  } catch (e) {
+    console.error('[community] 列表接口错误:', e);
+    res.status(500).json({ success: false, error: '服务器错误' });
+  }
+});
+
+// 详情（未登录可访问） with comments pagination
+router.get('/posts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+  const post = await prisma.post.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, username: true, avatar: true } },
+        comments: {
+          where: { parentId: null },
+          orderBy: { createdAt: 'asc' },
+          skip: (page - 1) * limit,
+          take: limit,
+          include: {
+            user: { select: { id: true, username: true, avatar: true } },
+            replies: { orderBy: { createdAt: 'asc' }, include: { user: { select: { id: true, username: true, avatar: true } } } }
+          }
+        },
+      }
+    });
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found' });
   const total = await prisma.comment.count({ where: { postId: id, parentId: null } });
-  res.json({ success: true, post, meta: { page, limit, total, hasNext: page * limit < total } });
+  // 兜底：likesCount/commentsCount 若为空
+  const safePost = {
+    ...post,
+    likesCount: post.likesCount ?? 0,
+    commentsCount: post.comments?.length ?? 0
+  };
+  res.json({ success: true, post: safePost, meta: { page, limit, total, hasNext: page * limit < total } });
+  } catch (e) {
+    console.error('[community] 详情接口错误:', e);
+    res.status(500).json({ success: false, error: '服务器错误' });
+  }
 });
 
 // 发帖（需登录）

@@ -44,7 +44,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
 
   const handleCommentsClick = () => {
-    navigate(`/post/${post.id}`);
+    try {
+      navigate(`/post/${post.id}`);
+    } catch (e) {
+      console.error('navigate post detail failed', e);
+    }
   };
 
   const handleImageClick = () => {
@@ -166,7 +170,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               }`}
             >
               <Heart className="h-6 w-6" fill={post.isLiked ? 'currentColor' : 'none'} />
-              <span className="text-sm font-medium">{post.likesCount}</span>
+              <span className="text-sm font-medium">{post.likesCount ?? 0}</span>
             </button>
             
             <button
@@ -174,7 +178,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               className="flex items-center space-x-1 text-gray-700 dark:text-gray-300 hover:text-blue-500 transition-colors"
             >
               <MessageCircle className="h-6 w-6" />
-              <span className="text-sm font-medium">{post.commentsCount}</span>
+               <span className="text-sm font-medium">{post.commentsCount ?? 0}</span>
             </button>
             
             <button className="text-gray-700 dark:text-gray-300 hover:text-green-500 transition-colors">

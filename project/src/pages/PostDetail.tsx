@@ -45,6 +45,12 @@ const PostDetail = () => {
     }
   });
   useEffect(() => { if (data?.success) setPost(data.post); }, [data]);
+  // 防御：如果接口失败，保留空状态，不要抛错
+  useEffect(() => {
+    if (data && !data.success) {
+      setPost(null);
+    }
+  }, [data]);
 
   if (!post) {
     return (
