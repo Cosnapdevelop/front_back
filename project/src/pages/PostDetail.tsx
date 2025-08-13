@@ -197,35 +197,33 @@ const PostDetail = () => {
     }
   };
 
-  const handleCommentLike = (commentId: string) => {
-    setPost(prev => {
-      if (!prev) return null;
-      
-      const updateCommentLike = (comments: any[]): any[] => {
-        return comments.map(comment => {
-          if (comment.id === commentId) {
-            return {
-              ...comment,
-              isLiked: !comment.isLiked,
-              likesCount: comment.isLiked ? comment.likesCount - 1 : comment.likesCount + 1
-            };
-          }
-          if (comment.replies && comment.replies.length > 0) {
-            return {
-              ...comment,
-              replies: updateCommentLike(comment.replies)
-            };
-          }
-          return comment;
-        });
-      };
-      
-      return {
-        ...prev,
-        comments: updateCommentLike(prev.comments)
-      };
-    });
+  const handleCommentLike = async (commentId: string) => {
+    if (!isAuthenticated) { alert('请先登录'); return; }
+    const toggle = (c: any): any => {
+      if (c.id === commentId) return { ...c, isLiked: !c.isLiked, likesCount: (c.likesCount || 0) + (c.isLiked ? -1 : 1) };
+      return { ...c, replies: c.replies ? c.replies.map(toggle) : [] };
+    };
+    const prev = post ? JSON.parse(JSON.stringify(post)) : null;
+    setPost(p => p ? { ...p, comments: p.comments.map(toggle) } : p);
+    try {
+      const target = findComment(post?.comments || [], commentId);
+      const endpoint = target?.isLiked ? 'unlike' : 'like';
+      await fetch(`${API_BASE_URL}/api/community/comments/${commentId}/${endpoint}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }
+      });
+    } catch {
+      if (prev) setPost(prev);
+    }
   };
+
+  function findComment(arr: any[], id: string): any | null {
+    for (const c of arr) {
+      if (c.id === id) return c;
+      if (c.replies) { const f = findComment(c.replies, id); if (f) return f; }
+    }
+    return null;
+  }
 
   const handleReply = async (commentId: string) => {
     if (!replyContent.trim() || !state.user || !post) return;

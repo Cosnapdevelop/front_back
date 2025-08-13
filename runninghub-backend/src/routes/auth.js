@@ -117,11 +117,26 @@ router.get('/me', async (req, res) => {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ success: false, error: '未授权' });
     const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, email: true, username: true, avatar: true } });
+    const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, email: true, username: true, avatar: true, bio: true } });
     if (!user) return res.status(404).json({ success: false, error: '用户不存在' });
     return res.json({ success: true, user });
   } catch {
     return res.status(401).json({ success: false, error: '未授权' });
+  }
+});
+
+// 更新用户信息
+router.put('/me', async (req, res) => {
+  try {
+    const header = req.headers['authorization'] || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ success: false, error: '未授权' });
+    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const { username, email, bio, avatar } = req.body;
+    const user = await prisma.user.update({ where: { id: payload.sub }, data: { username, email, bio, avatar }, select: { id: true, email: true, username: true, avatar: true, bio: true } });
+    return res.json({ success: true, user });
+  } catch (e) {
+    return res.status(400).json({ success: false, error: e.message });
   }
 });
 

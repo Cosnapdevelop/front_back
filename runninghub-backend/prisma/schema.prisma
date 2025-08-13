@@ -14,6 +14,7 @@ model User {
   username      String         @unique
   passwordHash  String
   avatar        String?
+  bio           String?
   createdAt     DateTime       @default(now())
   refreshTokens RefreshToken[]
   posts         Post[]
@@ -60,11 +61,26 @@ model Comment {
   parentId  String? 
   parent    Comment? @relation("CommentToReplies", fields: [parentId], references: [id])
   replies   Comment[] @relation("CommentToReplies")
+  likes     CommentLike[]
+  likesCount Int      @default(0)
   createdAt DateTime @default(now())
 
   @@index([postId])
   @@index([userId])
   @@index([parentId])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
 }
 
 model PostLike {

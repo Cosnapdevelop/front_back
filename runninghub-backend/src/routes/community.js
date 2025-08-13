@@ -21,7 +21,7 @@ router.get('/posts', async (req, res) => {
         take: limit,
         include: {
           user: { select: { id: true, username: true, avatar: true } },
-          comments: { select: { id: true, content: true, createdAt: true, user: { select: { id: true, username: true, avatar: true } } }, take: 3, orderBy: { createdAt: 'desc' } },
+        comments: { select: { id: true, content: true, createdAt: true, likesCount: true, user: { select: { id: true, username: true, avatar: true } } }, take: 3, orderBy: { createdAt: 'desc' } },
         }
       }),
       prisma.post.count()
@@ -130,6 +130,22 @@ router.post('/posts/:id/comments', auth, async (req, res) => {
     });
   }
   res.json({ success: true, comment });
+});
+
+// 评论点赞/取消
+router.post('/comments/:id/like', auth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.commentLike.create({ data: { commentId: id, userId: req.user.id } });
+    await prisma.comment.update({ where: { id }, data: { likesCount: { increment: 1 } } });
+  } catch {}
+  res.json({ success: true });
+});
+router.post('/comments/:id/unlike', auth, async (req, res) => {
+  const { id } = req.params;
+  await prisma.commentLike.deleteMany({ where: { commentId: id, userId: req.user.id } });
+  await prisma.comment.update({ where: { id }, data: { likesCount: { decrement: 1 } } }).catch(()=>{});
+  res.json({ success: true });
 });
 
 // 获取通知（需登录）

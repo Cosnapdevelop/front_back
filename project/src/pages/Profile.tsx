@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Settings, 
@@ -17,11 +17,15 @@ import EffectCard from '../components/Cards/EffectCard';
 
 const Profile = () => {
   const { state, dispatch } = useApp();
-  const [activeTab, setActiveTab] = useState<'history' | 'bookmarks' | 'settings'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'bookmarks' | 'posts' | 'settings'>('history');
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const bioRef = useRef<HTMLTextAreaElement>(null);
 
   const tabs = [
     { id: 'history', label: 'Recent History', icon: Clock },
     { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
+    { id: 'posts', label: 'My Posts', icon: Edit3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -92,6 +96,7 @@ const Profile = () => {
                   <input
                     type="text"
                     defaultValue={state.user?.username}
+                    ref={usernameRef}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -102,6 +107,7 @@ const Profile = () => {
                   <input
                     type="email"
                     defaultValue={state.user?.email}
+                    ref={emailRef}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -111,6 +117,7 @@ const Profile = () => {
                   </label>
                   <textarea
                     defaultValue={state.user?.bio}
+                    ref={bioRef}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
                   />
@@ -201,10 +208,40 @@ const Profile = () => {
 
             {/* Save Button */}
             <div className="flex justify-end">
-              <button className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+              <button
+                onClick={async () => {
+                  const payload = {
+                    username: usernameRef.current?.value,
+                    email: emailRef.current?.value,
+                    bio: bioRef.current?.value,
+                  };
+                  try {
+                    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/auth/me`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+                      },
+                      body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (data.success) alert('Saved'); else alert('Failed: ' + (data.error || '')); 
+                  } catch (e) {
+                    alert('Failed to save');
+                  }
+                }}
+                className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+              >
                 Save Changes
               </button>
             </div>
+          </div>
+        );
+      case 'posts':
+        return (
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">My Posts</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">暂时展示列表入口（可在后续版本中完善编辑/删除界面）。</p>
           </div>
         );
 
