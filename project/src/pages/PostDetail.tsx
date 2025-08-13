@@ -228,41 +228,46 @@ const PostDetail = () => {
   };
 
   const handleReply = async (commentId: string) => {
-    if (!replyContent.trim() || !state.user) return;
-    
-    const reply = {
-      id: Date.now().toString(),
+    if (!replyContent.trim() || !state.user || !post) return;
+    if (!isAuthenticated) { alert('请先登录'); return; }
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
       user: state.user,
       content: replyContent.trim(),
       createdAt: new Date().toISOString(),
       likesCount: 0,
       isLiked: false,
-      replies: [],
-    };
-    
-    setPost(prev => {
-      if (!prev) return null;
-      
-      const addReplyToComment = (comments: any[]): any[] => {
-        return comments.map(comment => {
-          if (comment.id === commentId) {
-            return {
-              ...comment,
-              replies: [...(comment.replies || []), reply]
-            };
-          }
-          return comment;
-        });
-      };
-      
-      return {
-        ...prev,
-        comments: addReplyToComment(prev.comments)
-      };
+      replies: []
+    } as any;
+    const prev = JSON.parse(JSON.stringify(post));
+    setPost(prevPost => {
+      if (!prevPost) return prevPost;
+      const add = (arr: any[]): any[] => arr.map(c => c.id === commentId ? { ...c, replies: [ ...(c.replies || []), optimistic ] } : c);
+      return { ...prevPost, comments: add(prevPost.comments) } as any;
     });
-    
     setReplyingTo(null);
     setReplyContent('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/community/posts/${post.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
+        body: JSON.stringify({ content: optimistic.content, parentId: commentId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPost(cur => {
+          if (!cur) return cur;
+          const replace = (arr: any[]) => arr.map(c => c.id === commentId ? { ...c, replies: (c.replies || []).map((r:any)=> r.id===tempId ? data.comment : r) } : c);
+          return { ...cur, comments: replace(cur.comments) } as any;
+        });
+      } else {
+        throw new Error('reply failed');
+      }
+    } catch {
+      setPost(prev);
+      alert('回复失败，请重试');
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -367,10 +372,13 @@ const PostDetail = () => {
             {/* Main Image */}
             <div className="relative">
               <img
-                src={postImages[currentImageIndex] || 'https://via.placeholder.com/400x300?text=No+Image'}
+                src={postImages[currentImageIndex] || `${API_BASE_URL}/assets/placeholder-image-400x300.png`}
                 alt={`Post ${currentImageIndex + 1}`}
                 className="w-full h-96 sm:h-[500px] object-cover cursor-pointer"
                 onClick={() => openImageModal(currentImageIndex)}
+                loading="eager"
+                decoding="async"
+                onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API_BASE_URL}/assets/placeholder-image-400x300.png`;}}
               />
               
               {/* Image Navigation */}

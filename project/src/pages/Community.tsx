@@ -119,10 +119,19 @@ const Community = () => {
         queryClient.setQueryData<any>(['posts', { page, limit }], (old) => ({
           success: true,
           posts: [
-            { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0, images: data.post.images || selectedImages },
+            { ...data.post, user: state.user, comments: [], commentsCount: 0, likesCount: 0, images: data.post.images || selectedImages, __highlight: true },
             ...(old?.posts || [])
           ]
         }));
+        // 滚动至顶部并闪烁高亮
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+          const cards = document.querySelectorAll('[data-post-card]');
+          if (cards && cards[0]) {
+            (cards[0] as HTMLElement).classList.add('ring-2','ring-purple-400');
+            setTimeout(()=> (cards[0] as HTMLElement).classList.remove('ring-2','ring-purple-400'), 1200);
+          }
+        }, 400);
       }
       
       // Reset form and close modal
