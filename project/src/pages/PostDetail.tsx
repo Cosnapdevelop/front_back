@@ -23,7 +23,7 @@ const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user: authUser } = useAuth();
   const [post, setPost] = useState<Post | null>(null);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -105,33 +105,67 @@ const PostDetail = () => {
   };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !post) return;
     if (!isAuthenticated) { alert('请先登录'); return; }
-    
     setIsSubmitting(true);
-    
+
+    const tempId = `temp-${Date.now()}`;
+    const tempUser = authUser ? { id: authUser.id, username: authUser.username, avatar: authUser.avatar || '' } as User : post.user;
+    const tempComment: any = { id: tempId, user: tempUser, content: newComment.trim(), createdAt: new Date().toISOString(), likesCount: 0, isLiked: false, replies: [] };
+    const prevPost = JSON.parse(JSON.stringify(post));
+
+    // optimistic local update
+    setPost(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev } as any;
+      if (replyingTo) {
+        updated.comments = prev.comments.map(c => c.id === replyingTo ? { ...c, replies: [ ...(c.replies || []), tempComment ] } : c);
+      } else {
+        updated.comments = [...prev.comments, tempComment];
+        updated.commentsCount = (prev.commentsCount || 0) + 1;
+      }
+      return updated;
+    });
+
+    // sync lists commentsCount optimistically
+    const lists = queryClient.getQueriesData<any>({ queryKey: ['posts'] });
+    const prevLists = lists.map(([key, data]) => [key, data ? JSON.parse(JSON.stringify(data)) : data] as const);
+    if (!replyingTo) {
+      lists.forEach(([key, data]) => {
+        if (data?.posts) {
+          queryClient.setQueryData(key as any, { ...data, posts: data.posts.map((p: any) => p.id === post.id ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p) });
+        }
+      });
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
-        },
-        body: JSON.stringify({ content: newComment.trim() })
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
+        body: JSON.stringify({ content: newComment.trim(), parentId: replyingTo || undefined })
       });
       const data = await res.json();
       if (data.success) {
-        setPost(prev => prev ? {
-          ...prev,
-          comments: replyingTo
-            ? prev.comments.map(c => c.id === replyingTo ? { ...c, replies: [ ...(c.replies || []), data.comment ] } : c)
-            : [...prev.comments, data.comment],
-          commentsCount: replyingTo ? prev.commentsCount : (prev.commentsCount || 0) + 1
-        } : null);
+        // replace temp with server comment
+        setPost(prev => {
+          if (!prev) return prev;
+          const replace = (arr: any[]) => arr.map(c => c.id === tempId ? data.comment : { ...c, replies: c.replies ? replace(c.replies) : [] });
+          if (replyingTo) {
+            return { ...prev, comments: prev.comments.map(c => c.id === replyingTo ? { ...c, replies: (c.replies || []).map(r => r.id === tempId ? data.comment : r) } : c) };
+          }
+          return { ...prev, comments: prev.comments.map(c => c.id === tempId ? data.comment : c) };
+        });
         setNewComment('');
+        setReplyingTo(null);
+        setReplyContent('');
+      } else {
+        throw new Error('create failed');
       }
-    } catch (error) {
-      console.error('Error adding comment:', error);
+    } catch (e) {
+      // rollback
+      setPost(prevPost);
+      prevLists.forEach(([key, data]) => queryClient.setQueryData(key as any, data));
+      alert('评论失败，请重试');
     } finally {
       setIsSubmitting(false);
     }
