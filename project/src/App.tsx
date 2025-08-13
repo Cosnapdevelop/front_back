@@ -36,7 +36,7 @@ function App() {
                 <Route path="/effect/:id" element={<EffectDetail />} />
                 <Route path="/apply/:id" element={<ProtectedRoute><ApplyEffect /></ProtectedRoute>} />
                 <Route path="/image-library" element={<ImageLibrary />} />
-                <Route path="/post/:postId" element={<PostDetail />} />
+                <Route path="/post/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
                 <Route path="/user/:userId" element={<UserProfile />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

@@ -54,9 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const stored = localStorage.getItem(ACCESS_KEY);
       if (stored) {
+        setAccessToken(stored);
         const me = await fetchMe(stored);
         if (me) setUser(me);
-        else clearTokens();
+        else {
+          // 尝试刷新一次
+          const ok = await refresh();
+          if (!ok) clearTokens();
+        }
       }
       setBootstrapped(true);
     })();
