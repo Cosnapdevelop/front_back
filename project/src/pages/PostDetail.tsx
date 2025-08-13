@@ -36,6 +36,7 @@ const PostDetail = () => {
   // 向后兼容：如果post.images不存在但post.image存在，则创建一个单元素数组
   const postImages = post?.images || (post?.image ? [post.image] : []);
 
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ['post', postId],
     enabled: !!postId,
@@ -75,13 +76,27 @@ const PostDetail = () => {
 
   const handleLike = async () => {
     if (!isAuthenticated) { alert('请先登录'); return; }
+    const prev = post ? JSON.parse(JSON.stringify(post)) : null;
+    const endpoint = post?.isLiked ? 'unlike' : 'like';
+    setPost(p => p ? { ...p, isLiked: !p.isLiked, likesCount: (p.likesCount || 0) + (p.isLiked ? -1 : 1) } : p);
+    // sync list caches
+    const lists = queryClient.getQueriesData<any>({ queryKey: ['posts'] });
+    const prevLists = lists.map(([key, data]) => [key, data ? JSON.parse(JSON.stringify(data)) : data] as const);
+    const toggle = (x: any) => x.id === post?.id ? { ...x, isLiked: !x.isLiked, likesCount: (x.likesCount || 0) + (x.isLiked ? -1 : 1) } : x;
+    lists.forEach(([key, data]) => {
+      if (data?.posts) queryClient.setQueryData(key as any, { ...data, posts: data.posts.map(toggle) });
+    });
     try {
-      await fetch(`${API_BASE_URL}/api/community/posts/${post.id}/like`, {
+      await fetch(`${API_BASE_URL}/api/community/posts/${post?.id}/${endpoint}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }
       });
-    } catch {}
-    dispatch({ type: 'LIKE_POST', payload: post.id });
+      dispatch({ type: 'LIKE_POST', payload: post!.id });
+    } catch {
+      // rollback
+      if (prev) setPost(prev);
+      prevLists.forEach(([key, data]) => queryClient.setQueryData(key as any, data));
+    }
   };
 
   const handleBookmark = () => {

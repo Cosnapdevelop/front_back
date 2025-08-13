@@ -4,6 +4,7 @@ import { Heart, MessageCircle, Bookmark, Share, MoreHorizontal, ChevronLeft, Che
 import { Post } from '../../types';
 import { API_BASE_URL } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,6 +14,7 @@ interface PostCardProps {
 
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { dispatch } = useApp();
+  const queryClient = useQueryClient();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -26,15 +28,34 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       alert('请先登录');
       return;
     }
+    // Optimistic update on all cached post lists
+    const queries = queryClient.getQueriesData<any>({ queryKey: ['posts'] });
+    const previous = queries.map(([key, data]) => [key, data ? JSON.parse(JSON.stringify(data)) : data] as const);
+    const toggle = (p: any) => p.id === post.id ? { ...p, isLiked: !p.isLiked, likesCount: (p.likesCount || 0) + (p.isLiked ? -1 : 1) } : p;
+    queries.forEach(([key, data]) => {
+      if (!data?.posts) return;
+      queryClient.setQueryData(key as any, { ...data, posts: data.posts.map(toggle) });
+    });
+    // Also sync detail cache if exists
+    const details = queryClient.getQueriesData<any>({ queryKey: ['post'] });
+    const prevDetails = details.map(([key, data]) => [key, data ? JSON.parse(JSON.stringify(data)) : data] as const);
+    details.forEach(([key, data]) => {
+      if (!data?.post) return;
+      if (data.post.id !== post.id) return;
+      queryClient.setQueryData(key as any, { ...data, post: toggle(data.post) });
+    });
+    dispatch({ type: 'LIKE_POST', payload: post.id });
     try {
-      await fetch(`${API_BASE_URL}/api/community/posts/${post.id}/like`, {
+      const endpoint = post.isLiked ? 'unlike' : 'like';
+      await fetch(`${API_BASE_URL}/api/community/posts/${post.id}/${endpoint}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }
       });
     } catch (e) {
+      // rollback
+      previous.forEach(([key, data]) => queryClient.setQueryData(key as any, data));
+      prevDetails.forEach(([key, data]) => queryClient.setQueryData(key as any, data));
       console.warn('like failed', e);
-    } finally {
-      dispatch({ type: 'LIKE_POST', payload: post.id });
     }
   };
 
