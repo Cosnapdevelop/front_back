@@ -125,6 +125,20 @@ router.get('/me', async (req, res) => {
   }
 });
 
+// 更换头像（预签名直传后传入新URL）
+router.put('/me/avatar', async (req, res) => {
+  try {
+    const header = req.headers['authorization'] || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ success: false, error: '未授权' });
+    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const { avatar } = req.body;
+    const user = await prisma.user.update({ where: { id: payload.sub }, data: { avatar }, select: { id: true, email: true, username: true, avatar: true, bio: true } });
+    return res.json({ success: true, user });
+  } catch (e) {
+    return res.status(400).json({ success: false, error: e.message });
+  }
+});
 // 更新用户信息
 router.put('/me', async (req, res) => {
   try {

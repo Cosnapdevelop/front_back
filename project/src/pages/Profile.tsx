@@ -113,12 +113,32 @@ const Profile = () => {
                         <button
                           onClick={async ()=>{
                             const caption = prompt('Edit caption', p.caption) ?? p.caption;
-                            const images = p.images; // 可扩展更换图片弹窗
-                            const res = await fetch(`${API}/api/community/posts/${p.id}`, {
-                              method:'PUT', headers:{'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}`}, body: JSON.stringify({ caption, images })
-                            });
-                            const data = await res.json();
-                            if (data.success) { alert('Updated'); fetchMyPosts(); } else { alert('Failed: '+(data.error||'')); }
+                            let images = p.images;
+                            // 选择并直传新图（可多次点击逐张追加）
+                            const input = document.createElement('input');
+                            input.type = 'file'; input.accept = 'image/*';
+                            input.onchange = async () => {
+                              const file = input.files && input.files[0];
+                              if (file) {
+                                const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+                                const resp = await fetch(`${API}/api/effects/upload/presign`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ ext, dir:'cosnap/community' }) });
+                                const ps = await resp.json();
+                                if (ps.success && ps.provider === 'aliyun-oss') {
+                                  const form = new FormData();
+                                  Object.entries(ps.form).forEach(([k,v])=> form.append(k, v as string));
+                                  if (!form.has('key')) form.append('key', ps.form.key);
+                                  form.append('file', file);
+                                  await fetch(ps.uploadUrl, { method:'POST', body: form });
+                                  images = [...(p.images||[]), ps.publicUrl];
+                                } else if (ps.success && ps.provider === 'mock') {
+                                  images = [...(p.images||[]), ps.publicUrl];
+                                }
+                              }
+                              const res = await fetch(`${API}/api/community/posts/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}`}, body: JSON.stringify({ caption, images }) });
+                              const data = await res.json();
+                              if (data.success) { alert('Updated'); fetchMyPosts(); } else { alert('Failed: '+(data.error||'') ); }
+                            };
+                            input.click();
                           }}
                           className="px-3 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600">Edit</button>
                         <button
@@ -338,9 +358,10 @@ const Profile = () => {
           <div className="relative px-6 pb-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-16 sm:-mt-20">
               <img
-                src={state.user.avatar}
+                src={state.user.avatar || `${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`}
                 alt={state.user.username}
                 className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white dark:border-gray-800 object-cover mx-auto sm:mx-0"
+                onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`;}}
               />
               
               <div className="flex-1 text-center sm:text-left mt-4 sm:mt-0 sm:pb-4">
@@ -377,6 +398,33 @@ const Profile = () => {
                 <button className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors">
                   <Share className="h-4 w-4" />
                   <span>Share</span>
+                </button>
+                <button
+                  onClick={async ()=>{
+                    const input = document.createElement('input');
+                    input.type='file'; input.accept='image/*';
+                    input.onchange = async ()=>{
+                      const file = input.files && input.files[0];
+                      if (!file) return;
+                      const ext = (file.name.split('.').pop()||'jpg').toLowerCase();
+                      const resp = await fetch(`${API}/api/effects/upload/presign`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ ext, dir:'cosnap/avatar' }) });
+                      const ps = await resp.json();
+                      if (ps.success) {
+                        if (ps.provider==='aliyun-oss'){
+                          const form = new FormData(); Object.entries(ps.form).forEach(([k,v])=> form.append(k, v as string)); if(!form.has('key')) form.append('key', ps.form.key); form.append('file', file); await fetch(ps.uploadUrl, { method:'POST', body: form });
+                        }
+                        const avatarUrl = ps.publicUrl;
+                        const res = await fetch(`${API}/auth/me/avatar`, { method:'PUT', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ avatar: avatarUrl }) });
+                        const data = await res.json();
+                        if (data.success){ localStorage.setItem('user', JSON.stringify(data.user)); dispatch({ type:'SET_USER', payload: data.user }); }
+                      }
+                    };
+                    input.click();
+                  }}
+                  className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  <span>Change Avatar</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('settings')}

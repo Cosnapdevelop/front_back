@@ -119,9 +119,10 @@ const Navbar = () => {
               <>
                 <Link to="/profile" className="flex items-center space-x-2">
                   <img
-                    src={state.user?.avatar}
+                    src={state.user?.avatar || `${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`}
                     alt={state.user?.username || 'me'}
                     className="h-8 w-8 rounded-full object-cover ring-2 ring-mint-500 ring-offset-2 dark:ring-offset-obsidian-900 hover:ring-cosmic-500 transition-all duration-300"
+                    onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`;}}
                   />
                 </Link>
                 <button
