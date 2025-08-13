@@ -7,6 +7,7 @@ type AuthContextValue = {
   user: AuthUser;
   isAuthenticated: boolean;
   accessToken: string | null;
+  bootstrapped: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, username: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -132,13 +133,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     isAuthenticated: !!user && !!accessToken,
     accessToken,
+    bootstrapped,
     login,
     register,
     logout,
     refresh,
   }), [user, accessToken]);
 
-  if (!bootstrapped) return null;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

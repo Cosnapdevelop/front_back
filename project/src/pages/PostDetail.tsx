@@ -24,7 +24,7 @@ const PostDetail = () => {
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const { isAuthenticated, user: authUser } = useAuth();
-  const [post, setPost] = useState<Post | null>(null);
+  const [post, setPost] = useState<Post | null | 'loading'>('loading');
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -54,15 +54,15 @@ const PostDetail = () => {
     return () => { mounted = false; };
   }, [postId]);
 
-  if (!post) {
+  if (post === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            加载中或帖子不存在
+            正在加载...
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            如果长时间无响应，请返回社区页重试。
+            请稍候
           </p>
           <button
             onClick={() => navigate('/community')}
@@ -70,6 +70,16 @@ const PostDetail = () => {
           >
             返回社区
           </button>
+        </div>
+      </div>
+    );
+  }
+  if (!post) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">帖子不存在</h2>
+          <button onClick={() => navigate('/community')} className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors">返回社区</button>
         </div>
       </div>
     );
