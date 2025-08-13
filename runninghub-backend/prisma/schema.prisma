@@ -20,6 +20,7 @@ model User {
   posts         Post[]
   comments      Comment[]
   postLikes     PostLike[]
+  commentLikes  CommentLike[]
   notificationsReceived Notification[] @relation("NotificationReceiver")
   notificationsSent     Notification[] @relation("NotificationActor")
 }
