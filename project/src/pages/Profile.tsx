@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Settings, 
@@ -297,6 +297,8 @@ const Profile = () => {
                       localStorage.setItem('user', JSON.stringify(data.user));
                       dispatch({ type: 'SET_USER', payload: data.user });
                       alert('Saved');
+                      // 立即刷新顶部展示
+                      setActiveTab('settings');
                     } else alert('Failed: ' + (data.error || ''));
                   } catch (e) {
                     alert('Failed to save');
@@ -418,6 +420,10 @@ const Profile = () => {
             );
           })}
         </div>
+
+        {activeTab === 'posts' && myPosts.length === 0 && !loadingPosts && (
+          <div className="mb-6"><button onClick={fetchMyPosts} className="px-3 py-1.5 text-sm rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">Load My Posts</button></div>
+        )}
 
         {/* Tab Content */}
         <motion.div
