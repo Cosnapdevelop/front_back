@@ -17,7 +17,7 @@ import { useApp } from '../context/AppContext';
 import { Post, Comment, User } from '../types';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
 const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
@@ -37,37 +37,38 @@ const PostDetail = () => {
   const postImages = post?.images || (post?.image ? [post.image] : []);
 
   const queryClient = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ['post', postId],
-    enabled: !!postId,
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}`);
-      return res.json();
-    }
-  });
-  useEffect(() => { if (data?.success) setPost(data.post); }, [data]);
-  // 防御：如果接口失败，保留空状态，不要抛错
   useEffect(() => {
-    if (data && !data.success) {
-      setPost(null);
-    }
-  }, [data]);
+    let mounted = true;
+    (async () => {
+      if (!postId) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}`);
+        const json = await res.json();
+        if (!mounted) return;
+        if (json?.success) setPost(json.post);
+        else setPost(null);
+      } catch {
+        if (mounted) setPost(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [postId]);
 
   if (!post) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Post not found
+            加载中或帖子不存在
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            The post you're looking for doesn't exist or has been removed.
+            如果长时间无响应，请返回社区页重试。
           </p>
           <button
             onClick={() => navigate('/community')}
             className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
           >
-            Back to Community
+            返回社区
           </button>
         </div>
       </div>
