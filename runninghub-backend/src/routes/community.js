@@ -175,3 +175,48 @@ router.post('/notifications/:id/read', auth, async (req, res) => {
 export default router;
 
 
+
+// ========== My Posts management ==========
+// 获取当前用户的帖子
+router.get('/my-posts', auth, async (req, res) => {
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 50);
+  const [posts, total] = await Promise.all([
+    prisma.post.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: { user: { select: { id: true, username: true, avatar: true } } }
+    }),
+    prisma.post.count({ where: { userId: req.user.id } })
+  ]);
+  res.json({ success: true, posts, meta: { page, limit, total, hasNext: page * limit < total } });
+});
+
+// 更新帖子（仅作者）
+router.put('/posts/:id', auth, async (req, res) => {
+  const { id } = req.params;
+  const { images, caption } = req.body;
+  try {
+    const post = await prisma.post.findUnique({ where: { id } });
+    if (!post || post.userId !== req.user.id) return res.status(403).json({ success: false, error: '无权限' });
+    const updated = await prisma.post.update({ where: { id }, data: { images: images || post.images, caption: caption ?? post.caption } });
+    res.json({ success: true, post: updated });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// 删除帖子（仅作者）
+router.delete('/posts/:id', auth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const post = await prisma.post.findUnique({ where: { id } });
+    if (!post || post.userId !== req.user.id) return res.status(403).json({ success: false, error: '无权限' });
+    await prisma.post.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});

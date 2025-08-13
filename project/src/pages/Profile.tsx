@@ -31,7 +31,75 @@ const Profile = () => {
 
   const bookmarkedEffects = state.effects.filter(effect => effect.isBookmarked);
 
+  const API = (import.meta.env.VITE_API_BASE_URL as string) || 'https://cosnap-back.onrender.com';
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+
+  const fetchMyPosts = async () => {
+    setLoadingPosts(true);
+    try {
+      const res = await fetch(`${API}/api/community/my-posts?page=1&limit=20`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }
+      });
+      const data = await res.json();
+      if (data.success) setMyPosts(data.posts);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
   const renderTabContent = () => {
+      case 'posts':
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">My Posts</h3>
+              <button onClick={fetchMyPosts} className="px-3 py-1.5 text-sm rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300">Refresh</button>
+            </div>
+            {loadingPosts ? (
+              <p className="text-gray-500">Loading...</p>
+            ) : myPosts.length === 0 ? (
+              <p className="text-gray-500">No posts yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {myPosts.map(p => (
+                  <div key={p.id} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">{new Date(p.createdAt).toLocaleString()}</div>
+                      <div className="space-x-2">
+                        <button
+                          onClick={async ()=>{
+                            const caption = prompt('Edit caption', p.caption) ?? p.caption;
+                            const images = p.images; // 可扩展更换图片弹窗
+                            const res = await fetch(`${API}/api/community/posts/${p.id}`, {
+                              method:'PUT', headers:{'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}`}, body: JSON.stringify({ caption, images })
+                            });
+                            const data = await res.json();
+                            if (data.success) { alert('Updated'); fetchMyPosts(); } else { alert('Failed: '+(data.error||'')); }
+                          }}
+                          className="px-3 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600">Edit</button>
+                        <button
+                          onClick={async ()=>{
+                            if (!confirm('Delete this post?')) return;
+                            const res = await fetch(`${API}/api/community/posts/${p.id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` } });
+                            const data = await res.json();
+                            if (data.success) { fetchMyPosts(); } else { alert('Failed: '+(data.error||'')); }
+                          }}
+                          className="px-3 py-1 text-sm rounded bg-red-500 text-white hover:bg-red-600">Delete</button>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-gray-900 dark:text-white">{p.caption}</div>
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(p.images||[]).map((src:string,idx:number)=> (
+                        <img key={idx} src={src} alt="" className="h-24 w-full object-cover rounded" loading="lazy" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
     switch (activeTab) {
       case 'history':
         return (
@@ -225,7 +293,11 @@ const Profile = () => {
                       body: JSON.stringify(payload)
                     });
                     const data = await res.json();
-                    if (data.success) alert('Saved'); else alert('Failed: ' + (data.error || '')); 
+                    if (data.success) {
+                      localStorage.setItem('user', JSON.stringify(data.user));
+                      dispatch({ type: 'SET_USER', payload: data.user });
+                      alert('Saved');
+                    } else alert('Failed: ' + (data.error || ''));
                   } catch (e) {
                     alert('Failed to save');
                   }
