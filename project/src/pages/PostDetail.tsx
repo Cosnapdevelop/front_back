@@ -115,8 +115,8 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
               <img src={preview.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API_BASE_URL}/assets/placeholder-user.png`;}} alt={preview.user?.username} className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
               <div className="flex-1">
                 <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
-                  {/* 第一行：作者 */}
-                  <p className="text-xs font-semibold text-gray-900 dark:text-white">@{preview.user?.username}</p>
+                  {/* 第一行：作者（去掉 @ 符号） */}
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">{preview.user?.username}</p>
                   {/* 第二行：回复对象 + 正文 */}
                   <p className="text-xs text-gray-900 dark:text-white mt-0.5">
                     {(() => {
@@ -142,8 +142,8 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
               <img src={reply.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API_BASE_URL}/assets/placeholder-user.png`;}} alt={reply.user?.username} className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
               <div className="flex-1">
                 <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
-                  {/* 第一行：作者 */}
-                  <p className="text-xs font-semibold text-gray-900 dark:text-white">@{reply.user?.username}</p>
+                  {/* 第一行：作者（去掉 @ 符号） */}
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">{reply.user?.username}</p>
                   {/* 第二行：回复对象 + 正文（解析前置 @昵称）*/}
                   <p className="text-xs text-gray-900 dark:text-white mt-0.5">
                     {(() => {
@@ -704,10 +704,10 @@ const PostDetail = () => {
             </div>
 
             {/* Caption */}
-            <p className="text-gray-900 dark:text-white text-sm mb-4">
-              <span className="font-semibold">@{post.user.username}</span>{' '}
-              {post.caption}
-            </p>
+                            <p className="text-gray-900 dark:text-white text-sm mb-4">
+                  <span className="font-semibold">{post.user.username}</span>{' '}
+                  {post.caption}
+                </p>
           </div>
         </div>
 
@@ -772,7 +772,7 @@ const PostDetail = () => {
                     <div className="flex-1">
                       <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
                         <p className="text-sm text-gray-900 dark:text-white">
-                          <span className="font-semibold">@{comment.user.username}</span>{' '}
+                          <span className="font-semibold">{comment.user.username}</span>{' '}
                           {comment.content}
                         </p>
                       </div>
@@ -782,9 +782,10 @@ const PostDetail = () => {
                         </span>
                         <button 
                           onClick={() => handleCommentLike(comment.id)}
-                          className={`text-xs ${comment.isLiked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500`}
+                          className={`flex items-center text-xs ${comment.isLiked ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'} hover:text-red-500`}
                         >
-                          {comment.isLiked ? '❤️' : '🤍'} {comment.likesCount > 0 && comment.likesCount}
+                          <Heart className="h-3.5 w-3.5" fill={comment.isLiked ? 'currentColor' : 'none'} />
+                          <span className="ml-1">{comment.likesCount > 0 ? comment.likesCount : ''}</span>
                         </button>
                         <button 
                           onClick={() => { setReplyingTo(comment.id); setReplyContent(`@${comment.user.username} `); }}
