@@ -5,6 +5,8 @@ import multer from 'multer';
 import { uploadImageService } from '../services/uploadImageService.js';
 import { startComfyUITaskService, waitForComfyUITaskAndGetImages, cancelComfyUITask, getComfyUITaskStatus, getComfyUITaskResult } from '../services/comfyUITaskService.js';
 import { startWebappTaskService, waitForWebappTaskAndGetImages, cancelWebappTask, getWebappTaskStatus, getWebappTaskResult } from '../services/webappTaskService.js';
+import { uploadLoraService, validateLoraFile } from '../services/loraUploadService.js';
+import axios from 'axios';
 
 const router = express.Router();
 
@@ -689,3 +691,125 @@ router.post('/upload/presign', auth, async (req, res) => {
     res.status(500).json({ success: false, error: e.message });
   }
 });
+
+// Lora上传接口
+router.post('/lora/upload', auth, upload.single('loraFile'), async (req, res) => {
+  try {
+    console.log('[Lora上传] 收到Lora文件上传请求');
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: '没有上传Lora文件'
+      });
+    }
+    
+    const { regionId = 'hongkong' } = req.body;
+    
+    // 验证Lora文件
+    try {
+      validateLoraFile(req.file);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+    
+    // 上传Lora文件
+    const fileName = await uploadLoraService(req.file, regionId);
+    
+    console.log('[Lora上传] Lora上传成功:', fileName);
+    
+    res.json({
+      success: true,
+      data: {
+        fileName: fileName,
+        message: 'Lora文件上传成功，可在RHLoraLoader节点中使用'
+      }
+    });
+    
+  } catch (error) {
+    console.error('[Lora上传] Lora上传失败:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Lora上传失败: ' + error.message
+    });
+  }
+});
+
+// 获取Lora上传链接接口（保留用于前端分步上传）
+router.post('/lora/upload-url', auth, async (req, res) => {
+  try {
+    console.log('[Lora上传] 请求获取上传链接');
+    
+    const { loraName, md5Hex } = req.body;
+    
+    if (!loraName || !md5Hex) {
+      return res.status(400).json({
+        success: false,
+        error: '缺少loraName或md5Hex参数'
+      });
+    }
+    
+    // 调用RunningHub获取Lora上传链接
+    const regionConfig = getCurrentRegionConfig();
+    const axiosInstance = createRunningHubAxiosInstance(regionConfig.id);
+    
+    const response = await axiosInstance.post('/api/openapi/getLoraUploadUrl', {
+      apiKey: process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105',
+      loraName,
+      md5Hex
+    });
+    
+    console.log('[Lora上传] 获取上传链接成功:', response.data);
+    
+    if (response.data.code === 0) {
+      res.json({
+        success: true,
+        data: response.data.data
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: response.data.msg || '获取Lora上传链接失败'
+      });
+    }
+    
+  } catch (error) {
+    console.error('[Lora上传] 获取上传链接失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '获取Lora上传链接失败: ' + error.message
+    });
+  }
+});
+
+// 创建RunningHub API实例的辅助函数
+function createRunningHubAxiosInstance(regionId) {
+  const regionConfig = getCurrentRegionConfig(regionId);
+  return axios.create({
+    baseURL: regionConfig.apiDomain,
+    timeout: 60000,
+    headers: {
+      'Host': regionConfig.apiDomain.replace('https://', '')
+    }
+  });
+}
+
+// 获取当前地区配置的辅助函数
+function getCurrentRegionConfig(regionId = 'hongkong') {
+  const regions = {
+    china: {
+      id: 'china',
+      name: '中国大陆',
+      apiDomain: 'https://www.runninghub.cn'
+    },
+    hongkong: {
+      id: 'hongkong', 
+      name: '香港/澳门/台湾',
+      apiDomain: 'https://www.runninghub.ai'
+    }
+  };
+  return regions[regionId] || regions.hongkong;
+}
