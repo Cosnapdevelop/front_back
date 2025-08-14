@@ -38,6 +38,7 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
   useEffect(() => {
     if (Array.isArray(parent.replies)) {
       setReplies(parent.replies);
+      if (parent.replies.length > 0) setPreview(parent.replies[0]);
     }
     // 仅以长度作为变更信号，避免深比较开销
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,9 +109,31 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
   return (
     <div className="mt-3 ml-10 space-y-3">
       {!open && (
-        <button onClick={toggleOpen} className="text-xs text-purple-600 hover:text-purple-700">
-          展开 {parent.repliesCount || replies.length} 条回复
-        </button>
+        <div className="space-y-2">
+          {preview && (
+            <div className="flex space-x-2">
+              <img src={preview.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API_BASE_URL}/assets/placeholder-user.png`;}} alt={preview.user?.username} className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
+              <div className="flex-1">
+                <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
+                  {/* 第一行：作者 */}
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">@{preview.user?.username}</p>
+                  {/* 第二行：回复对象 + 正文 */}
+                  <p className="text-xs text-gray-900 dark:text-white mt-0.5">
+                    {(() => {
+                      const m = /^@([^\s]+)\s+(.+)?$/u.exec(preview.content || '');
+                      if (m) {
+                        const [, mention, text] = m;
+                        return (<span>回复 @{mention}：{text || ''}</span>);
+                      }
+                      return <span>{preview.content}</span>;
+                    })()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <button onClick={toggleOpen} className="text-xs text-purple-600 hover:text-purple-700">展开 {parent.repliesCount || replies.length} 条回复</button>
+        </div>
       )}
       {open && (
         <div className="space-y-3">
@@ -119,7 +142,19 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
               <img src={reply.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API_BASE_URL}/assets/placeholder-user.png`;}} alt={reply.user?.username} className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
               <div className="flex-1">
                 <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
-                  <p className="text-xs text-gray-900 dark:text-white"><span className="font-semibold">@{reply.user?.username}</span> {reply.content}</p>
+                  {/* 第一行：作者 */}
+                  <p className="text-xs font-semibold text-gray-900 dark:text-white">@{reply.user?.username}</p>
+                  {/* 第二行：回复对象 + 正文（解析前置 @昵称）*/}
+                  <p className="text-xs text-gray-900 dark:text-white mt-0.5">
+                    {(() => {
+                      const m = /^@([^\s]+)\s+(.+)?$/u.exec(reply.content || '');
+                      if (m) {
+                        const [, mention, text] = m;
+                        return (<span>回复 @{mention}：{text || ''}</span>);
+                      }
+                      return <span>{reply.content}</span>;
+                    })()}
+                  </p>
                 </div>
                 <div className="flex items-center space-x-3 mt-1">
                   <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(reply.createdAt).toLocaleString()}</span>
@@ -149,7 +184,8 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
                         setReplies(prev => [...prev, optimistic]);
                         setActiveReplyTo(null); setReplyText('');
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ content: optimistic.content, parentId: reply.id }) });
+                          // 扁平化：存储层也以顶级评论为 parentId
+                          const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ content: optimistic.content, parentId: parent.id }) });
                           const contentType2 = res.headers.get('content-type') || '';
                           if (!contentType2.includes('application/json')) throw new Error('invalid');
                           const data = await res.json();
