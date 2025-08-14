@@ -23,7 +23,7 @@ import { useToast } from '../context/ToastContext';
 // 子组件：负责显示某条评论的子回复，支持折叠/展开 + 懒加载 + 嵌套回复
 function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { postId: string; parent: any; onLike: (id: string)=>void; depth?: number; initialOpen?: boolean }) {
   const { push } = useToast();
-  const [open, setOpen] = useState(initialOpen ?? (depth === 1));
+  const [open, setOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [replies, setReplies] = useState<any[]>(parent.replies || []);
   const [page, setPage] = useState(1);
@@ -32,6 +32,7 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
   const [replyText, setReplyText] = useState('');
   const [childRefresh, setChildRefresh] = useState<Record<string, number>>({});
   const [openedChildId, setOpenedChildId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<any | null>(Array.isArray(parent.replies) && parent.replies.length > 0 ? parent.replies[0] : null);
 
   // 当父级 comment 的 replies 发生变化（例如父组件做了乐观更新）时，同步到本地状态
   useEffect(() => {
@@ -41,6 +42,26 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
     // 仅以长度作为变更信号，避免深比较开销
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parent.id, Array.isArray(parent.replies) ? parent.replies.length : 0]);
+
+  // 预览：未展开时，尝试加载 1 条作为预览
+  useEffect(() => {
+    if (!open && !preview && (parent.repliesCount || 0) > 0) {
+      (async () => {
+        try {
+          let res = await fetch(`${API_BASE_URL}/api/community/comments/${parent.id}/replies?page=1&limit=1`);
+          if (res.status === 404) {
+            res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments?parentId=${parent.id}&page=1&limit=1`);
+          }
+          const ct = res.headers.get('content-type') || '';
+          if (!ct.includes('application/json')) return;
+          const data = await res.json();
+          const items = Array.isArray(data.replies) ? data.replies : (Array.isArray(data.comments) ? data.comments : []);
+          if (items.length > 0) setPreview(items[0]);
+        } catch {}
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, parent.id, parent.repliesCount]);
 
   const load = async (reset=false) => {
     setLoading(true);
@@ -71,8 +92,9 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
   };
 
   const toggleOpen = async () => {
-    const next = !open; setOpen(next);
-    if (next && replies.length === 0) await load(true);
+    if (open) return; // 不支持收起
+    setOpen(true);
+    if (replies.length === 0) await load(true);
   };
 
   // 默认展开一级：初次渲染时如果 open=true 且还未加载数据，自动加载
@@ -85,9 +107,11 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
 
   return (
     <div className="mt-3 ml-10 space-y-3">
-      <button onClick={toggleOpen} className="text-xs text-gray-500 hover:text-gray-700">
-        {open ? '收起回复' : `展开 ${parent.repliesCount || replies.length} 条回复`}
-      </button>
+      {!open && (
+        <button onClick={toggleOpen} className="text-xs text-purple-600 hover:text-purple-700">
+          展开 {parent.repliesCount || replies.length} 条回复
+        </button>
+      )}
       {open && (
         <div className="space-y-3">
           {replies.map((reply:any)=> (
@@ -146,8 +170,7 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
                     >发送</button>
                   </div>
                 )}
-                {/* 嵌套子回复 */}
-                <RepliesThread key={`${reply.id}-${childRefresh[reply.id]||0}`} postId={postId} parent={reply} onLike={onLike} depth={depth + 1} initialOpen={openedChildId === reply.id} />
+                {/* 扁平化：去掉嵌套显示 */}
               </div>
             </div>
           ))}
