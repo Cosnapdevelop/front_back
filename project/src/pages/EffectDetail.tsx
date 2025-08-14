@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '../context/ToastContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -24,6 +25,7 @@ const EffectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const { push } = useToast();
   const [showComments, setShowComments] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +91,7 @@ const EffectDetail = () => {
       
     } catch (error) {
       console.error('Error posting comment:', error);
-      alert('Failed to post comment. Please try again.');
+      push('error','Failed to post comment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -110,7 +112,7 @@ const EffectDetail = () => {
     switch (platform) {
       case 'copy':
         navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard!');
+        push('success','Link copied to clipboard!');
         break;
       case 'whatsapp':
         window.open(`https://wa.me/?text=${encodeURIComponent(`${title} - ${url}`)}`);
@@ -118,12 +120,12 @@ const EffectDetail = () => {
       case 'wechat':
         // WeChat sharing typically requires their SDK, but we can copy link for now
         navigator.clipboard.writeText(url);
-        alert('Link copied! You can paste it in WeChat.');
+        push('success','Link copied! You can paste it in WeChat.');
         break;
       case 'instagram':
         // Instagram doesn't support direct URL sharing, so we copy the link
         navigator.clipboard.writeText(url);
-        alert('Link copied! You can share it in your Instagram story or bio.');
+        push('success','Link copied! You can share it in your Instagram story or bio.');
         break;
       case 'twitter':
         window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`);
@@ -139,7 +141,7 @@ const EffectDetail = () => {
         break;
       default:
         navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard!');
+        push('success','Link copied to clipboard!');
     }
     setShowShareMenu(false);
   };

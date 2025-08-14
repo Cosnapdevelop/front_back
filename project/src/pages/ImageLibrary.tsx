@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { GeneratedImage } from '../types';
 import imageLibraryService, { ExtendedGeneratedImage } from '../services/imageLibraryService';
 import { useImageLibrary } from '../hooks/useImageLibrary';
+import { useToast } from '../context/ToastContext';
 import { getCurrentRegionConfig } from '../config/regions';
 import { taskManagementService, TaskStatus } from '../services/taskManagementService';
 import { LoadingSpinner, TaskStatusIndicator } from '../components/LoadingSpinner';
@@ -29,6 +30,7 @@ const ImageLibrary = () => {
   const [selectedImage, setSelectedImage] = useState<ExtendedGeneratedImage | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const { imageCount } = useImageLibrary();
+  const { push } = useToast();
 
   useEffect(() => {
     loadImages();
@@ -51,7 +53,7 @@ const ImageLibrary = () => {
 
   const handleDownload = async (image: ExtendedGeneratedImage) => {
     if (image.status !== 'completed' || !image.url) {
-      alert('图片尚未生成完成，无法下载');
+      push('warning','图片尚未生成完成，无法下载');
       return;
     }
     
@@ -69,7 +71,7 @@ const ImageLibrary = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('下载失败:', error);
-      alert('下载失败，请重试');
+      push('error','下载失败，请重试');
     }
   };
 
@@ -102,11 +104,11 @@ const ImageLibrary = () => {
         imageLibraryService.updateImageStatus(image.id, 'cancelled');
         loadImages(); // 重新加载图片列表
       } else {
-        alert('取消任务失败，请重试');
+        push('error','取消任务失败，请重试');
       }
     } catch (error) {
       console.error('[ImageLibrary] 取消任务异常:', error);
-      alert('取消任务时发生错误，请重试');
+      push('error','取消任务时发生错误，请重试');
     }
   };
 
@@ -125,17 +127,17 @@ const ImageLibrary = () => {
         imageLibraryService.updateImageStatus(image.id, 'processing');
         loadImages(); // 重新加载图片列表
       } else {
-        alert('重试任务失败，请重试');
+        push('error','重试任务失败，请重试');
       }
     } catch (error) {
       console.error('[ImageLibrary] 重试任务异常:', error);
-      alert('重试任务时发生错误，请重试');
+      push('error','重试任务时发生错误，请重试');
     }
   };
 
   const handlePreview = (image: ExtendedGeneratedImage) => {
     if (image.status !== 'completed' || !image.url) {
-      alert('图片尚未生成完成，无法预览');
+      push('warning','图片尚未生成完成，无法预览');
       return;
     }
     
@@ -178,7 +180,7 @@ const ImageLibrary = () => {
       } else {
         // 复制链接到剪贴板
         await navigator.clipboard.writeText(window.location.href);
-        alert('链接已复制到剪贴板！');
+        push('success','链接已复制到剪贴板！');
       }
     } catch (error) {
       console.error('分享失败:', error);

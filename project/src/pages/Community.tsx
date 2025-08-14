@@ -6,9 +6,11 @@ import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/Cards/PostCard';
 import { API_BASE_URL } from '../config/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../context/ToastContext';
 
 const Community = () => {
   const { state, dispatch } = useApp();
+  const { push } = useToast();
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<'trending' | 'recent' | 'following'>('trending');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -82,7 +84,7 @@ const Community = () => {
         const resp = await fetch(presignResp.uploadUrl, { method: 'POST', body: formData });
         if (!resp.ok) {
           console.error('OSS upload failed', await resp.text());
-          alert('图片直传失败，请稍后重试');
+          push('error','图片直传失败，请稍后重试');
           continue;
         }
         setSelectedImages(prev => [...prev, presignResp.publicUrl]);
@@ -102,7 +104,7 @@ const Community = () => {
     setIsSubmitting(true);
     
     try {
-      if (!isAuthenticated) { alert('请先登录'); setIsSubmitting(false); return; }
+      if (!isAuthenticated) { push('warning','请先登录'); setIsSubmitting(false); return; }
       const effect = state.effects.find(e => e.id === selectedEffect);
       if (!effect || !state.user) { setIsSubmitting(false); return; }
 
@@ -140,12 +142,12 @@ const Community = () => {
       setSelectedEffect('');
       setShowCreateModal(false);
       
-      // Show success message (you could use a toast notification here)
-      alert('Post created successfully!');
+      // Show success message
+      push('success','发布成功！');
       
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
+      push('error','发布失败，请重试');
     } finally {
       setIsSubmitting(false);
     }
@@ -175,7 +177,7 @@ const Community = () => {
           <button 
             onClick={() => {
               if (!isAuthenticated) {
-                alert('请先登录');
+                push('warning','请先登录');
                 return;
               }
               setShowCreateModal(true);

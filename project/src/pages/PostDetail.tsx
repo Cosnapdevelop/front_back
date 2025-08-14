@@ -18,14 +18,19 @@ import { Post, Comment, User } from '../types';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '../context/ToastContext';
 
 // 子组件：负责显示某条评论的子回复，支持折叠/展开 + 懒加载 + 嵌套回复
 function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; parent: any; onLike: (id: string)=>void; depth?: number }) {
+  const { push } = useToast();
   const [open, setOpen] = useState(depth === 1);
   const [loading, setLoading] = useState(false);
   const [replies, setReplies] = useState<any[]>(parent.replies || []);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
+  const [activeReplyTo, setActiveReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [childRefresh, setChildRefresh] = useState<Record<string, number>>({});
 
   const load = async (reset=false) => {
     setLoading(true);
@@ -71,9 +76,31 @@ function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; 
                 <div className="flex items-center space-x-3 mt-1">
                   <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(reply.createdAt).toLocaleString()}</span>
                   <button onClick={()=> onLike(reply.id)} className={`text-xs ${reply.isLiked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500`}>{reply.isLiked ? '❤️' : '🤍'} {reply.likesCount > 0 && reply.likesCount}</button>
+                  <button className="text-xs text-gray-500 hover:text-gray-700" onClick={()=> { setActiveReplyTo(reply.id); setReplyText(`@${reply.user?.username} `); setChildRefresh(r=>({...r})); }}>回复</button>
                 </div>
+                {/* 子回复输入 */}
+                {activeReplyTo === reply.id && (
+                  <div className="mt-2 flex items-center space-x-2">
+                    <input value={replyText} onChange={e=> setReplyText(e.target.value)} placeholder="写下你的回复..." className="flex-1 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                    <button
+                      className="px-2 py-1 text-xs rounded bg-purple-500 text-white"
+                       onClick={async ()=>{
+                        if (!replyText.trim()) return;
+                        try {
+                          const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ content: replyText.trim(), parentId: reply.id }) });
+                          const data = await res.json();
+                          if (data.success) {
+                            // 强制展开并刷新该条回复的子线程
+                            setChildRefresh(r=> ({ ...r, [reply.id]: (r[reply.id]||0)+1 }));
+                            setActiveReplyTo(null); setReplyText('');
+                          }
+                         } catch { push('error','回复失败，请重试'); }
+                      }}
+                    >发送</button>
+                  </div>
+                )}
                 {/* 嵌套子回复 */}
-                <RepliesThread postId={postId} parent={reply} onLike={onLike} depth={depth + 1} />
+                <RepliesThread key={`${reply.id}-${childRefresh[reply.id]||0}`} postId={postId} parent={reply} onLike={onLike} depth={depth + 1} />
               </div>
             </div>
           ))}
@@ -92,6 +119,7 @@ const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
+  const { push } = useToast();
   const { isAuthenticated, user: authUser } = useAuth();
   const [post, setPost] = useState<Post | null | 'loading'>('loading');
   const [newComment, setNewComment] = useState('');
@@ -170,7 +198,7 @@ const PostDetail = () => {
   }
 
   const handleLike = async () => {
-    if (!isAuthenticated) { alert('请先登录'); return; }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     const prev = post ? JSON.parse(JSON.stringify(post)) : null;
     const endpoint = post?.isLiked ? 'unlike' : 'like';
     setPost(p => p ? { ...p, isLiked: !p.isLiked, likesCount: (p.likesCount || 0) + (p.isLiked ? -1 : 1) } : p);
@@ -195,13 +223,13 @@ const PostDetail = () => {
   };
 
   const handleBookmark = () => {
-    if (!isAuthenticated) { alert('请先登录'); return; }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     dispatch({ type: 'BOOKMARK_POST', payload: post.id });
   };
 
   const handleSubmitComment = async () => {
     if (!newComment.trim() || !post) return;
-    if (!isAuthenticated) { alert('请先登录'); return; }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     setIsSubmitting(true);
 
     const tempId = `temp-${Date.now()}`;
@@ -260,14 +288,14 @@ const PostDetail = () => {
       // rollback
       setPost(prevPost);
       prevLists.forEach(([key, data]) => queryClient.setQueryData(key as any, data));
-      alert('评论失败，请重试');
+      push('error','评论失败，请重试');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCommentLike = async (commentId: string) => {
-    if (!isAuthenticated) { alert('请先登录'); return; }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     const toggle = (c: any): any => {
       if (c.id === commentId) return { ...c, isLiked: !c.isLiked, likesCount: (c.likesCount || 0) + (c.isLiked ? -1 : 1) };
       return { ...c, replies: c.replies ? c.replies.map(toggle) : [] };
@@ -296,7 +324,7 @@ const PostDetail = () => {
 
   const handleReply = async (commentId: string) => {
     if (!replyContent.trim() || !state.user || !post) return;
-    if (!isAuthenticated) { alert('请先登录'); return; }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     const tempId = `temp-${Date.now()}`;
     const optimistic = {
       id: tempId,
@@ -333,7 +361,7 @@ const PostDetail = () => {
       }
     } catch {
       setPost(prev);
-      alert('回复失败，请重试');
+      push('error','回复失败，请重试');
     }
   };
 
@@ -626,7 +654,7 @@ const PostDetail = () => {
                           {comment.isLiked ? '❤️' : '🤍'} {comment.likesCount > 0 && comment.likesCount}
                         </button>
                         <button 
-                          onClick={() => setReplyingTo(comment.id)}
+                          onClick={() => { setReplyingTo(comment.id); setReplyContent(`@${comment.user.username} `); }}
                           className="text-xs text-gray-500 dark:text-gray-400 hover:text-blue-500"
                         >
                           Reply

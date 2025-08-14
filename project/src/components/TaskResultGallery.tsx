@@ -1,4 +1,5 @@
 import React from 'react';
+import { useToast } from '../context/ToastContext';
 
 interface TaskResultGalleryProps {
   images: Array<{ id: string; url: string }>;
@@ -6,6 +7,7 @@ interface TaskResultGalleryProps {
 }
 
 const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview }) => {
+  const { push } = useToast();
   if (!images || images.length === 0) return null;
   return (
     <div className="mt-6 space-y-4">
@@ -39,7 +41,7 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
                 window.URL.revokeObjectURL(url);
               } catch (error) {
                 console.error('下载失败:', error);
-                alert('下载失败，请重试');
+                push('error','下载失败，请重试');
               }
             }}
             className="w-full flex items-center justify-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors"

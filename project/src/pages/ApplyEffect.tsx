@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useToast } from '../context/ToastContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Upload, 
@@ -18,6 +19,7 @@ const ApplyEffect = () => {
   const navigate = useNavigate();
   const { state } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { push } = useToast();
   
   const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string, name: string, size: number}>>([]);
   const [parameters, setParameters] = useState<Record<string, any>>({});
@@ -117,7 +119,7 @@ const ApplyEffect = () => {
     const runningHubLimit = 10 * 1024 * 1024; // 10MB
     
     if (currentCount + files.length > maxFiles) {
-      alert(`Maximum ${maxFiles} images allowed. You can upload ${maxFiles - currentCount} more.`);
+      push('warning', `Maximum ${maxFiles} images allowed. You can upload ${maxFiles - currentCount} more.`);
       return;
     }
 
@@ -126,7 +128,7 @@ const ApplyEffect = () => {
       const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       
       if (error) {
-        alert(error);
+        push('error', error);
         return;
       }
       
@@ -164,7 +166,7 @@ const ApplyEffect = () => {
   const handleImageParamUpload = (paramName: string, file: File) => {
     const error = validateFile(file);
     if (error) {
-      alert(error);
+      push('error', error);
       return;
     }
 
@@ -234,7 +236,7 @@ const ApplyEffect = () => {
       console.log('[下载] 图片下载完成');
     } catch (error) {
       console.error('[下载] 下载失败:', error);
-      alert('下载失败，请重试');
+      push('error','下载失败，请重试');
     }
   };
 
@@ -380,7 +382,7 @@ const ApplyEffect = () => {
     });
     
     if (!hasUploadedImages && !hasParamImages) {
-      alert('Please upload at least one image');
+      push('warning','Please upload at least one image');
       return;
     }
 
@@ -441,7 +443,7 @@ const ApplyEffect = () => {
     
     if (activeTaskIds.length === 0) {
       console.log('[ApplyEffect] 没有活跃任务，显示错误');
-      alert('没有正在进行的任务可以取消');
+      push('warning','没有正在进行的任务可以取消');
       return;
     }
     

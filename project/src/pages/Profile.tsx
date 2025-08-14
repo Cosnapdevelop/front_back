@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useToast } from '../context/ToastContext';
+import Cropper from 'react-easy-crop';
 import { motion } from 'framer-motion';
 import { 
   Settings, 
@@ -17,6 +19,7 @@ import EffectCard from '../components/Cards/EffectCard';
 
 const Profile = () => {
   const { state, dispatch } = useApp();
+  const { push } = useToast();
   const [activeTab, setActiveTab] = useState<'history' | 'bookmarks' | 'posts' | 'settings'>('history');
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -36,6 +39,10 @@ const Profile = () => {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [sourceImg, setSourceImg] = useState<string | null>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   // Edit Post Modal state
   const [editOpen, setEditOpen] = useState(false);
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -67,7 +74,7 @@ const Profile = () => {
     if (data.success) {
       setMyPosts(prev => prev.map(p => (p.id === postId ? { ...p, images: newImages, caption: newCaption ?? p.caption } : p)));
     } else {
-      alert('Update failed: ' + (data.error || ''));
+      push('error', 'Update failed: ' + (data.error || ''));
     }
   };
 
@@ -135,14 +142,29 @@ const Profile = () => {
   const onAvatarFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const dataUrl = centerCropAndCompress(img, 512, 'image/jpeg', 0.92);
-        setAvatarPreview(dataUrl);
-      };
-      img.src = reader.result as string;
+      const src = reader.result as string;
+      setSourceImg(src);
     };
     reader.readAsDataURL(file);
+  };
+  const onCropComplete = (_: any, areaPixels: any) => setCroppedAreaPixels(areaPixels);
+  const generateCroppedPreview = async () => {
+    if (!sourceImg || !croppedAreaPixels) return;
+    const img = new Image();
+    img.src = sourceImg;
+    await new Promise(r=> img.onload = r as any);
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+    const scaleX = img.naturalWidth / (img.width || 1);
+    const scaleY = img.naturalHeight / (img.height || 1);
+    const sx = croppedAreaPixels.x * scaleX;
+    const sy = croppedAreaPixels.y * scaleY;
+    const sw = croppedAreaPixels.width * scaleX;
+    const sh = croppedAreaPixels.height * scaleY;
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 512, 512);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    setAvatarPreview(dataUrl);
   };
   const saveAvatar = async () => {
     if (!avatarPreview) return;
@@ -241,7 +263,7 @@ const Profile = () => {
                             if (!confirm('Delete this post?')) return;
                             const res = await fetch(`${API}/api/community/posts/${p.id}`, { method:'DELETE', headers:{ Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` } });
                             const data = await res.json();
-                            if (data.success) { fetchMyPosts(); } else { alert('Failed: '+(data.error||'')); }
+                            if (data.success) { fetchMyPosts(); } else { push('error','Failed: '+(data.error||'')); }
                           }}
                           className="px-3 py-1 text-sm rounded bg-red-500 text-white hover:bg-red-600">Delete</button>
                       </div>
@@ -415,16 +437,16 @@ const Profile = () => {
                     if (data.success) {
                       localStorage.setItem('user', JSON.stringify(data.user));
                       dispatch({ type: 'SET_USER', payload: data.user });
-                      alert('Saved');
+                      push('success','Saved');
                       // 立即刷新顶部展示
                       setActiveTab('settings');
                     } else if (res.status === 409) {
-                      alert(data.error || '用户名或邮箱已被占用');
+                      push('warning', data.error || '用户名或邮箱已被占用');
                     } else {
-                      alert('Failed: ' + (data.error || ''));
+                      push('error','Failed: ' + (data.error || ''));
                     }
                   } catch (e) {
-                    alert('Failed to save');
+                    push('error','Failed to save');
                   }
                 }}
                 className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
@@ -613,6 +635,7 @@ const Profile = () => {
                             <button onClick={()=> setEditImages(prev=> prev.filter((_,i)=> i!==idx))} className="px-2 py-1 text-xs rounded bg-red-500 text-white">Delete</button>
                             <span className="text-xs text-white">Drag to reorder</span>
                           </div>
+                          <div className="absolute top-1 left-1 bg-white/90 rounded px-1 text-xs cursor-grab">⋮⋮</div>
                         </div>
                       ))}
                     </div>
@@ -634,18 +657,40 @@ const Profile = () => {
             <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Change Avatar</h3>
               <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="h-24 w-24 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600">
-                    {avatarPreview ? (
-                      <img src={avatarPreview} className="h-full w-full object-cover" />
+                <div className="flex flex-col space-y-3">
+                  <div className="h-60 relative rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
+                    {sourceImg ? (
+                      <Cropper
+                        image={sourceImg}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={1}
+                        onCropChange={setCrop}
+                        onZoomChange={setZoom}
+                        onCropComplete={onCropComplete}
+                        cropShape="round"
+                        showGrid={false}
+                      />
                     ) : (
-                      <div className="h-full w-full flex items-center justify-center text-gray-500">Preview</div>
+                      <div className="h-full w-full flex items-center justify-center text-gray-500">Select an image</div>
                     )}
                   </div>
-                  <label className="px-3 py-1 text-sm rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer">
-                    Select Image
-                    <input type="file" accept="image/*" onChange={(e)=> onAvatarFile(e.target.files?.[0] as File)} className="hidden" />
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="px-3 py-1 text-sm rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer">
+                      Select Image
+                      <input type="file" accept="image/*" onChange={(e)=> onAvatarFile(e.target.files?.[0] as File)} className="hidden" />
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Zoom</span>
+                      <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e)=> setZoom(Number(e.target.value))} />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="h-20 w-20 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600">
+                      {avatarPreview ? <img src={avatarPreview} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-gray-500">Preview</div>}
+                    </div>
+                    <button onClick={generateCroppedPreview} className="px-3 py-1 text-sm rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Generate Preview</button>
+                  </div>
                 </div>
                 <div className="flex justify-end space-x-2">
                   <button onClick={()=> setAvatarModalOpen(false)} className="px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>

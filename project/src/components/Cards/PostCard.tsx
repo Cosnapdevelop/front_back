@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
 
 interface PostCardProps {
   post: Post;
@@ -15,6 +16,7 @@ interface PostCardProps {
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const { dispatch } = useApp();
   const queryClient = useQueryClient();
+  const { push } = useToast();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -24,10 +26,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const effectName = post.effect?.name;
 
   const handleLike = async () => {
-    if (!isAuthenticated) {
-      alert('请先登录');
-      return;
-    }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     // Optimistic update on all cached post lists
     const queries = queryClient.getQueriesData<any>({ queryKey: ['posts'] });
     const previous = queries.map(([key, data]) => [key, data ? JSON.parse(JSON.stringify(data)) : data] as const);
@@ -60,7 +59,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
 
   const handleBookmark = () => {
-    if (!isAuthenticated) { alert('请先登录'); return; }
+    if (!isAuthenticated) { push('warning','请先登录'); return; }
     dispatch({ type: 'BOOKMARK_POST', payload: post.id });
   };
 
