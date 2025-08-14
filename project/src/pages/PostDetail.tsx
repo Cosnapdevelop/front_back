@@ -770,12 +770,12 @@ const PostDetail = () => {
                       className="h-8 w-8 rounded-full object-cover flex-shrink-0"
                     />
                     <div className="flex-1">
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                        <p className="text-sm text-gray-900 dark:text-white">
-                          <span className="font-semibold">{comment.user.username}</span>{' '}
-                          {comment.content}
-                        </p>
-                      </div>
+                                              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+                          {/* 第一行：作者 */}
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">{comment.user.username}</p>
+                          {/* 第二行：正文 */}
+                          <p className="text-sm text-gray-900 dark:text-white mt-0.5">{comment.content}</p>
+                        </div>
                       <div className="flex items-center space-x-4 mt-2">
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {formatDate(comment.createdAt)}
