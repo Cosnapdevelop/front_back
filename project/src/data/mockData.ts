@@ -406,6 +406,36 @@ export const mockEffects: Effect[] = [
     nodeInfoTemplate: [
       { nodeId: '333', fieldName: 'image', paramKey: 'image_333' }  // 输入图片节点
     ]
+  },
+  // 自定义颜色光（WebApp）
+  {
+    id: 'custom-light-color',
+    name: '自定义颜色光',
+    description: '自定义光颜色的人像/物体打光效果，支持选择预设光色或输入自定义颜色文本。',
+    author: mockUsers[0],
+    category: 'Lighting',
+    tags: ['lighting', 'color', 'ic-light', 'webapp'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 0,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: new Date().toISOString(),
+    difficulty: 'Easy',
+    processingTime: '2-4 minutes',
+    isWebapp: true,
+    webappId: '1949030128047857666',
+    isTrending: false,
+    parameters: [
+      { name: 'image_386', type: 'image', description: '上传需要加光的图片' },
+      { name: 'select_381', type: 'select', default: '5', description: '选择光颜色（预设）' },
+      { name: 'prompt_379', type: 'text', default: '紫色', description: '自定义光颜色（文本）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '386', fieldName: 'image', paramKey: 'image_386' },
+      { nodeId: '381', fieldName: 'select', paramKey: 'select_381' },
+      { nodeId: '379', fieldName: 'prompt', paramKey: 'prompt_379' }
+    ]
   }
 ];
 
