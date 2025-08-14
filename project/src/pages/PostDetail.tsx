@@ -21,9 +21,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '../context/ToastContext';
 
 // 子组件：负责显示某条评论的子回复，支持折叠/展开 + 懒加载 + 嵌套回复
-function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; parent: any; onLike: (id: string)=>void; depth?: number }) {
+function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { postId: string; parent: any; onLike: (id: string)=>void; depth?: number; initialOpen?: boolean }) {
   const { push } = useToast();
-  const [open, setOpen] = useState(depth === 1);
+  const [open, setOpen] = useState(initialOpen ?? (depth === 1));
   const [loading, setLoading] = useState(false);
   const [replies, setReplies] = useState<any[]>(parent.replies || []);
   const [page, setPage] = useState(1);
@@ -31,6 +31,7 @@ function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; 
   const [activeReplyTo, setActiveReplyTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [childRefresh, setChildRefresh] = useState<Record<string, number>>({});
+  const [openedChildId, setOpenedChildId] = useState<string | null>(null);
 
   const load = async (reset=false) => {
     setLoading(true);
@@ -85,14 +86,18 @@ function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; 
                     <button
                       className="px-2 py-1 text-xs rounded bg-purple-500 text-white"
                        onClick={async ()=>{
-                        if (!replyText.trim()) return;
+                        const pure = replyText.replace(/^@\S+\s*/, '').trim();
+                        if (!pure) { push('warning','请输入内容'); return; }
                         try {
                           const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ content: replyText.trim(), parentId: reply.id }) });
                           const data = await res.json();
                           if (data.success) {
                             // 强制展开并刷新该条回复的子线程
+                            setOpenedChildId(reply.id);
                             setChildRefresh(r=> ({ ...r, [reply.id]: (r[reply.id]||0)+1 }));
                             setActiveReplyTo(null); setReplyText('');
+                          } else {
+                            push('error', data.message || '回复失败，请重试');
                           }
                          } catch { push('error','回复失败，请重试'); }
                       }}
@@ -100,7 +105,7 @@ function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; 
                   </div>
                 )}
                 {/* 嵌套子回复 */}
-                <RepliesThread key={`${reply.id}-${childRefresh[reply.id]||0}`} postId={postId} parent={reply} onLike={onLike} depth={depth + 1} />
+                <RepliesThread key={`${reply.id}-${childRefresh[reply.id]||0}`} postId={postId} parent={reply} onLike={onLike} depth={depth + 1} initialOpen={openedChildId === reply.id} />
               </div>
             </div>
           ))}
@@ -228,7 +233,9 @@ const PostDetail = () => {
   };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim() || !post) return;
+    if (!post) return;
+    const pure = newComment.replace(/^@\S+\s*/, '').trim();
+    if (!pure) { push('warning','请输入内容'); return; }
     if (!isAuthenticated) { push('warning','请先登录'); return; }
     setIsSubmitting(true);
 
@@ -323,7 +330,9 @@ const PostDetail = () => {
   }
 
   const handleReply = async (commentId: string) => {
-    if (!replyContent.trim() || !state.user || !post) return;
+    if (!state.user || !post) return;
+    const pure = replyContent.replace(/^@\S+\s*/, '').trim();
+    if (!pure) { push('warning','请输入内容'); return; }
     if (!isAuthenticated) { push('warning','请先登录'); return; }
     const tempId = `temp-${Date.now()}`;
     const optimistic = {
@@ -351,11 +360,16 @@ const PostDetail = () => {
       });
       const data = await res.json();
       if (data.success) {
+        // 展开该评论的子线程以展示新回复
+        setReplyingTo(commentId);
         setPost(cur => {
           if (!cur) return cur;
           const replace = (arr: any[]) => arr.map(c => c.id === commentId ? { ...c, replies: (c.replies || []).map((r:any)=> r.id===tempId ? data.comment : r) } : c);
           return { ...cur, comments: replace(cur.comments) } as any;
         });
+        // 清空输入
+        setReplyingTo(null);
+        setReplyContent('');
       } else {
         throw new Error('reply failed');
       }
