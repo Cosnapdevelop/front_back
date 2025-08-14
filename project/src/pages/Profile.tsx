@@ -418,7 +418,11 @@ const Profile = () => {
                       alert('Saved');
                       // 立即刷新顶部展示
                       setActiveTab('settings');
-                    } else alert('Failed: ' + (data.error || ''));
+                    } else if (res.status === 409) {
+                      alert(data.error || '用户名或邮箱已被占用');
+                    } else {
+                      alert('Failed: ' + (data.error || ''));
+                    }
                   } catch (e) {
                     alert('Failed to save');
                   }

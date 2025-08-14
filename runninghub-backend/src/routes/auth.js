@@ -146,8 +146,33 @@ router.put('/me', async (req, res) => {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ success: false, error: '未授权' });
     const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
-    const { username, email, bio, avatar } = req.body;
-    const user = await prisma.user.update({ where: { id: payload.sub }, data: { username, email, bio, avatar }, select: { id: true, email: true, username: true, avatar: true, bio: true } });
+
+    const current = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!current) return res.status(404).json({ success: false, error: '用户不存在' });
+
+    const { username, email, bio, avatar } = req.body || {};
+    const data = {};
+
+    // 唯一性校验（仅当实际修改时）
+    if (typeof username === 'string' && username !== current.username) {
+      const exists = await prisma.user.findFirst({ where: { username } });
+      if (exists) return res.status(409).json({ success: false, error: '用户名已被占用' });
+      data.username = username;
+    }
+    if (typeof email === 'string' && email !== current.email) {
+      const exists = await prisma.user.findFirst({ where: { email } });
+      if (exists) return res.status(409).json({ success: false, error: '邮箱已被使用' });
+      data.email = email;
+    }
+    if (typeof bio === 'string') data.bio = bio;
+    if (typeof avatar === 'string') data.avatar = avatar;
+
+    // 如果没有任何变更，直接返回当前信息
+    if (Object.keys(data).length === 0) {
+      return res.json({ success: true, user: { id: current.id, email: current.email, username: current.username, avatar: current.avatar, bio: current.bio } });
+    }
+
+    const user = await prisma.user.update({ where: { id: payload.sub }, data, select: { id: true, email: true, username: true, avatar: true, bio: true } });
     return res.json({ success: true, user });
   } catch (e) {
     return res.status(400).json({ success: false, error: e.message });
