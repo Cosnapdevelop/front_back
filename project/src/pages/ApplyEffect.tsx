@@ -11,6 +11,7 @@ import {
   StopCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { useTaskProcessing } from '../hooks/useTaskProcessing';
 import ImageCarousel from '../components/ImageCarousel';
 
@@ -18,6 +19,7 @@ const ApplyEffect = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { state } = useApp();
+  const { isAuthenticated, bootstrapped } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { push } = useToast();
   
@@ -54,6 +56,34 @@ const ApplyEffect = () => {
     status,
     activeTasksSize: activeTasks?.size || 0
   });
+
+  // 等待认证状态初始化
+  if (!bootstrapped) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 检查用户是否已登录
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">请先登录后再使用AI效果</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+          >
+            去登录
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const effect = state.effects.find(e => e.id === id);
 
@@ -184,8 +214,17 @@ const ApplyEffect = () => {
           fileId
         }
       }));
+      
+      // 更新参数值，确保参数被正确设置
+      // 对于图片参数，我们使用一个占位符值，因为实际的文件会通过FormData传递
+      setParameters(prev => ({
+        ...prev,
+        [paramName]: `uploaded_${file.name}` // 使用一个标识符表示已上传
+      }));
     };
     reader.readAsDataURL(file);
+    
+    console.log(`[ApplyEffect] 参数图片上传完成: ${paramName} = uploaded_${file.name}`);
   };
 
   const handleParameterChange = (paramName: string, value: any) => {
