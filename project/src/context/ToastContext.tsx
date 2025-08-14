@@ -7,8 +7,16 @@ const ToastContext = createContext<{ push: (type: ToastType, message: string) =>
 
 export const useToast = () => {
   const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error('useToast must be used within ToastProvider');
-  return ctx;
+  if (ctx) return ctx;
+  // Fallback: avoid crashing when provider is missing (e.g., outside root or during pre-render)
+  return {
+    push: (_type: ToastType, message: string) => {
+      if (typeof window !== 'undefined') {
+        // eslint-disable-next-line no-console
+        console.warn('[toast:fallback]', message);
+      }
+    }
+  };
 };
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
