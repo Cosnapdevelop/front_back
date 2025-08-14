@@ -19,6 +19,75 @@ import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 
+// 子组件：负责显示某条评论的子回复，支持折叠/展开 + 懒加载 + 嵌套回复
+function RepliesThread({ postId, parent, onLike, depth = 1 }: { postId: string; parent: any; onLike: (id: string)=>void; depth?: number }) {
+  const [open, setOpen] = useState(depth === 1);
+  const [loading, setLoading] = useState(false);
+  const [replies, setReplies] = useState<any[]>(parent.replies || []);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+
+  const load = async (reset=false) => {
+    setLoading(true);
+    try {
+      const next = reset ? 1 : page;
+      const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments?parentId=${parent.id}&page=${next}&limit=10`);
+      const data = await res.json();
+      if (data.success) {
+        setReplies(prev => reset ? data.comments : [...prev, ...data.comments]);
+        setHasNext(data.meta?.hasNext);
+        setPage(next + 1);
+      }
+    } finally { setLoading(false); }
+  };
+
+  const toggleOpen = async () => {
+    const next = !open; setOpen(next);
+    if (next && replies.length === 0) await load(true);
+  };
+
+  // 默认展开一级：初次渲染时如果 open=true 且还未加载数据，自动加载
+  useEffect(() => {
+    if (open && replies.length === 0) {
+      load(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="mt-3 ml-10 space-y-3">
+      <button onClick={toggleOpen} className="text-xs text-gray-500 hover:text-gray-700">
+        {open ? '收起回复' : `展开 ${parent.repliesCount || replies.length} 条回复`}
+      </button>
+      {open && (
+        <div className="space-y-3">
+          {replies.map((reply:any)=> (
+            <div key={reply.id} className="flex space-x-2">
+              <img src={reply.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`} onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API_BASE_URL}/assets/placeholder-user.png`;}} alt={reply.user?.username} className="h-6 w-6 rounded-full object-cover flex-shrink-0" />
+              <div className="flex-1">
+                <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
+                  <p className="text-xs text-gray-900 dark:text-white"><span className="font-semibold">@{reply.user?.username}</span> {reply.content}</p>
+                </div>
+                <div className="flex items-center space-x-3 mt-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(reply.createdAt).toLocaleString()}</span>
+                  <button onClick={()=> onLike(reply.id)} className={`text-xs ${reply.isLiked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500`}>{reply.isLiked ? '❤️' : '🤍'} {reply.likesCount > 0 && reply.likesCount}</button>
+                </div>
+                {/* 嵌套子回复 */}
+                <RepliesThread postId={postId} parent={reply} onLike={onLike} depth={depth + 1} />
+              </div>
+            </div>
+          ))}
+          {hasNext && (
+            <div className="flex justify-center">
+              <button disabled={loading} onClick={()=> load(false)} className="px-3 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300">{loading ? '加载中...' : '加载更多'}</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
@@ -564,7 +633,7 @@ const PostDetail = () => {
                         </button>
                       </div>
                       
-                      {/* Reply Input */}
+                       {/* Reply Input */}
                       {replyingTo === comment.id && (
                         <div className="mt-3 flex space-x-2">
                           <input
@@ -597,39 +666,8 @@ const PostDetail = () => {
                         </div>
                       )}
                       
-                      {/* Replies */}
-                      {comment.replies && comment.replies.length > 0 && (
-                        <div className="mt-3 ml-10 space-y-3">
-                          {comment.replies.map((reply) => (
-                            <div key={reply.id} className="flex space-x-2">
-                              <img
-                                src={reply.user.avatar}
-                                alt={reply.user.username}
-                                className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-                              />
-                              <div className="flex-1">
-                                <div className="bg-gray-100 dark:bg-gray-600 rounded-lg p-2">
-                                  <p className="text-xs text-gray-900 dark:text-white">
-                                    <span className="font-semibold">@{reply.user.username}</span>{' '}
-                                    {reply.content}
-                                  </p>
-                                </div>
-                                <div className="flex items-center space-x-3 mt-1">
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {formatDate(reply.createdAt)}
-                                  </span>
-                                  <button 
-                                    onClick={() => handleCommentLike(reply.id)}
-                                    className={`text-xs ${reply.isLiked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500`}
-                                  >
-                                    {reply.isLiked ? '❤️' : '🤍'} {reply.likesCount > 0 && reply.likesCount}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {/* Replies (collapsible & lazy-load) */}
+                      <RepliesThread postId={post.id} parent={comment} onLike={handleCommentLike} />
                     </div>
                   </div>
                 ))}
