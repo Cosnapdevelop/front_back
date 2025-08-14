@@ -34,6 +34,15 @@ const Profile = () => {
   const API = (import.meta.env.VITE_API_BASE_URL as string) || 'https://cosnap-back.onrender.com';
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  // Edit Post Modal state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editCaption, setEditCaption] = useState('');
+  const [editImages, setEditImages] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
 
   const fetchMyPosts = async () => {
     setLoadingPosts(true);
@@ -45,6 +54,120 @@ const Profile = () => {
       if (data.success) setMyPosts(data.posts);
     } finally {
       setLoadingPosts(false);
+    }
+  };
+
+  const updatePostImages = async (postId: string, newImages: string[], newCaption?: string) => {
+    const res = await fetch(`${API}/api/community/posts/${postId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
+      body: JSON.stringify({ images: newImages, caption: newCaption })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setMyPosts(prev => prev.map(p => (p.id === postId ? { ...p, images: newImages, caption: newCaption ?? p.caption } : p)));
+    } else {
+      alert('Update failed: ' + (data.error || ''));
+    }
+  };
+
+  const openEditModal = (p: any) => {
+    setEditingPostId(p.id);
+    setEditCaption(p.caption || '');
+    setEditImages([...(p.images || [])]);
+    setEditOpen(true);
+  };
+
+  const handleUploadFiles = async (files: FileList | null) => {
+    if (!files) return;
+    setIsUploading(true);
+    try {
+      const list: string[] = [];
+      for (const f of Array.from(files)) {
+        const ext = (f.name.split('.').pop() || 'jpg').toLowerCase();
+        const resp = await fetch(`${API}/api/effects/upload/presign`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
+          body: JSON.stringify({ ext, dir: 'cosnap/community' })
+        });
+        const ps = await resp.json();
+        if (ps.success) {
+          if (ps.provider === 'aliyun-oss') {
+            const form = new FormData();
+            Object.entries(ps.form).forEach(([k, v]) => form.append(k, v as string));
+            if (!form.has('key')) form.append('key', ps.form.key);
+            form.append('file', f);
+            await fetch(ps.uploadUrl, { method: 'POST', body: form });
+          }
+          list.push(ps.publicUrl as string);
+        }
+      }
+      setEditImages(prev => [...prev, ...list]);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const onDragStartImg = (idx: number) => setDragFrom(idx);
+  const onDropImg = (idx: number) => {
+    if (dragFrom === null || dragFrom === idx) return;
+    const arr = [...editImages];
+    const temp = arr[dragFrom];
+    arr[dragFrom] = arr[idx];
+    arr[idx] = temp;
+    setEditImages(arr);
+    setDragFrom(null);
+  };
+
+  // Canvas 工具：中心裁剪为正方形并压缩到 512x512
+  const centerCropAndCompress = (img: HTMLImageElement, size = 512, type = 'image/jpeg', quality = 0.9): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    const minSide = Math.min(img.naturalWidth, img.naturalHeight);
+    const sx = (img.naturalWidth - minSide) / 2;
+    const sy = (img.naturalHeight - minSide) / 2;
+    ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+    return canvas.toDataURL(type, quality);
+  };
+
+  const openAvatarEditor = () => { setAvatarModalOpen(true); setAvatarPreview(null); };
+  const onAvatarFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const dataUrl = centerCropAndCompress(img, 512, 'image/jpeg', 0.92);
+        setAvatarPreview(dataUrl);
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+  const saveAvatar = async () => {
+    if (!avatarPreview) return;
+    // dataURL -> Blob
+    const resFetch = await fetch(avatarPreview);
+    const blob = await resFetch.blob();
+    const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+    // 预签名直传
+    const resp = await fetch(`${API}/api/effects/upload/presign`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
+      body: JSON.stringify({ ext: 'jpg', dir: 'cosnap/avatar' })
+    });
+    const ps = await resp.json();
+    if (ps.success) {
+      if (ps.provider === 'aliyun-oss') {
+        const form = new FormData();
+        Object.entries(ps.form).forEach(([k, v]) => form.append(k, v as string));
+        if (!form.has('key')) form.append('key', ps.form.key);
+        form.append('file', file);
+        await fetch(ps.uploadUrl, { method: 'POST', body: form });
+      }
+      const avatarUrl = ps.publicUrl as string;
+      const put = await fetch(`${API}/auth/me/avatar`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }, body: JSON.stringify({ avatar: avatarUrl }) });
+      const data = await put.json();
+      if (data.success) { localStorage.setItem('user', JSON.stringify(data.user)); dispatch({ type: 'SET_USER', payload: data.user }); setAvatarModalOpen(false); }
     }
   };
 
@@ -111,35 +234,7 @@ const Profile = () => {
                       <div className="text-sm text-gray-600 dark:text-gray-400">{new Date(p.createdAt).toLocaleString()}</div>
                       <div className="space-x-2">
                         <button
-                          onClick={async ()=>{
-                            const caption = prompt('Edit caption', p.caption) ?? p.caption;
-                            let images = p.images;
-                            // 选择并直传新图（可多次点击逐张追加）
-                            const input = document.createElement('input');
-                            input.type = 'file'; input.accept = 'image/*';
-                            input.onchange = async () => {
-                              const file = input.files && input.files[0];
-                              if (file) {
-                                const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-                                const resp = await fetch(`${API}/api/effects/upload/presign`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ ext, dir:'cosnap/community' }) });
-                                const ps = await resp.json();
-                                if (ps.success && ps.provider === 'aliyun-oss') {
-                                  const form = new FormData();
-                                  Object.entries(ps.form).forEach(([k,v])=> form.append(k, v as string));
-                                  if (!form.has('key')) form.append('key', ps.form.key);
-                                  form.append('file', file);
-                                  await fetch(ps.uploadUrl, { method:'POST', body: form });
-                                  images = [...(p.images||[]), ps.publicUrl];
-                                } else if (ps.success && ps.provider === 'mock') {
-                                  images = [...(p.images||[]), ps.publicUrl];
-                                }
-                              }
-                              const res = await fetch(`${API}/api/community/posts/${p.id}`, { method:'PUT', headers:{'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}`}, body: JSON.stringify({ caption, images }) });
-                              const data = await res.json();
-                              if (data.success) { alert('Updated'); fetchMyPosts(); } else { alert('Failed: '+(data.error||'') ); }
-                            };
-                            input.click();
-                          }}
+                          onClick={()=> openEditModal(p)}
                           className="px-3 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600">Edit</button>
                         <button
                           onClick={async ()=>{
@@ -154,7 +249,14 @@ const Profile = () => {
                     <div className="mt-3 text-gray-900 dark:text-white">{p.caption}</div>
                     <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {(p.images||[]).map((src:string,idx:number)=> (
-                        <img key={idx} src={src} alt="" className="h-24 w-full object-cover rounded" loading="lazy" />
+                        <div key={idx} className="relative group">
+                          <img src={src} alt="" className="h-24 w-full object-cover rounded" loading="lazy" />
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center space-x-2 bg-black/40 rounded">
+                            <button onClick={()=>{ const arr=[...p.images]; if(idx>0){ [arr[idx-1],arr[idx]]=[arr[idx],arr[idx-1]]; updatePostImages(p.id, arr);} }} className="px-2 py-1 text-xs bg-white/90 rounded">←</button>
+                            <button onClick={()=>{ const arr=[...p.images]; arr.splice(idx,1); updatePostImages(p.id, arr); }} className="px-2 py-1 text-xs bg-red-500 text-white rounded">Delete</button>
+                            <button onClick={()=>{ const arr=[...p.images]; if(idx<arr.length-1){ [arr[idx+1],arr[idx]]=[arr[idx],arr[idx+1]]; updatePostImages(p.id, arr);} }} className="px-2 py-1 text-xs bg-white/90 rounded">→</button>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -472,6 +574,83 @@ const Profile = () => {
         >
           {renderTabContent()}
         </motion.div>
+
+        {/* Edit Post Modal */}
+        {editOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={()=> setEditOpen(false)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-3xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Post</h3>
+                <button onClick={()=> setEditOpen(false)} className="px-3 py-1 text-sm rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Close</button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-2">Caption</label>
+                  <input value={editCaption} onChange={e=> setEditCaption(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm text-gray-600 dark:text-gray-400">Images ({editImages.length})</label>
+                    <label className="px-3 py-1 text-sm rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer">
+                      {isUploading ? 'Uploading...' : 'Add Images'}
+                      <input type="file" accept="image/*" multiple onChange={(e)=> handleUploadFiles(e.target.files)} className="hidden" />
+                    </label>
+                  </div>
+                  {editImages.length === 0 ? (
+                    <div className="h-24 flex items-center justify-center text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 rounded">No images yet</div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                      {editImages.map((src,idx)=> (
+                        <div key={idx} className="relative group border border-gray-200 dark:border-gray-700 rounded overflow-hidden"
+                          draggable onDragStart={()=> onDragStartImg(idx)} onDragOver={(e)=> e.preventDefault()} onDrop={()=> onDropImg(idx)}>
+                          <img src={src} alt="" className="h-28 w-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2">
+                            <button onClick={()=> setEditImages(prev=> prev.filter((_,i)=> i!==idx))} className="px-2 py-1 text-xs rounded bg-red-500 text-white">Delete</button>
+                            <span className="text-xs text-white">Drag to reorder</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <button onClick={()=> setEditOpen(false)} className="px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>
+                  <button onClick={async ()=>{ if (editingPostId) { await updatePostImages(editingPostId, editImages, editCaption); setEditOpen(false); } }} className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-600 text-white">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Avatar Crop Modal */}
+        {avatarModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={()=> setAvatarModalOpen(false)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Change Avatar</h3>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="h-24 w-24 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-gray-500">Preview</div>
+                    )}
+                  </div>
+                  <label className="px-3 py-1 text-sm rounded bg-purple-500 text-white hover:bg-purple-600 cursor-pointer">
+                    Select Image
+                    <input type="file" accept="image/*" onChange={(e)=> onAvatarFile(e.target.files?.[0] as File)} className="hidden" />
+                  </label>
+                </div>
+                <div className="flex justify-end space-x-2">
+                  <button onClick={()=> setAvatarModalOpen(false)} className="px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>
+                  <button disabled={!avatarPreview} onClick={saveAvatar} className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50">Save</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
