@@ -33,6 +33,15 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
   const [childRefresh, setChildRefresh] = useState<Record<string, number>>({});
   const [openedChildId, setOpenedChildId] = useState<string | null>(null);
 
+  // 当父级 comment 的 replies 发生变化（例如父组件做了乐观更新）时，同步到本地状态
+  useEffect(() => {
+    if (Array.isArray(parent.replies)) {
+      setReplies(parent.replies);
+    }
+    // 仅以长度作为变更信号，避免深比较开销
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parent.id, Array.isArray(parent.replies) ? parent.replies.length : 0]);
+
   const load = async (reset=false) => {
     setLoading(true);
     try {
@@ -47,7 +56,9 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
       }
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
-        throw new Error('Invalid response');
+        // 非 JSON（多半是 404 HTML），静默失败，禁止继续加载
+        setHasNext(false);
+        return;
       }
       const data = await res.json();
       if (data.success) {
@@ -100,18 +111,37 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
                        onClick={async ()=>{
                         const pure = replyText.replace(/^@\S+\s*/, '').trim();
                         if (!pure) { push('warning','请输入内容'); return; }
+                        // 乐观添加到本地 replies
+                        const tempId = `temp-${Date.now()}`;
+                        const optimistic = {
+                          id: tempId,
+                          user: reply.user,
+                          content: replyText.trim(),
+                          createdAt: new Date().toISOString(),
+                          likesCount: 0,
+                          isLiked: false,
+                          replies: []
+                        } as any;
+                        setReplies(prev => [...prev, optimistic]);
+                        setActiveReplyTo(null); setReplyText('');
                         try {
-                          const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ content: replyText.trim(), parentId: reply.id }) });
+                          const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ content: optimistic.content, parentId: reply.id }) });
+                          const contentType2 = res.headers.get('content-type') || '';
+                          if (!contentType2.includes('application/json')) throw new Error('invalid');
                           const data = await res.json();
-                          if (data.success) {
-                            // 强制展开并刷新该条回复的子线程
+                          if (data.success && data.comment) {
+                            // 用真实数据替换临时项
+                            setReplies(prev => prev.map(r => r.id === tempId ? data.comment : r));
                             setOpenedChildId(reply.id);
                             setChildRefresh(r=> ({ ...r, [reply.id]: (r[reply.id]||0)+1 }));
-                            setActiveReplyTo(null); setReplyText('');
                           } else {
-                            push('error', data.message || '回复失败，请重试');
+                            throw new Error('failed');
                           }
-                         } catch { push('error','回复失败，请重试'); }
+                         } catch {
+                           // 回滚临时项
+                           setReplies(prev => prev.filter(r => r.id !== tempId));
+                           push('error','回复失败，请重试');
+                         }
                       }}
                     >发送</button>
                   </div>
