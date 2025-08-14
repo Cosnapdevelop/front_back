@@ -37,10 +37,21 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
     setLoading(true);
     try {
       const next = reset ? 1 : page;
-      const res = await fetch(`${API_BASE_URL}/api/community/comments/${parent.id}/replies?page=${next}&limit=10`);
+      // 首选新接口：/comments/:id/replies
+      let url = `${API_BASE_URL}/api/community/comments/${parent.id}/replies?page=${next}&limit=10`;
+      let res = await fetch(url);
+      // Render 旧版本可能没有该接口，404 时回退到 /posts/:postId/comments?parentId=
+      if (res.status === 404) {
+        url = `${API_BASE_URL}/api/community/posts/${postId}/comments?parentId=${parent.id}&page=${next}&limit=10`;
+        res = await fetch(url);
+      }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Invalid response');
+      }
       const data = await res.json();
       if (data.success) {
-        const items = Array.isArray(data.replies) ? data.replies : [];
+        const items = Array.isArray(data.replies) ? data.replies : (Array.isArray(data.comments) ? data.comments : []);
         setReplies(prev => reset ? items : [...prev, ...items]);
         setHasNext(!!data.meta?.hasNext);
         setPage(next + 1);
