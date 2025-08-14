@@ -158,7 +158,25 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
                 </div>
                 <div className="flex items-center space-x-3 mt-1">
                   <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(reply.createdAt).toLocaleString()}</span>
-                  <button onClick={()=> onLike(reply.id)} className={`text-xs ${reply.isLiked ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'} hover:text-red-500`}>{reply.isLiked ? '❤️' : '🤍'} {reply.likesCount > 0 && reply.likesCount}</button>
+                  <button
+                    onClick={async ()=>{
+                      const target = replies.find(r => r.id === reply.id);
+                      if (!target) return;
+                      const prev = JSON.parse(JSON.stringify(replies));
+                      const willLike = !target.isLiked;
+                      setReplies(rs => rs.map(r => r.id === reply.id ? { ...r, isLiked: willLike, likesCount: (r.likesCount || 0) + (willLike ? 1 : -1) } : r));
+                      try {
+                        const endpoint = willLike ? 'like' : 'unlike';
+                        await fetch(`${API_BASE_URL}/api/community/comments/${reply.id}/${endpoint}`, { method:'POST', headers:{ Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` } });
+                      } catch {
+                        setReplies(prev);
+                      }
+                    }}
+                    className={`flex items-center text-xs ${reply.isLiked ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'} hover:text-red-500`}
+                  >
+                    <Heart className="h-3.5 w-3.5" fill={reply.isLiked ? 'currentColor' : 'none'} />
+                    <span className="ml-1">{reply.likesCount > 0 ? reply.likesCount : ''}</span>
+                  </button>
                   <button className="text-xs text-gray-500 hover:text-gray-700" onClick={()=> { setActiveReplyTo(reply.id); setReplyText(`@${reply.user?.username} `); setChildRefresh(r=>({...r})); }}>回复</button>
                 </div>
                 {/* 子回复输入 */}
