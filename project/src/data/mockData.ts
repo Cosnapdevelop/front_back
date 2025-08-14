@@ -379,6 +379,33 @@ export const mockEffects: Effect[] = [
       { nodeId: '65', fieldName: 'scale', paramKey: 'scale_65' },        // 光源大小
       { nodeId: '65', fieldName: 'rotation', paramKey: 'rotation_65' }   // 光源角度
     ]
+  },
+  // 生成梦幻风格人物照
+  {
+    id: 'dreamy-portrait-generation',
+    name: '生成梦幻风格人物照',
+    description: 'AI驱动的梦幻风格人物肖像生成技术，使用先进的图像生成模型，将普通照片转换为具有梦幻、艺术风格的人物肖像，适用于社交媒体头像、艺术创作、个人写真等场景。',
+    author: mockUsers[0],
+    category: 'Portrait',
+    tags: ['portrait', 'dreamy', 'artistic', 'generation', 'AI', 'fantasy', 'style-transfer'],
+    beforeImage: 'https://images.pexels.com/photos/1308881/pexels-photo-1308881.jpeg?auto=compress&cs=tinysrgb&w=400',
+    afterImage: 'https://images.pexels.com/photos/3680219/pexels-photo-3680219.jpeg?auto=compress&cs=tinysrgb&w=400',
+    likesCount: 892,
+    isLiked: false,
+    isBookmarked: false,
+    createdAt: '2025-08-14',
+    difficulty: 'Easy',
+    processingTime: '2-4 minutes',
+    webappId: '1941076109855453186', // 从API调用中获取的webappId
+    apiKey: '8ee162873b6e44bd97d3ef6fce2de105', // 从API调用中获取的apiKey
+    isWebapp: true, // 标记为AI应用任务
+    isTrending: true,
+    parameters: [
+      { name: 'image_333', type: 'image', description: '上传原始人物照片（要转换为梦幻风格的照片）' }
+    ],
+    nodeInfoTemplate: [
+      { nodeId: '333', fieldName: 'image', paramKey: 'image_333' }  // 输入图片节点
+    ]
   }
 ];
 
