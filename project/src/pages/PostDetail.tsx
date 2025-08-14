@@ -37,11 +37,12 @@ function RepliesThread({ postId, parent, onLike, depth = 1, initialOpen }: { pos
     setLoading(true);
     try {
       const next = reset ? 1 : page;
-      const res = await fetch(`${API_BASE_URL}/api/community/posts/${postId}/comments?parentId=${parent.id}&page=${next}&limit=10`);
+      const res = await fetch(`${API_BASE_URL}/api/community/comments/${parent.id}/replies?page=${next}&limit=10`);
       const data = await res.json();
       if (data.success) {
-        setReplies(prev => reset ? data.comments : [...prev, ...data.comments]);
-        setHasNext(data.meta?.hasNext);
+        const items = Array.isArray(data.replies) ? data.replies : [];
+        setReplies(prev => reset ? items : [...prev, ...items]);
+        setHasNext(!!data.meta?.hasNext);
         setPage(next + 1);
       }
     } finally { setLoading(false); }
