@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config/api';
 import { taskManagementService, TaskStatus } from '../services/taskManagementService';
 import imageLibraryService from '../services/imageLibraryService';
 import { createError, errorUtils, ErrorCode } from '../types/errors';
+import { useAuth } from '../context/AuthContext';
 
 export interface TaskProcessingState {
   isProcessing: boolean;
@@ -28,6 +29,7 @@ const initialState: TaskProcessingState = {
 export function useTaskProcessing() {
   const [state, setState] = useState<TaskProcessingState>(initialState);
   const activeIntervalsRef = useRef<Set<number>>(new Set());
+  const { accessToken } = useAuth();
   
   // 组件卸载时清理所有轮询
   useEffect(() => {
@@ -124,8 +126,14 @@ export function useTaskProcessing() {
         }
       });
 
+      const applyHeaders: Record<string, string> = {};
+      if (accessToken) {
+        applyHeaders['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/apply`, {
         method: 'POST',
+        headers: applyHeaders, // 不手动设置 Content-Type，浏览器会为 FormData 自动设置
         body: formData,
       });
 
@@ -207,9 +215,11 @@ export function useTaskProcessing() {
       console.log(`[轮询] 第${attempts}次轮询: taskId=${taskId}`);
       
       try {
+        const statusHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (accessToken) statusHeaders['Authorization'] = `Bearer ${accessToken}`;
         const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/status`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: statusHeaders,
           body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id })
         });
 
@@ -231,9 +241,11 @@ export function useTaskProcessing() {
             console.log('[轮询] 任务完成，开始获取结果');
             
             try {
+              const resultsHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+              if (accessToken) resultsHeaders['Authorization'] = `Bearer ${accessToken}`;
               const resultsResponse = await fetch(`${API_BASE_URL}/api/effects/comfyui/results`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: resultsHeaders,
                 body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id })
               });
               
@@ -379,9 +391,11 @@ export function useTaskProcessing() {
 
   const cancelTask = useCallback(async (taskId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/effects/comfyui/cancel`, {
+      const cancelHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (accessToken) cancelHeaders['Authorization'] = `Bearer ${accessToken}`;
+      await fetch(`${API_BASE_URL}/api/effects/comfyui/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: cancelHeaders,
         body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id })
       });
 
