@@ -286,9 +286,44 @@ export const notFoundHandler = (req, res) => {
  */
 export const corsPreflightHandler = (req, res, next) => {
   if (req.method === 'OPTIONS') {
-    // 预检请求的快速响应
+    // 预检请求：必须返回完整的CORS响应头，否则浏览器会判定为失败
+    const origin = req.get('Origin');
+
+    // 与 index.js 中保持一致的允许来源列表（支持通配符）
+    const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'https://cosnap.vercel.app',
+      'https://cosnap-*.vercel.app'
+    ];
+
+    const isAllowed = !origin || allowedOrigins.some((allowed) => {
+      if (allowed.includes('*')) {
+        const pattern = allowed
+          .replace(/\./g, '\\.')
+          .replace(/\*/g, '.*');
+        return new RegExp(`^${pattern}$`).test(origin);
+      }
+      return allowed === origin;
+    });
+
+    if (!isAllowed) {
+      return res.status(403).send('CORS Not Allowed');
+    }
+
+    // 设置必要的CORS响应头
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    if (origin) {
+      res.header('Vary', 'Origin');
+    }
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header(
+      'Access-Control-Allow-Headers',
+      req.get('Access-Control-Request-Headers') || 'Content-Type, Authorization, X-Requested-With'
+    );
     res.header('Access-Control-Max-Age', '86400'); // 24小时缓存
-    res.status(204).send();
+    return res.status(204).send();
   } else {
     next();
   }
