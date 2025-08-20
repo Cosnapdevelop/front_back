@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
+import { body, validationResult, query } from 'express-validator';
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { 
@@ -49,19 +49,16 @@ router.post(
       username = (username || '').trim().toLowerCase();
       scene = scene || 'register';
       
-      // 检查用户是否已存在
-      const exists = await prisma.user.findFirst({ 
-        where: { 
-          OR: [{ email }, { username }] 
-        } 
-      });
-      
-      if (exists) {
-        console.warn(`[注册失败] 用户已存在 - Email: ${email}, Username: ${username}, IP: ${req.ip}`);
-        return res.status(409).json({ 
-          success: false, 
-          error: '邮箱或用户名已存在' 
-        });
+      // 检查用户是否已存在（分别检查邮箱与用户名），用于更明确的冲突提示
+      const [emailExists, usernameExists] = await Promise.all([
+        prisma.user.findUnique({ where: { email } }),
+        prisma.user.findUnique({ where: { username } })
+      ]);
+      if (emailExists || usernameExists) {
+        const details = { emailExists: !!emailExists, usernameExists: !!usernameExists };
+        const errorMsg = emailExists ? '邮箱已存在' : '用户名已存在';
+        console.warn(`[注册失败] 冲突 - Email: ${email}(${details.emailExists}), Username: ${username}(${details.usernameExists}), IP: ${req.ip}`);
+        return res.status(409).json({ success: false, error: errorMsg, details });
       }
 
       // 若提供验证码，则校验
@@ -129,6 +126,44 @@ router.post(
         success: false, 
         error: '注册失败，请稍后重试' 
       });
+    }
+  }
+);
+
+// 可用性检查：GET /auth/check-availability?email=...&username=...
+router.get(
+  '/check-availability',
+  [
+    query('email').optional().isEmail().withMessage('email格式不正确'),
+    query('username').optional().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_-]+$/),
+    (req, res, next) => {
+      const result = validationResult(req);
+      if (!result.isEmpty()) {
+        return res.status(400).json({ success: false, error: '参数无效', details: result.array() });
+      }
+      next();
+    }
+  ],
+  async (req, res) => {
+    try {
+      const emailRaw = req.query.email ? String(req.query.email) : undefined;
+      const usernameRaw = req.query.username ? String(req.query.username) : undefined;
+      const email = emailRaw?.trim();
+      const username = usernameRaw?.trim().toLowerCase();
+
+      const [emailUser, usernameUser] = await Promise.all([
+        email ? prisma.user.findUnique({ where: { email } }) : Promise.resolve(null),
+        username ? prisma.user.findUnique({ where: { username } }) : Promise.resolve(null)
+      ]);
+
+      return res.json({
+        success: true,
+        emailAvailable: email ? !emailUser : undefined,
+        usernameAvailable: username ? !usernameUser : undefined
+      });
+    } catch (error) {
+      console.error(`[可用性检查错误] IP: ${req.ip}, 错误:`, error);
+      return res.status(500).json({ success: false, error: '服务器错误' });
     }
   }
 );
