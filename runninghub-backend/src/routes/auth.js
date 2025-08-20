@@ -15,6 +15,7 @@ import {
   sanitizeInput 
 } from '../middleware/validation.js';
 import { auth, checkTokenExpiry } from '../middleware/auth.js';
+import { isEmailEnabled, sendVerificationEmail } from '../services/emailService.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -188,8 +189,17 @@ router.post(
         data: { email, code, scene, expiresAt }
       });
 
-      // TODO: 集成真实邮件服务。当前先打印到日志，供开发调试。
-      console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
+      if (await isEmailEnabled()) {
+        try {
+          await sendVerificationEmail(email, code);
+        } catch (e) {
+          console.warn('[Email] 发送失败，降级为日志输出:', e?.message);
+          console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
+        }
+      } else {
+        // 未配置SMTP，降级日志输出
+        console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
+      }
 
       return res.json({ success: true });
     } catch (error) {
