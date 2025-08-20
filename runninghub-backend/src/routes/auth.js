@@ -44,8 +44,8 @@ router.post(
   async (req, res) => {
     try {
       let { email, username, password, code, scene } = req.body;
-      // 标准化：邮箱/用户名统一小写、去空格
-      email = (email || '').trim().toLowerCase();
+      // 标准化：用户名不区分大小写 -> 统一小写；邮箱保留大小写，仅去空格
+      email = (email || '').trim();
       username = (username || '').trim().toLowerCase();
       scene = scene || 'register';
       
@@ -174,10 +174,12 @@ router.post(
       const { email, password } = req.body;
       
       // 查找用户（支持邮箱或用户名登录）
-      const user = await prisma.user.findFirst({ 
-        where: { 
-          OR: [{ email }, { username: email }] 
-        } 
+      const identifier = String(email || '').trim();
+      const isEmail = identifier.includes('@');
+      const user = await prisma.user.findFirst({
+        where: isEmail
+          ? { email: identifier }
+          : { username: identifier.toLowerCase() }
       });
       
       if (!user) {
