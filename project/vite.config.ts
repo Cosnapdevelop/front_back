@@ -7,6 +7,25 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['lucide-react', 'framer-motion'],
+          'utils': ['axios', '@tanstack/react-query']
+        }
+      }
+    },
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: false, // 保留console用于调试
+        drop_debugger: true
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': 'http://localhost:3001',

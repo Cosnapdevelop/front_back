@@ -9,12 +9,8 @@ const IMAGE_CACHE_NAME = 'cosnap-images-v1.0.0';
 const CORE_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
-  '/static/js/main.js',
-  '/static/css/main.css',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/offline.html'
+  '/manifest.json'
+  // 动态资源不在这里缓存，避免404错误
 ];
 
 // API endpoints to cache
