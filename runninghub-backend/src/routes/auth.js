@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
+import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { 
   authLimiter, 
@@ -42,7 +43,11 @@ router.post(
   ...authValidation.register,
   async (req, res) => {
     try {
-      const { email, username, password } = req.body;
+      let { email, username, password, code, scene } = req.body;
+      // 标准化：邮箱/用户名统一小写、去空格
+      email = (email || '').trim().toLowerCase();
+      username = (username || '').trim().toLowerCase();
+      scene = scene || 'register';
       
       // 检查用户是否已存在
       const exists = await prisma.user.findFirst({ 
@@ -56,6 +61,28 @@ router.post(
         return res.status(409).json({ 
           success: false, 
           error: '邮箱或用户名已存在' 
+        });
+      }
+
+      // 若提供验证码，则校验
+      if (code) {
+        const now = new Date();
+        const found = await prisma.verificationCode.findFirst({
+          where: {
+            email,
+            scene,
+            code,
+            expiresAt: { gt: now },
+            usedAt: null
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+        if (!found) {
+          return res.status(400).json({ success: false, error: '验证码无效或已过期' });
+        }
+        await prisma.verificationCode.update({
+          where: { id: found.id },
+          data: { usedAt: new Date() }
         });
       }
 
@@ -102,6 +129,37 @@ router.post(
         success: false, 
         error: '注册失败，请稍后重试' 
       });
+    }
+  }
+);
+
+// 发送邮箱验证码
+router.post(
+  '/send-code',
+  authLimiter,
+  sanitizeInput,
+  body('email').isEmail().withMessage('请提供有效邮箱'),
+  async (req, res) => {
+    try {
+      const emailRaw = String(req.body.email || '');
+      const scene = (req.body.scene || 'register').trim();
+      const email = emailRaw.trim().toLowerCase();
+
+      // 生成6位数字验证码
+      const code = ('' + Math.floor(100000 + Math.random() * 900000));
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟
+
+      await prisma.verificationCode.create({
+        data: { email, code, scene, expiresAt }
+      });
+
+      // TODO: 集成真实邮件服务。当前先打印到日志，供开发调试。
+      console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error(`[发送验证码失败] IP: ${req.ip}, 错误:`, error);
+      return res.status(500).json({ success: false, error: '发送验证码失败' });
     }
   }
 );

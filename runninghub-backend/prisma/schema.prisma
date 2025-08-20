@@ -284,3 +284,16 @@ model ChineseConfig {
 }
 
 
+model VerificationCode {
+  id         String   @id @default(cuid())
+  email      String
+  code       String
+  scene      String   // e.g. 'register', 'reset-password'
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([email, scene, code])
+  @@index([expiresAt])
+}
+
