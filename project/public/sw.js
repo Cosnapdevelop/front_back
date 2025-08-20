@@ -1,7 +1,7 @@
 // Service Worker for Cosnap AI PWA
 // Optimized for Chinese mobile networks and offline functionality
 
-const CACHE_NAME = 'cosnap-v1.0.1';
+const CACHE_NAME = 'cosnap-v1.0.2';
 const API_CACHE_NAME = 'cosnap-api-v1.0.1';
 const IMAGE_CACHE_NAME = 'cosnap-images-v1.0.1';
 
