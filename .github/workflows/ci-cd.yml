@@ -31,6 +31,10 @@ jobs:
         working-directory: ./project
         run: npm ci
 
+      - name: Run linter (non-blocking)
+        working-directory: ./project
+        run: npm run lint || echo "⚠️ Linting issues found but not blocking deployment"
+
       - name: Build frontend
         working-directory: ./project
         run: npm run build
