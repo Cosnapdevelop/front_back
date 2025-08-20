@@ -10,21 +10,25 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'framer-motion'],
-          'utils': ['axios', '@tanstack/react-query']
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            if (id.includes('lucide-react') || id.includes('framer-motion')) {
+              return 'ui-vendor';
+            }
+            if (id.includes('axios') || id.includes('@tanstack')) {
+              return 'utils';
+            }
+            return 'vendor';
+          }
         }
       }
     },
     sourcemap: false,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: false, // 保留console用于调试
-        drop_debugger: true
-      }
-    }
+    minify: 'esbuild', // 使用esbuild替代terser，避免过度优化
+    target: 'es2020'
   },
   server: {
     proxy: {

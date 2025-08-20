@@ -1,16 +1,15 @@
 // Service Worker for Cosnap AI PWA
 // Optimized for Chinese mobile networks and offline functionality
 
-const CACHE_NAME = 'cosnap-v1.0.0';
-const API_CACHE_NAME = 'cosnap-api-v1.0.0';
-const IMAGE_CACHE_NAME = 'cosnap-images-v1.0.0';
+const CACHE_NAME = 'cosnap-v1.0.1';
+const API_CACHE_NAME = 'cosnap-api-v1.0.1';
+const IMAGE_CACHE_NAME = 'cosnap-images-v1.0.1';
 
-// Resources to cache on install
+// Minimal cache for critical resources only
 const CORE_ASSETS = [
   '/',
-  '/index.html',
   '/manifest.json'
-  // 动态资源不在这里缓存，避免404错误
+  // 只缓存最核心的资源
 ];
 
 // API endpoints to cache
@@ -81,6 +80,15 @@ self.addEventListener('fetch', (event) => {
   
   // Skip non-HTTP requests
   if (!request.url.startsWith('http')) {
+    return;
+  }
+  
+  // Skip external resources (Google Fonts, CDNs, etc.)
+  if (!url.origin.includes(self.location.hostname) && 
+      !url.origin.includes('localhost') &&
+      !url.origin.includes('127.0.0.1') &&
+      !url.pathname.startsWith('/api/')) {
+    // Let external resources load normally
     return;
   }
   

@@ -4,7 +4,8 @@
       "Bash(claude doctor)",
       "WebFetch(domain:git-scm.com)",
       "Bash(where bash)",
-      "Bash(setx:*)"
+      "Bash(setx:*)",
+      "Bash(NODE_ENV=production FORCE_HTTPS=true SECURE_COOKIES=true HIDE_ERROR_DETAILS=true DEBUG=false timeout 5s node src/index.js)"
     ],
     "deny": [],
     "ask": []
