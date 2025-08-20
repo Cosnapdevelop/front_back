@@ -51,6 +51,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    const refreshToken = localStorage.getItem(REFRESH_KEY);
+    if (!refreshToken) return false;
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      saveTokens(data.accessToken);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [saveTokens]);
+
   useEffect(() => {
     (async () => {
       const stored = localStorage.getItem(ACCESS_KEY);
@@ -102,27 +120,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [saveTokens]);
 
-  const refresh = useCallback(async () => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (!refreshToken) return false;
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken })
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      saveTokens(data.accessToken);
-      if (!user) {
-        const me = await fetchMe(data.accessToken);
-        if (me) setUser(me);
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  }, [saveTokens, fetchMe, user]);
 
   const logout = useCallback(() => {
     clearTokens();
