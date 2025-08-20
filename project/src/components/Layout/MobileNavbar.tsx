@@ -17,6 +17,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { RegionSelector } from '../RegionSelector';
+import { API_BASE_URL } from '../../config/api';
 
 interface MobileNavbarProps {
   title?: string;
@@ -263,11 +264,11 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
                 <div className="p-4 border-b border-pearl-200 dark:border-obsidian-700">
                   <div className="flex items-center space-x-3">
                     <img
-                      src={state.user?.avatar || `${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`}
+                      src={state.user?.avatar || `${API_BASE_URL}/assets/placeholder-user.png`}
                       alt={state.user?.username || 'User'}
                       className="w-12 h-12 rounded-full object-cover ring-2 ring-mint-500"
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = `${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`;
+                        (e.currentTarget as HTMLImageElement).src = `${API_BASE_URL}/assets/placeholder-user.png`;
                       }}
                     />
                     <div>

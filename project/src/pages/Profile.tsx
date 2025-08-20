@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../config/api';
 import { useToast } from '../context/ToastContext';
 import Cropper from 'react-easy-crop';
 import { motion } from 'framer-motion';
@@ -34,7 +35,7 @@ const Profile = () => {
 
   const bookmarkedEffects = state.effects.filter(effect => effect.isBookmarked);
 
-  const API = (import.meta.env.VITE_API_BASE_URL as string) || 'https://cosnap-back.onrender.com';
+  const API = API_BASE_URL;
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
@@ -425,7 +426,7 @@ const Profile = () => {
                     bio: bioRef.current?.value,
                   };
                   try {
-                    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/auth/me`, {
+                    const res = await fetch(`${API}/auth/me`, {
                       method: 'PUT',
                       headers: {
                         'Content-Type': 'application/json',
@@ -486,10 +487,10 @@ const Profile = () => {
           <div className="relative px-6 pb-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-16 sm:-mt-20">
               <img
-                src={state.user.avatar || `${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`}
+                src={state.user.avatar || `${API}/assets/placeholder-user.png`}
                 alt={state.user.username}
                 className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white dark:border-gray-800 object-cover mx-auto sm:mx-0"
-                onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${import.meta.env.VITE_API_BASE_URL || 'https://cosnap-back.onrender.com'}/assets/placeholder-user.png`;}}
+                onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API}/assets/placeholder-user.png`;}}
               />
               
               <div className="flex-1 text-center sm:text-left mt-4 sm:mt-0 sm:pb-4">

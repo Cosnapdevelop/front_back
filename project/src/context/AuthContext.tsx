@@ -9,9 +9,10 @@ type AuthContextValue = {
   accessToken: string | null;
   bootstrapped: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, username: string, password: string) => Promise<boolean>;
+  register: (email: string, username: string, password: string, code?: string) => Promise<boolean>;
   logout: () => void;
   refresh: () => Promise<boolean>;
+  requestRegisterCode: (email: string) => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -103,12 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [saveTokens]);
 
-  const register = useCallback(async (email: string, username: string, password: string) => {
+  const register = useCallback(async (email: string, username: string, password: string, code?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, username, password })
+        body: JSON.stringify({ email, username, password, code })
       });
       if (!res.ok) return false;
       const data = await res.json();
@@ -119,6 +120,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }, [saveTokens]);
+
+  const requestRegisterCode = useCallback(async (email: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/send-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, scene: 'register' })
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }, []);
 
 
   const logout = useCallback(() => {
@@ -135,7 +149,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refresh,
-  }), [user, accessToken, bootstrapped, login, register, logout, refresh]);
+    requestRegisterCode,
+  }), [user, accessToken, bootstrapped, login, register, logout, refresh, requestRegisterCode]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

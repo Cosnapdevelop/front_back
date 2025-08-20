@@ -8,11 +8,13 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, requestRegisterCode } = useAuth();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [codeSending, setCodeSending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,7 +66,7 @@ export default function Register() {
     setFieldErrors({});
     
     try {
-      const ok = await register(email.trim(), username.trim(), password);
+      const ok = await register(email.trim(), username.trim(), password, code.trim() || undefined);
       
       if (ok) {
         // Add a small delay for better UX
@@ -186,6 +188,43 @@ export default function Register() {
                   {fieldErrors.username}
                 </motion.p>
               )}
+            </div>
+
+            {/* Email verification code */}
+            <div>
+              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                邮箱验证码（可选，若后端已开启）
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="输入收到的6位验证码"
+                  className="flex-1 w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={async ()=>{
+                    if (!email || !/\S+@\S+\.\S+/.test(email)) {
+                      setFieldErrors(prev=>({ ...prev, email: '请输入有效邮箱后再获取验证码' }));
+                      return;
+                    }
+                    setCodeSending(true);
+                    try {
+                      const ok = await requestRegisterCode(email.trim());
+                      if (!ok) {
+                        setError('验证码发送失败或未开通');
+                      }
+                    } finally {
+                      setCodeSending(false);
+                    }
+                  }}
+                  className="whitespace-nowrap px-4 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white disabled:bg-gray-500"
+                  disabled={loading || codeSending}
+                >{codeSending ? '发送中...' : '获取验证码'}</button>
+              </div>
             </div>
 
             {/* Password field */}
