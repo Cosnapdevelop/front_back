@@ -1,12 +1,12 @@
 import axios from 'axios';
+import monitoringService from './monitoringService.js';
 
 const apiKey = process.env.RUNNINGHUB_API_KEY;
 
 // 安全检查：确保API密钥已配置
 if (!apiKey) {
-  console.error('❌ 错误：RUNNINGHUB_API_KEY环境变量未配置');
-  console.error('请在.env文件中设置RUNNINGHUB_API_KEY=your-api-key');
-  process.exit(1);
+  console.warn('⚠️ 警告：RUNNINGHUB_API_KEY环境变量未配置');
+  console.warn('ComfyUI功能将被禁用，请在.env文件中设置RUNNINGHUB_API_KEY=your-api-key');
 }
 
 // 地区配置
@@ -53,7 +53,20 @@ function createRunningHubAxiosInstance(regionId = DEFAULT_REGION) {
  * @param {string} instanceType - 实例类型
  */
 async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFAULT_REGION, instanceType = null) {
+  // 检查API密钥是否可用
+  if (!apiKey) {
+    const error = new Error('ComfyUI服务不可用：RUNNINGHUB_API_KEY未配置');
+    error.code = 'NO_API_KEY';
+    monitoringService.recordMetric('errors_total', 1, { 
+      type: 'ComfyUI', 
+      route: 'startTask', 
+      error_code: 'NO_API_KEY' 
+    });
+    throw error;
+  }
+  
   console.log(`[ComfyUI] 开始发起任务 (地区: ${getRegionConfig(regionId).name}): workflowId=${workflowId}, instanceType=${instanceType}`);
+  const timerStart = Date.now();
   
   // 重试机制
   const maxRetries = 3;
@@ -119,6 +132,7 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
       });
       
       console.log(`[ComfyUI] 任务发起成功 (地区: ${getRegionConfig(regionId).name}):`, response.data);
+      monitoringService.recordEffectProcessing('comfyui', regionId, Date.now() - timerStart, 'success');
       
       // 检查promptTips字段，如果有错误信息则输出
       if (response.data?.data?.promptTips) {
@@ -156,6 +170,7 @@ async function startComfyUITaskService(workflowId, nodeInfoList, regionId = DEFA
         data: err.response?.data,
         message: err.message
       });
+      monitoringService.recordEffectProcessing('comfyui', regionId, Date.now() - timerStart, 'failed');
       
       // 如果不是最后一次尝试，等待后重试
       if (attempt < maxRetries) {
@@ -216,6 +231,10 @@ async function waitForComfyUITaskAndGetImages(taskId, { interval = 5000, maxAtte
 }
 
 async function getComfyUITaskStatus(taskId, regionId = DEFAULT_REGION) {
+  if (!apiKey) {
+    throw new Error('ComfyUI服务不可用：RUNNINGHUB_API_KEY未配置');
+  }
+  
   try {
     const axiosInstance = createRunningHubAxiosInstance(regionId);
     const response = await axiosInstance.post('/task/openapi/status', {
@@ -259,6 +278,10 @@ async function getComfyUITaskStatus(taskId, regionId = DEFAULT_REGION) {
 }
 
 async function getComfyUITaskResult(taskId, regionId = DEFAULT_REGION) {
+  if (!apiKey) {
+    throw new Error('ComfyUI服务不可用：RUNNINGHUB_API_KEY未配置');
+  }
+  
   try {
     const axiosInstance = createRunningHubAxiosInstance(regionId);
     const response = await axiosInstance.post('/task/openapi/outputs', {
@@ -304,6 +327,10 @@ async function getComfyUITaskResult(taskId, regionId = DEFAULT_REGION) {
 }
 
 async function cancelComfyUITask(taskId, regionId = DEFAULT_REGION) {
+  if (!apiKey) {
+    throw new Error('ComfyUI服务不可用：RUNNINGHUB_API_KEY未配置');
+  }
+  
   try {
     console.log(`[ComfyUI] 开始取消任务: taskId=${taskId}, regionId=${regionId}`);
     

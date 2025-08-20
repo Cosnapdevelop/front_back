@@ -18,6 +18,7 @@ import {
   recordFeatureUsage
 } from '../middleware/chinesePayment.js';
 import { uploadImageService } from '../services/uploadImageService.js';
+import monitoringService from '../services/monitoringService.js';
 import { startComfyUITaskService, waitForComfyUITaskAndGetImages, cancelComfyUITask, getComfyUITaskStatus, getComfyUITaskResult } from '../services/comfyUITaskService.js';
 import { startWebappTaskService, waitForWebappTaskAndGetImages, cancelWebappTask, getWebappTaskStatus, getWebappTaskResult } from '../services/webappTaskService.js';
 import { uploadLoraService, validateLoraFile } from '../services/loraUploadService.js';
@@ -73,9 +74,13 @@ function validateFileType(file) {
 }
 
 function validateFileName(filename) {
-  // 防止路径遍历攻击
-  const dangerous = /[<>:"/\\|?*\x00-\x1f\.\./;
+  // 防止路径遍历攻击与非法字符
+  const dangerous = /[<>:"/\\|?*\x00-\x1f]/;
   if (dangerous.test(filename)) {
+    return false;
+  }
+  // 禁止出现 .. 或 以 / \\ 开头 的路径片段
+  if (filename.includes('..') || filename.startsWith('/') || filename.startsWith('\\')) {
     return false;
   }
   
@@ -198,12 +203,15 @@ router.post(
   }),
   async (req, res) => {
   try {
-    console.log('[任务处理] 收到新的任务请求');
-    console.log('[任务处理] Headers:', req.headers);
-    console.log('[任务处理] 请求体:', req.body);
+    monitoringService.info('effects.apply.request', {
+      userId: req.user?.id,
+      ip: req.ip,
+      ua: req.get('User-Agent')
+    });
+    monitoringService.debug?.('effects.apply.headers', { headers: req.headers });
+    monitoringService.debug?.('effects.apply.body', { body: req.body });
     console.log('[任务处理] 请求体参数详情:', Object.keys(req.body).map(key => `${key}: ${req.body[key]} (类型: ${typeof req.body[key]})`));
-    console.log('[任务处理] 完整的请求体:', JSON.stringify(req.body, null, 2));
-    console.log('[任务处理] 文件数量:', req.files ? req.files.length : 0);
+    monitoringService.info('effects.apply.files', { count: req.files ? req.files.length : 0 });
     
     // 设置响应头确保正确的内容类型
     res.setHeader('Content-Type', 'application/json');
@@ -218,7 +226,7 @@ router.post(
     const isComfyUI = cleanWorkflowId && cleanWorkflowId !== 'undefined' && cleanWorkflowId !== '';
     const isWebapp = cleanWebappId && cleanWebappId !== 'undefined' && cleanWebappId !== '' && !isComfyUI;
     
-    console.log('[任务处理] 解析的参数:', {
+    monitoringService.info('effects.apply.params', {
       workflowId: cleanWorkflowId,
       webappId: cleanWebappId,
       nodeInfoList,
@@ -268,7 +276,7 @@ router.post(
         });
       }
     } catch (error) {
-      console.error(`[${taskType}] nodeInfoList解析失败:`, error);
+      monitoringService.error(`[${taskType}] nodeInfoList parse failed`, error, { route: '/api/effects/comfyui/apply' });
       return res.status(400).json({ 
         success: false, 
         error: 'nodeInfoList格式错误: ' + error.message 
@@ -282,8 +290,10 @@ router.post(
         const fileName = await uploadImageService(file, regionId);
         uploadedImages.push(fileName);
         console.log(`[${taskType}] 图片上传成功:`, fileName);
+        monitoringService.recordFileUpload('image', file.size, 'success');
       } catch (error) {
-        console.error(`[${taskType}] 图片上传失败:`, error);
+        monitoringService.error(`[${taskType}] upload failed`, error, { route: '/api/effects/comfyui/apply' });
+        monitoringService.recordFileUpload('image', file.size, 'error');
         return res.status(500).json({ 
           success: false, 
           error: '图片上传失败: ' + error.message 
@@ -461,7 +471,7 @@ router.post(
 
     // 根据任务类型启动相应的服务
     try {
-      console.log(`[${taskType}] 开始启动${taskType}任务...`);
+      monitoringService.info('effects.apply.start', { taskType, regionId });
       
       let taskResult;
       if (isComfyUI) {
@@ -470,7 +480,10 @@ router.post(
         taskResult = await startWebappTaskService(cleanWebappId, updatedNodeInfoList, regionId);
       }
       
-      console.log(`[${taskType}] ${taskType}任务启动成功:`, taskResult);
+      monitoringService.info('effects.apply.started', { taskType, taskId: taskResult.taskId, regionId });
+      if (monitoringService.metrics?.effectsApiCalls) {
+        monitoringService.metrics.effectsApiCalls.inc({ endpoint: 'apply', status: 'success' });
+      }
       
       // 立即返回taskId，不等待任务完成，并包含任务类型信息
       res.json({
@@ -485,10 +498,14 @@ router.post(
           tier: req.featureAccess?.subscription?.tier || 'FREE'
         }
       });
+      monitoringService.recordEffectProcessing('cosnap_effect', regionId, 0, 'started');
       
     } catch (error) {
-      console.error(`[${taskType}] ${taskType}任务启动失败:`, error);
-      console.error(`[${taskType}] 错误堆栈:`, error.stack);
+      monitoringService.error(`[${taskType}] start failed`, error, { route: '/api/effects/comfyui/apply' });
+      monitoringService.recordEffectProcessing('cosnap_effect', regionId, 0, 'failed');
+      if (monitoringService.metrics?.effectsApiCalls) {
+        monitoringService.metrics.effectsApiCalls.inc({ endpoint: 'apply', status: 'error' });
+      }
       
       // 确保返回有效的JSON响应
       if (!res.headersSent) {
@@ -501,8 +518,7 @@ router.post(
     }
 
   } catch (error) {
-    console.error('[任务处理] 处理任务请求失败:', error);
-    console.error('[任务处理] 错误堆栈:', error.stack);
+    monitoringService.error('effects.apply.exception', error, { route: '/api/effects/comfyui/apply' });
     
     // 确保返回有效的JSON响应
     if (!res.headersSent) {
@@ -614,7 +630,7 @@ router.post(
   try {
     const { taskId, regionId = 'hongkong' } = req.body;
     
-    console.log(`[状态查询] 用户: ${req.user.username} (${req.user.id}), 查询任务: ${taskId}, 地区: ${regionId}, IP: ${req.ip}`);
+    monitoringService.info('effects.status.request', { userId: req.user.id, taskId, regionId, ip: req.ip });
     
     // 智能判断任务类型 - 先尝试ComfyUI，再尝试Webapp
     let status;
@@ -622,18 +638,15 @@ router.post(
     try {
       // 首先尝试ComfyUI服务
       status = await getComfyUITaskStatus(taskId, regionId);
-      console.log(`[状态查询] ComfyUI查询成功 - 任务: ${taskId}, 状态: ${typeof status === 'string' ? status : status.status}`);
+      monitoringService.info('effects.status.comfyui.ok', { taskId, status: (typeof status === 'string' ? status : status.status) });
     } catch (error) {
       // 如果ComfyUI服务失败，尝试Webapp服务
-      console.log(`[状态查询] ComfyUI失败，尝试Webapp - 任务: ${taskId}, 错误: ${error.message}`);
+      monitoringService.warn('effects.status.comfyui.fail_try_webapp', { taskId, error: error.message });
       try {
         status = await getWebappTaskStatus(taskId, regionId);
-        console.log(`[状态查询] Webapp查询成功 - 任务: ${taskId}, 状态: ${typeof status === 'string' ? status : status.status}`);
+        monitoringService.info('effects.status.webapp.ok', { taskId, status: (typeof status === 'string' ? status : status.status) });
       } catch (webappError) {
-        console.error(`[状态查询] 所有服务失败 - 任务: ${taskId}, 用户: ${req.user.id}, IP: ${req.ip}`, { 
-          comfyuiError: error.message, 
-          webappError: webappError.message 
-        });
+        monitoringService.error('effects.status.all_failed', null, { taskId, userId: req.user.id, ip: req.ip, comfyuiError: error.message, webappError: webappError.message });
         return res.status(404).json({
           success: false,
           error: '任务不存在或服务暂不可用'
@@ -648,7 +661,7 @@ router.post(
     });
     
   } catch (error) {
-    console.error(`[状态查询] 查询失败 - 任务: ${req.body.taskId}, 用户: ${req.user?.id}, IP: ${req.ip}, 错误:`, error);
+    monitoringService.error('effects.status.exception', error, { taskId: req.body.taskId, userId: req.user?.id, ip: req.ip });
     res.status(500).json({ 
       success: false, 
       error: '查询任务状态失败，请稍后重试' 
@@ -683,7 +696,7 @@ router.post(
       });
     }
     
-    console.log(`[结果获取] 获取任务结果: taskId=${taskId}, regionId=${regionId}`);
+    monitoringService.info('effects.results.request', { taskId, regionId });
     
     // 智能判断任务类型 - 先尝试ComfyUI，再尝试Webapp
     // 因为ComfyUI服务更稳定，优先使用ComfyUI服务
@@ -692,15 +705,15 @@ router.post(
     try {
       // 首先尝试ComfyUI服务
       results = await getComfyUITaskResult(taskId, regionId);
-      console.log('[结果获取] 使用ComfyUI服务获取成功');
+      monitoringService.info('effects.results.comfyui.ok', { taskId });
     } catch (error) {
       // 如果ComfyUI服务失败，尝试Webapp服务
-      console.log('[结果获取] ComfyUI服务失败，尝试Webapp服务');
+      monitoringService.warn('effects.results.comfyui.fail_try_webapp', { taskId });
       try {
         results = await getWebappTaskResult(taskId, regionId);
-        console.log('[结果获取] 使用Webapp服务获取成功');
+        monitoringService.info('effects.results.webapp.ok', { taskId });
       } catch (webappError) {
-        console.error('[结果获取] 两种服务都失败:', { comfyuiError: error.message, webappError: webappError.message });
+        monitoringService.error('effects.results.all_failed', null, { comfyuiError: error.message, webappError: webappError.message, taskId });
         throw new Error('无法获取任务结果');
       }
     }
@@ -711,7 +724,7 @@ router.post(
     });
     
   } catch (error) {
-    console.error('[结果获取] 获取失败:', error);
+    monitoringService.error('effects.results.exception', error, { taskId: req.body?.taskId });
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -751,6 +764,50 @@ router.post('/comfyui/cancel', auth, async (req, res) => {
       success: false, 
       error: error.message 
     });
+  }
+});
+
+// 统一取消任务接口：根据任务类型智能尝试取消
+router.post('/cancel', auth, async (req, res) => {
+  try {
+    const { taskId, regionId = 'hongkong', taskType } = req.body;
+    if (!taskId) {
+      return res.status(400).json({ success: false, error: '缺少taskId参数' });
+    }
+
+    console.log('[Effects] 统一取消任务请求:', { taskId, regionId, taskType });
+
+    // 优先按传入的 taskType 取消
+    if (taskType === 'ComfyUI') {
+      await cancelComfyUITask(taskId, regionId);
+      return res.json({ success: true, message: 'ComfyUI任务取消成功' });
+    }
+    if (taskType === 'Webapp') {
+      try {
+        await cancelWebappTask(taskId, regionId);
+        return res.json({ success: true, message: 'Webapp任务取消成功' });
+      } catch (e) {
+        console.log('[Effects] Webapp取消失败，尝试ComfyUI:', e.message);
+      }
+    }
+
+    // 未提供类型或失败时，智能双向尝试
+    try {
+      await cancelComfyUITask(taskId, regionId);
+      return res.json({ success: true, message: '任务取消成功 (ComfyUI)' });
+    } catch (e1) {
+      console.log('[Effects] ComfyUI取消失败，尝试Webapp:', e1.message);
+      try {
+        await cancelWebappTask(taskId, regionId);
+        return res.json({ success: true, message: '任务取消成功 (Webapp)' });
+      } catch (e2) {
+        console.error('[Effects] 统一取消任务失败:', { comfyui: e1.message, webapp: e2.message });
+        return res.status(500).json({ success: false, error: '取消任务失败' });
+      }
+    }
+  } catch (error) {
+    console.error('[Effects] 统一取消任务异常:', error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 

@@ -22,6 +22,7 @@ export interface TaskInfo {
   errorMessage?: string;    // 错误信息
   resultUrls?: string[];    // 结果图片URL
   parameters?: any;         // 任务参数
+  taskType?: 'ComfyUI' | 'Webapp'; // 任务类型（用于统一取消等）
 }
 
 // 任务管理服务

@@ -336,7 +336,7 @@ const Community = () => {
                               Click to upload your creations
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-500">
-                              PNG, JPG, WebP up to 10MB (max 5 images)
+                              PNG, JPG, WebP up to 20MB (max 5 images)
                             </p>
                           </label>
                         </div>

@@ -28,9 +28,15 @@ const initialState: TaskProcessingState = {
 
 export function useTaskProcessing() {
   const [state, setState] = useState<TaskProcessingState>(initialState);
+  const stateRef = useRef<TaskProcessingState>(initialState);
   const activeIntervalsRef = useRef<Set<number>>(new Set());
   const { accessToken } = useAuth();
   
+  // 同步 state 到 ref
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // 组件卸载时清理所有轮询
   useEffect(() => {
     return () => {
@@ -94,10 +100,10 @@ export function useTaskProcessing() {
       
       // 根据任务类型添加相应的ID
       if (effect.isWebapp && effect.webappId) {
-        formData.append('webappId', effect.webappId);
+        formData.append('webappId', String(effect.webappId));
         console.log('[任务处理] 使用webappId:', effect.webappId);
       } else if (effect.workflowId) {
-        formData.append('workflowId', effect.workflowId);
+        formData.append('workflowId', String(effect.workflowId));
         console.log('[任务处理] 使用workflowId:', effect.workflowId);
       } else {
         throw createError.config('缺少workflowId或webappId配置', 'effect.config');
@@ -112,7 +118,7 @@ export function useTaskProcessing() {
       Object.entries(parameters).forEach(([key, value]) => {
         console.log(`[任务处理] 处理参数: ${key} = ${value} (类型: ${typeof value})`);
         if (value !== undefined && value !== null && value !== '') {
-          formData.append(key, value as string);
+          formData.append(key, String(value));
           console.log(`[任务处理] 已添加参数到formData: ${key} = ${value}`);
         } else {
           console.warn(`[任务处理] 跳过空参数: ${key} = ${value}`);
@@ -156,7 +162,9 @@ export function useTaskProcessing() {
           createdAt: new Date(),
           updatedAt: new Date(),
           progress: 0,
-          parameters: { ...parameters, imageParamFiles }
+          parameters: { ...parameters, imageParamFiles },
+          // 记录后端返回的任务类型（ComfyUI/Webapp）
+          taskType: result.taskType || (effect.isWebapp ? 'Webapp' : 'ComfyUI')
         };
         
         taskManagementService.addTask(taskInfo);
@@ -204,8 +212,6 @@ export function useTaskProcessing() {
     let isPollingActive = true; // 添加轮询状态控制
     
     const pollInterval = setInterval(async () => {
-      // 添加到活跃轮询集合
-      activeIntervalsRef.current.add(pollInterval);
       // 检查轮询是否应该继续
       if (!isPollingActive) {
         clearInterval(pollInterval);
@@ -387,16 +393,21 @@ export function useTaskProcessing() {
         }
       }
     }, 5000);
+    // 仅在创建时登记一次
+    activeIntervalsRef.current.add(pollInterval);
   }, []);
 
   const cancelTask = useCallback(async (taskId: string) => {
     try {
       const cancelHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
       if (accessToken) cancelHeaders['Authorization'] = `Bearer ${accessToken}`;
-      await fetch(`${API_BASE_URL}/api/effects/comfyui/cancel`, {
+      // 尝试从本地状态读取任务类型，传给后端统一取消接口
+      const currentTask = stateRef.current.activeTasks.get(taskId as any) as any;
+      const taskType = currentTask?.taskType;
+      await fetch(`${API_BASE_URL}/api/effects/cancel`, {
         method: 'POST',
         headers: cancelHeaders,
-        body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id })
+        body: JSON.stringify({ taskId: taskId, regionId: getCurrentRegionConfig().id, ...(taskType ? { taskType } : {}) })
       });
 
       // 从activeTasks中移除已取消的任务

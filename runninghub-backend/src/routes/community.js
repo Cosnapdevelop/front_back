@@ -1,4 +1,5 @@
 import express from 'express';
+import monitoringService from '../services/monitoringService.js';
 import { PrismaClient } from '@prisma/client';
 import { auth, checkTokenExpiry, optionalAuth } from '../middleware/auth.js';
 import { 
@@ -74,6 +75,13 @@ router.get(
     ]);
 
     console.log(`[社区] 帖子列表查询成功 - 返回: ${posts.length}条, 总计: ${total}条`);
+    monitoringService.info('community.posts.list', {
+      page,
+      limit,
+      total,
+      ip: req.ip,
+      userId: req.user?.id
+    });
     
     res.json({ 
       success: true, 
@@ -194,7 +202,7 @@ router.post(
     try {
       const { images = [], caption = '', effectId } = req.body;
       
-      console.log(`[社区] 用户发帖 - 用户: ${req.user.username} (${req.user.id}), 图片数: ${images.length}, IP: ${req.ip}`);
+      monitoringService.info('community.post.create', { userId: req.user.id, imagesCount: images.length, ip: req.ip });
       
       const newPost = await prisma.post.create({
         data: {
@@ -217,7 +225,10 @@ router.post(
         }
       });
       
-      console.log(`[社区] 发帖成功 - 帖子ID: ${newPost.id}, 用户: ${req.user.username}`);
+      monitoringService.info('community.post.created', { postId: newPost.id, userId: req.user.id });
+      if (monitoringService.metrics?.communityActions) {
+        monitoringService.metrics.communityActions.inc({ action: 'post_create' });
+      }
       
       res.status(201).json({ 
         success: true, 
@@ -225,7 +236,7 @@ router.post(
         message: '发帖成功'
       });
     } catch (error) {
-      console.error(`[社区] 发帖失败 - 用户: ${req.user?.id}, IP: ${req.ip}, 错误:`, error);
+      monitoringService.error('community.post.create_failed', error, { userId: req.user?.id, ip: req.ip });
       res.status(500).json({ 
         success: false, 
         error: '发帖失败，请稍后重试' 
@@ -289,10 +300,13 @@ router.post(
           });
         }
         
-        console.log(`[社区] 点赞成功 - 帖子: ${id}, 用户: ${req.user.username} (${req.user.id})`);
+        monitoringService.info('community.post.like', { postId: id, userId: req.user.id });
+        if (monitoringService.metrics?.communityActions) {
+          monitoringService.metrics.communityActions.inc({ action: 'post_like' });
+        }
       } catch (error) {
         // 已经点过赞，忽略错误
-        console.log(`[社区] 重复点赞 - 帖子: ${id}, 用户: ${req.user.username} (${req.user.id})`);
+        monitoringService.warn('community.post.like_duplicate', { postId: id, userId: req.user.id });
       }
       
       res.json({ 
@@ -300,7 +314,7 @@ router.post(
         message: '点赞成功' 
       });
     } catch (error) {
-      console.error(`[社区] 点赞失败 - 帖子: ${req.params.id}, 用户: ${req.user?.id}, IP: ${req.ip}, 错误:`, error);
+      monitoringService.error('community.post.like_failed', error, { postId: req.params.id, userId: req.user?.id, ip: req.ip });
       res.status(500).json({ 
         success: false, 
         error: '点赞失败，请稍后重试' 
@@ -353,7 +367,10 @@ router.post(
           data: { likesCount: { decrement: 1 } } 
         }).catch(() => {});
         
-        console.log(`[社区] 取消点赞成功 - 帖子: ${id}, 用户: ${req.user.username} (${req.user.id})`);
+        monitoringService.info('community.post.unlike', { postId: id, userId: req.user.id });
+        if (monitoringService.metrics?.communityActions) {
+          monitoringService.metrics.communityActions.inc({ action: 'post_unlike' });
+        }
       }
       
       res.json({ 
@@ -361,7 +378,7 @@ router.post(
         message: '取消点赞成功' 
       });
     } catch (error) {
-      console.error(`[社区] 取消点赞失败 - 帖子: ${req.params.id}, 用户: ${req.user?.id}, IP: ${req.ip}, 错误:`, error);
+      monitoringService.error('community.post.unlike_failed', error, { postId: req.params.id, userId: req.user?.id, ip: req.ip });
       res.status(500).json({ 
         success: false, 
         error: '取消点赞失败，请稍后重试' 
@@ -387,6 +404,10 @@ router.post('/posts/:id/comments', auth, async (req, res) => {
       data: { userId: notifyUserId, actorId: req.user.id, type: parentId ? 'reply' : 'comment', postId: id, commentId: comment.id }
     });
   }
+  monitoringService.info('community.comment.create', { postId: id, userId: req.user.id, commentId: comment.id, parentId: parentId || null });
+  if (monitoringService.metrics?.communityActions) {
+    monitoringService.metrics.communityActions.inc({ action: 'comment_create' });
+  }
   res.json({ success: true, comment });
 });
 
@@ -411,9 +432,13 @@ router.get('/comments/:id/replies', async (req, res) => {
       const repliesCount = await prisma.comment.count({ where: { parentId: r.id } });
       return { ...r, repliesCount };
     }));
+    monitoringService.info('community.comment.replies', { commentId: id, page, limit, total });
+    if (monitoringService.metrics?.communityActions) {
+      monitoringService.metrics.communityActions.inc({ action: 'comment_replies_list' });
+    }
     res.json({ success: true, replies: withCounts, meta: { page, limit, total, hasNext: page * limit < total } });
   } catch (e) {
-    console.error('[community] replies接口错误:', e);
+    monitoringService.error('community.comment.replies_failed', e, {});
     res.status(500).json({ success: false, error: '服务器错误' });
   }
 });
@@ -423,6 +448,10 @@ router.post('/comments/:id/like', auth, async (req, res) => {
   try {
     await prisma.commentLike.create({ data: { commentId: id, userId: req.user.id } });
     await prisma.comment.update({ where: { id }, data: { likesCount: { increment: 1 } } });
+    monitoringService.info('community.comment.like', { commentId: id, userId: req.user.id });
+    if (monitoringService.metrics?.communityActions) {
+      monitoringService.metrics.communityActions.inc({ action: 'comment_like' });
+    }
   } catch {}
   res.json({ success: true });
 });
@@ -430,6 +459,10 @@ router.post('/comments/:id/unlike', auth, async (req, res) => {
   const { id } = req.params;
   await prisma.commentLike.deleteMany({ where: { commentId: id, userId: req.user.id } });
   await prisma.comment.update({ where: { id }, data: { likesCount: { decrement: 1 } } }).catch(()=>{});
+  monitoringService.info('community.comment.unlike', { commentId: id, userId: req.user.id });
+  if (monitoringService.metrics?.communityActions) {
+    monitoringService.metrics.communityActions.inc({ action: 'comment_unlike' });
+  }
   res.json({ success: true });
 });
 
@@ -447,6 +480,10 @@ router.get('/notifications', auth, async (req, res) => {
     }),
     prisma.notification.count({ where: { userId: req.user.id } })
   ]);
+  monitoringService.info('community.notifications.list', { userId: req.user.id, page, limit, total });
+  if (monitoringService.metrics?.communityActions) {
+    monitoringService.metrics.communityActions.inc({ action: 'notifications_list' });
+  }
   res.json({ success: true, items, meta: { page, limit, total, hasNext: page * limit < total } });
 });
 
@@ -454,6 +491,10 @@ router.get('/notifications', auth, async (req, res) => {
 router.post('/notifications/:id/read', auth, async (req, res) => {
   const { id } = req.params;
   await prisma.notification.updateMany({ where: { id, userId: req.user.id }, data: { isRead: true } });
+  monitoringService.info('community.notifications.read', { userId: req.user.id, notificationId: id });
+  if (monitoringService.metrics?.communityActions) {
+    monitoringService.metrics.communityActions.inc({ action: 'notification_read' });
+  }
   res.json({ success: true });
 });
 

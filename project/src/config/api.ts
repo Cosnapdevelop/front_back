@@ -43,7 +43,7 @@ export const RUNNING_HUB_CONFIG = {
   },
   
   // AI App配置
-  webappId: 1937084629516193794,
+  webappId: '1937084629516193794',
   
   // 背景替换特效workflowId（ComfyUI工作流）
   backgroundChangeWorkflowId: '1949831786093264897',

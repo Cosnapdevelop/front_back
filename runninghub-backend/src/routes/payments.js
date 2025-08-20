@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import { auth } from '../middleware/auth.js';
 import {
   validatePaymentCreation,
   validatePaymentQuery,
@@ -62,7 +62,7 @@ router.get('/pricing', (req, res) => {
  * GET /api/payments/subscription
  */
 router.get('/subscription', 
-  authenticateToken,
+  auth,
   checkSubscriptionStatus,
   logPaymentOperation('get_subscription'),
   async (req, res) => {
@@ -82,7 +82,7 @@ router.get('/subscription',
  * GET /api/payments/usage-stats
  */
 router.get('/usage-stats',
-  authenticateToken,
+  auth,
   logPaymentOperation('get_usage_stats'),
   async (req, res) => {
     try {
@@ -110,7 +110,7 @@ router.get('/usage-stats',
  * POST /api/payments/create-order
  */
 router.post('/create-order',
-  authenticateToken,
+  auth,
   validateClientIP,
   validateUserAgent,
   checkPaymentSecurity,
@@ -155,7 +155,7 @@ router.post('/create-order',
  * GET /api/payments/:paymentId/status
  */
 router.get('/:paymentId/status',
-  authenticateToken,
+  auth,
   validatePaymentQuery,
   logPaymentOperation('query_payment'),
   async (req, res) => {
@@ -178,7 +178,7 @@ router.get('/:paymentId/status',
  * POST /api/payments/refund
  */
 router.post('/refund',
-  authenticateToken,
+  auth,
   validateRefundRequest,
   logPaymentOperation('refund'),
   async (req, res) => {
@@ -203,7 +203,7 @@ router.post('/refund',
  * POST /api/payments/cancel-subscription
  */
 router.post('/cancel-subscription',
-  authenticateToken,
+  auth,
   logPaymentOperation('cancel_subscription'),
   async (req, res) => {
     try {
@@ -321,7 +321,7 @@ router.get('/return/alipay',
  * GET /api/payments/admin/stats
  */
 router.get('/admin/stats',
-  authenticateToken,
+  auth,
   // 这里应该添加管理员权限检查中间件
   logPaymentOperation('admin_stats'),
   async (req, res) => {
@@ -350,7 +350,7 @@ router.get('/admin/stats',
  * POST /api/payments/admin/manual-webhook
  */
 router.post('/admin/manual-webhook',
-  authenticateToken,
+  auth,
   // 这里应该添加管理员权限检查中间件
   logPaymentOperation('manual_webhook'),
   async (req, res) => {

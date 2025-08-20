@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude doctor)",
+      "WebFetch(domain:git-scm.com)",
+      "Bash(where bash)",
+      "Bash(setx:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "outputStyle": "Explanatory"
+}

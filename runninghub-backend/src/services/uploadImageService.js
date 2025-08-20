@@ -1,9 +1,10 @@
 import axios from 'axios';
+import monitoringService from './monitoringService.js';
 import FormData from 'form-data';
 import { uploadToCloudStorage, shouldUseCloudStorage, formatFileSize } from './cloudStorageService.js';
 
 const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105';
-const webappId = process.env.RUNNINGHUB_WEBAPP_ID || 1937084629516193794;
+const webappId = process.env.RUNNINGHUB_WEBAPP_ID || '1937084629516193794';
 
 // 地区配置
 const REGIONS = {
@@ -50,11 +51,13 @@ export async function uploadImageService(file, regionId = DEFAULT_REGION) {
       // 使用云存储上传大文件
       const cloudUrl = await uploadToCloudStorage(file.buffer, file.originalname, file.mimetype);
       console.log(`[图片上传] 云存储上传成功: ${cloudUrl}`);
+      monitoringService.recordFileUpload('image', file.size, 'success');
       
       // 返回云存储URL（这个URL可以直接在LoadImage节点中使用）
       return cloudUrl;
     } catch (error) {
       console.error('[图片上传] 云存储上传失败:', error);
+      monitoringService.recordFileUpload('image', file.size, 'error');
       throw new Error(`大文件上传失败: ${error.message}`);
     }
   }
@@ -103,6 +106,7 @@ export async function uploadImageService(file, regionId = DEFAULT_REGION) {
       });
       
       console.log(`[RunningHub] 上传成功 (地区: ${getRegionConfig(regionId).name}):`, response.data);
+      monitoringService.recordFileUpload('image', file.size, 'success');
       
       if (response.data && response.data.code === 0 && response.data.data && response.data.data.fileName) {
         return response.data.data.fileName;
@@ -117,6 +121,7 @@ export async function uploadImageService(file, regionId = DEFAULT_REGION) {
         data: err.response?.data,
         message: err.message
       });
+      monitoringService.recordFileUpload('image', file.size, 'error');
       
       // 如果不是最后一次尝试，等待后重试
       if (attempt < maxRetries) {

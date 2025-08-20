@@ -7,6 +7,7 @@ import paymentsRouter from './routes/payments.js';
 import healthRouter from './routes/health.js';
 import { warmupConnection } from './services/comfyUITaskService.js';
 import { PrismaClient } from '@prisma/client';
+import monitoringService from './services/monitoringService.js';
 
 // 安全中间件导入
 import { 
@@ -78,6 +79,10 @@ app.use(requestSizeLimit); // 请求大小限制
 app.use(requestLogger); // 请求日志
 app.use(generalLimiter); // 全局限流
 
+// 监控服务中间件集成
+app.use(monitoringService.createHttpMiddleware());
+app.use(monitoringService.createErrorMiddleware());
+
 // 基础中间件
 app.use(cors(corsOptions));
 app.use(express.json({ 
@@ -101,6 +106,13 @@ app.use(securityCheck);
 
 // 路由
 app.use('/health', healthRouter); // Health checks should be first for load balancers
+
+// Prometheus metrics endpoint
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', monitoringService.getMetricsContentType());
+  res.send(monitoringService.getMetrics());
+});
+
 app.use('/auth', authRouter);
 app.use('/api/effects', effectsRoutes);
 app.use('/api/community', communityRouter);
@@ -132,8 +144,16 @@ process.on('uncaughtException', (err) => {
 });
 
 // 优雅关闭处理
-const gracefulShutdown = (signal) => {
+const gracefulShutdown = async (signal) => {
   console.log(`\n收到 ${signal} 信号，开始优雅关闭...`);
+  
+  // 关闭监控服务
+  try {
+    await monitoringService.shutdown();
+    console.log('监控服务已关闭');
+  } catch (error) {
+    console.error('关闭监控服务失败:', error);
+  }
   
   // 关闭数据库连接
   prisma.$disconnect()

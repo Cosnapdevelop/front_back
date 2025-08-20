@@ -233,6 +233,27 @@ class MonitoringService {
       buckets: [1024, 10240, 102400, 1048576, 10485760, 31457280] // 1KB to 30MB
     });
 
+    // Alerts metrics
+    this.metrics.alerts = new promClient.Counter({
+      name: `${monitoring.metrics.prometheus.prefix}alerts_total`,
+      help: 'Total number of alerts',
+      labelNames: ['category', 'escalation']
+    });
+
+    // Effects API calls metrics
+    this.metrics.effectsApiCalls = new promClient.Counter({
+      name: `${monitoring.metrics.prometheus.prefix}effects_api_calls_total`,
+      help: 'Total number of effects API calls',
+      labelNames: ['endpoint', 'status']
+    });
+
+    // Community actions metrics
+    this.metrics.communityActions = new promClient.Counter({
+      name: `${monitoring.metrics.prometheus.prefix}community_actions_total`,
+      help: 'Total number of community actions',
+      labelNames: ['action']
+    });
+
     // Error metrics
     this.metrics.errors = new promClient.Counter({
       name: `${monitoring.metrics.prometheus.prefix}errors_total`,
@@ -337,6 +358,42 @@ class MonitoringService {
       { method, route, status_code: statusCode },
       duration / 1000 // Convert to seconds
     );
+  }
+
+  /**
+   * Generic metric recorder with basic name mapping to known metrics
+   */
+  recordMetric(name, value = 1, labels = {}) {
+    try {
+      // Map common external names to internal metric instances
+      if (name === 'errors_total' && this.metrics.errors) {
+        const finalLabels = {
+          type: labels.type || 'Unknown',
+          route: labels.route || 'unknown',
+          error_code: labels.error_code || 'unknown'
+        };
+        this.metrics.errors.inc(finalLabels, value);
+        return;
+      }
+      if (name === 'alerts_total' && this.metrics.alerts) {
+        const finalLabels = {
+          category: labels.category || 'unknown',
+          escalation: labels.escalation || 'medium'
+        };
+        this.metrics.alerts.inc(finalLabels, value);
+        return;
+      }
+      // Direct access if exact key exists
+      const metric = this.metrics[name];
+      if (metric && typeof metric.inc === 'function') {
+        metric.inc(labels, value);
+      }
+    } catch (e) {
+      // Swallow metric recording errors
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('recordMetric failed:', name, e.message);
+      }
+    }
   }
 
   recordDbQuery(operation, table, duration, status = 'success') {

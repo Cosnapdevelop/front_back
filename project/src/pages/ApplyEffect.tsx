@@ -97,8 +97,8 @@ const ApplyEffect = () => {
   }, [effect.parameters]);
 
   const validateFile = (file: File): string | null => {
-    const maxSize = 100 * 1024 * 1024; // 100MB (system supports cloud storage, max 100MB)
-    const runningHubLimit = 10 * 1024 * 1024; // 10MB (RunningHub native limit)
+    const maxSize = 30 * 1024 * 1024; // 30MB（与后端multer限制保持一致）
+    const runningHubLimit = 10 * 1024 * 1024; // 10MB（RunningHub原生限制，用于提示走云存储路径）
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     
     if (!allowedTypes.includes(file.type)) {
@@ -106,7 +106,7 @@ const ApplyEffect = () => {
     }
     
     if (file.size > maxSize) {
-      return `File too large. Maximum size: 100MB`;
+      return `File too large. Maximum size: 30MB`;
     }
     
     // If file is larger than 10MB, log a notice for cloud storage usage
