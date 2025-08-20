@@ -8,27 +8,15 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            if (id.includes('lucide-react') || id.includes('framer-motion')) {
-              return 'ui-vendor';
-            }
-            if (id.includes('axios') || id.includes('@tanstack')) {
-              return 'utils';
-            }
-            return 'vendor';
-          }
-        }
-      }
-    },
     sourcemap: false,
-    minify: 'esbuild', // 使用esbuild替代terser，避免过度优化
-    target: 'es2020'
+    minify: false, // 完全禁用压缩来排除构建问题
+    target: 'es2020',
+    rollupOptions: {
+      // 移除代码分割，先让应用正常运行
+      // output: {
+      //   manualChunks: undefined
+      // }
+    }
   },
   server: {
     proxy: {

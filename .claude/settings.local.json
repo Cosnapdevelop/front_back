@@ -5,7 +5,11 @@
       "WebFetch(domain:git-scm.com)",
       "Bash(where bash)",
       "Bash(setx:*)",
-      "Bash(NODE_ENV=production FORCE_HTTPS=true SECURE_COOKIES=true HIDE_ERROR_DETAILS=true DEBUG=false timeout 5s node src/index.js)"
+      "Bash(NODE_ENV=production FORCE_HTTPS=true SECURE_COOKIES=true HIDE_ERROR_DETAILS=true DEBUG=false timeout 5s node src/index.js)",
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
