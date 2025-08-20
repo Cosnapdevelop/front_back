@@ -8,8 +8,8 @@ export const validateEnvironment = () => {
     'JWT_ACCESS_SECRET',
     'JWT_REFRESH_SECRET',
     'DATABASE_URL',
-    'RUNNINGHUB_API_KEY',
-    'RUNNINGHUB_API_URL'
+    'RUNNINGHUB_API_KEY'
+    // RUNNINGHUB_API_URL 已移除，因为实际使用区域特定的URL变量
   ];
 
   const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
