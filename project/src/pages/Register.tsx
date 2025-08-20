@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, User, Sparkles } from 'lucide-react';
@@ -19,6 +19,9 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const debounceRef = useRef<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{email?: string; username?: string; password?: string; confirmPassword?: string}>({});
 
   const validateForm = () => {
@@ -84,6 +87,30 @@ export default function Register() {
     }
   };
 
+  // 实时可用性检查（防抖）
+  useEffect(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        const qs = new URLSearchParams();
+        if (email && /\S+@\S+\.\S+/.test(email)) qs.append('email', email.trim());
+        if (username.trim().length >= 3) qs.append('username', username.trim());
+        if ([...qs.keys()].length === 0) {
+          setEmailAvailable(null);
+          setUsernameAvailable(null);
+          return;
+        }
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/auth/check-availability?` + qs.toString());
+        if (res.ok) {
+          const data = await res.json();
+          if (Object.prototype.hasOwnProperty.call(data, 'emailAvailable')) setEmailAvailable(data.emailAvailable ?? null);
+          if (Object.prototype.hasOwnProperty.call(data, 'usernameAvailable')) setUsernameAvailable(data.usernameAvailable ?? null);
+        }
+      } catch {}
+    }, 400);
+    return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current); };
+  }, [email, username]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 px-4 py-8">
       <motion.div
@@ -142,6 +169,11 @@ export default function Register() {
                   }`}
                   disabled={loading}
                 />
+                {email && emailAvailable !== null && (
+                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${emailAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                    {emailAvailable ? '可用' : '已占用'}
+                  </span>
+                )}
               </div>
               {fieldErrors.email && (
                 <motion.p
@@ -178,6 +210,11 @@ export default function Register() {
                   }`}
                   disabled={loading}
                 />
+                {username && usernameAvailable !== null && (
+                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${usernameAvailable ? 'text-green-600' : 'text-red-600'}`}>
+                    {usernameAvailable ? '可用' : '已占用'}
+                  </span>
+                )}
               </div>
               {fieldErrors.username && (
                 <motion.p
