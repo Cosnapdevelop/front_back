@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { API_BASE_URL } from '../config/api';
 
 type AuthUser = { id: string; email: string; username: string; avatar?: string } | null;
@@ -24,21 +24,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
 
-  const saveTokens = (access?: string, refresh?: string) => {
+  const saveTokens = useCallback((access?: string, refresh?: string) => {
     if (access) {
       localStorage.setItem(ACCESS_KEY, access);
       setAccessToken(access);
     }
     if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
-  };
+  }, []);
 
-  const clearTokens = () => {
+  const clearTokens = useCallback(() => {
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
     setAccessToken(null);
-  };
+  }, []);
 
-  const fetchMe = async (token: string) => {
+  const fetchMe = useCallback(async (token: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -59,16 +59,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const me = await fetchMe(stored);
         if (me) setUser(me);
         else {
-          // 尝试刷新一次
+          // Try to refresh once
           const ok = await refresh();
           if (!ok) clearTokens();
         }
       }
       setBootstrapped(true);
     })();
-  }, []);
+  }, [fetchMe, refresh, clearTokens]);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
@@ -83,9 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return false;
     }
-  };
+  }, [saveTokens]);
 
-  const register = async (email: string, username: string, password: string) => {
+  const register = useCallback(async (email: string, username: string, password: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -100,9 +100,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return false;
     }
-  };
+  }, [saveTokens]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     const refreshToken = localStorage.getItem(REFRESH_KEY);
     if (!refreshToken) return false;
     try {
@@ -122,12 +122,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return false;
     }
-  };
+  }, [saveTokens, fetchMe, user]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     clearTokens();
     setUser(null);
-  };
+  }, [clearTokens]);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
@@ -138,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refresh,
-  }), [user, accessToken]);
+  }), [user, accessToken, bootstrapped, login, register, logout, refresh]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

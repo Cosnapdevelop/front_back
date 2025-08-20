@@ -1,0 +1,230 @@
+version: '3.8'
+
+services:
+  # Frontend Service
+  frontend:
+    build:
+      context: ./project
+      dockerfile: Dockerfile
+      target: production
+    container_name: cosnap-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./project/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`cosnap.ai`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+
+  # Backend Service
+  backend:
+    build:
+      context: ./runninghub-backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: cosnap-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
+      - ALI_OSS_ACCESS_KEY_ID=${ALI_OSS_ACCESS_KEY_ID}
+      - ALI_OSS_ACCESS_KEY_SECRET=${ALI_OSS_ACCESS_KEY_SECRET}
+      - ALI_OSS_BUCKET=${ALI_OSS_BUCKET}
+      - RUNNINGHUB_API_KEY_CHINA=${RUNNINGHUB_API_KEY_CHINA}
+      - RUNNINGHUB_API_KEY_HONGKONG=${RUNNINGHUB_API_KEY_HONGKONG}
+    volumes:
+      - ./runninghub-backend/uploads:/app/uploads
+      - ./logs:/var/log/cosnap
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.cosnap.ai`)"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cosnap-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-cosnap}
+      - POSTGRES_USER=${POSTGRES_USER:-cosnap}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+    command: postgres -c 'max_connections=200' -c 'shared_buffers=256MB' -c 'effective_cache_size=1GB'
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: cosnap-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+      - ./scripts/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+  # Monitoring - Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cosnap-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+  # Monitoring - Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cosnap-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+  # Log Management - Loki
+  loki:
+    image: grafana/loki:latest
+    container_name: cosnap-loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+  # Log Collection - Promtail
+  promtail:
+    image: grafana/promtail:latest
+    container_name: cosnap-promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ./logs:/var/log/cosnap:ro
+      - /var/log:/var/log:ro
+    depends_on:
+      - loki
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+  # Reverse Proxy - Traefik
+  traefik:
+    image: traefik:v3.0
+    container_name: cosnap-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--api.debug=true"
+      - "--log.level=INFO"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme.json:/acme.json
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+  # Health Check Service
+  healthcheck:
+    build:
+      context: ./scripts/healthcheck
+      dockerfile: Dockerfile
+    container_name: cosnap-healthcheck
+    environment:
+      - SERVICES=frontend:80,backend:3001,postgres:5432,redis:6379
+      - CHECK_INTERVAL=30
+      - WEBHOOK_URL=${HEALTH_WEBHOOK_URL}
+    depends_on:
+      - frontend
+      - backend
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - cosnap-network
+
+networks:
+  cosnap-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local

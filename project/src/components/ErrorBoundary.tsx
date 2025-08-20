@@ -18,7 +18,7 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // 更新 state 使下一次渲染能够显示降级后的 UI
+    // Update state to render fallback UI on next render
     return { hasError: true, error };
   }
 
@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
       errorInfo
     });
 
-    // 可以在这里上报错误到监控服务
+    // Report error to monitoring service
     // reportError(error, errorInfo);
   }
 
@@ -44,12 +44,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
-      // 如果有自定义的fallback，使用它
+      // If custom fallback provided, use it
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // 默认的错误UI
+      // Default error UI
       return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
           <div className="max-w-md w-full">
@@ -61,11 +61,11 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
               
               <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                页面出现错误
+                Something went wrong
               </h1>
               
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                抱歉，页面遇到了意外错误。如果你是从社区进入帖子详情，请返回社区后再进入；如问题持续，请将此页面的错误信息截图发我。
+                Sorry, an unexpected error occurred. You can try refreshing the page or returning to the home page.
               </p>
 
               <div className="space-y-3">
@@ -74,7 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  <span>刷新页面</span>
+                  <span>Refresh Page</span>
                 </button>
                 
                 <button
@@ -82,15 +82,15 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
                 >
                   <Home className="w-4 h-4" />
-                  <span>返回首页</span>
+                  <span>Go Home</span>
                 </button>
               </div>
 
-              {/* 开发环境显示错误详情 */}
+              {/* Show error details in development */}
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="mt-6 text-left">
                   <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    错误详情 (仅开发环境显示)
+                    Error Details (Development Only)
                   </summary>
                   <div className="bg-gray-100 dark:bg-gray-700 rounded p-3 text-xs font-mono">
                     <div className="text-red-600 dark:text-red-400 mb-2">
@@ -112,7 +112,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// 高阶组件，用于包装页面组件
+// Higher-order component for wrapping page components
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
   fallback?: ReactNode

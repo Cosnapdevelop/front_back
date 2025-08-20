@@ -1,13 +1,191 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cosnap - AI-Powered Image Effects</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- PWA Icons and Manifest -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Mobile Optimization Meta Tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    <meta name="format-detection" content="telephone=no, date=no, email=no, address=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Cosnap" />
+    <meta name="application-name" content="Cosnap" />
+    <meta name="msapplication-TileColor" content="#14b8a6" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    <meta name="theme-color" content="#14b8a6" />
+    <meta name="color-scheme" content="light dark" />
+    
+    <!-- Performance and Security -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Chinese Mobile Market Specific -->
+    <meta name="applicable-device" content="mobile" />
+    <meta name="mobile-agent" content="format=xhtml;url=/mobile" />
+    <meta name="mobile-agent" content="format=html5;url=/" />
+    
+    <!-- SEO and Social Sharing -->
+    <title>Cosnap AI - 智能图像处理平台 | AI特效 图片美化</title>
+    <meta name="description" content="Cosnap是领先的AI图像处理平台，提供丰富的智能特效、图片美化工具。支持一键美颜、风格转换、背景替换等功能，让你的照片更精彩。" />
+    <meta name="keywords" content="AI图像处理,图片特效,智能美化,照片编辑,AI美颜,风格转换,Cosnap" />
+    <meta name="author" content="Cosnap Team" />
+    
+    <!-- Open Graph for Social Sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Cosnap AI - 智能图像处理平台" />
+    <meta property="og:description" content="领先的AI图像处理平台，轻松创造精美作品" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:url" content="https://cosnap.ai" />
+    <meta property="og:site_name" content="Cosnap" />
+    <meta property="og:locale" content="zh_CN" />
+    
+    <!-- Twitter/X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cosnap AI - 智能图像处理平台" />
+    <meta name="twitter:description" content="领先的AI图像处理平台，轻松创造精美作品" />
+    <meta name="twitter:image" content="/twitter-image.png" />
+    <meta name="twitter:site" content="@CosnopAI" />
+    
+    <!-- WeChat Mini Program -->
+    <meta property="wx:card" content="summary" />
+    <meta property="wx:img" content="/wechat-share.png" />
+    
+    <!-- Preconnect to External Resources -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.cosnap.ai" />
+    <link rel="preconnect" href="https://cdn.cosnap.ai" />
+    
+    <!-- DNS Prefetch for Performance -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="//fonts.gstatic.com" />
+    <link rel="dns-prefetch" href="//api.cosnap.ai" />
+    <link rel="dns-prefetch" href="//cdn.cosnap.ai" />
+    
+    <!-- Fonts with Display Swap for Performance -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+    
+    <!-- Critical CSS Inlined for Performance -->
+    <style>
+      /* Critical CSS for mobile loading */
+      body {
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #fafafa;
+        color: #0f172a;
+        line-height: 1.5;
+        /* Prevent zoom on input focus in iOS */
+        -webkit-text-size-adjust: 100%;
+        /* Smooth scrolling for mobile */
+        -webkit-overflow-scrolling: touch;
+        /* Prevent callouts on touch */
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+      
+      /* Dark mode support */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #0f172a;
+          color: #fafafa;
+        }
+      }
+      
+      /* Loading spinner */
+      .loading-spinner {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border: 3px solid #e5e7eb;
+        border-top: 3px solid #14b8a6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        z-index: 9999;
+      }
+      
+      @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+      }
+      
+      /* Prevent FOUC */
+      #root {
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+      }
+      
+      #root.loaded {
+        opacity: 1;
+      }
+      
+      /* Safe area support for iPhone X+ */
+      @supports (padding: max(0px)) {
+        body {
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+      }
+      
+      /* High DPI display optimization */
+      @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+        body {
+          -webkit-font-smoothing: subpixel-antialiased;
+        }
+      }
+      
+      /* Reduce motion for accessibility */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
+    </style>
+    
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Cosnap AI",
+      "alternateName": "Cosnap",
+      "description": "领先的AI图像处理平台，提供智能特效和图片美化工具",
+      "url": "https://cosnap.ai",
+      "applicationCategory": "PhotoApplication",
+      "operatingSystem": "Web Browser, iOS, Android",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "CNY"
+      },
+      "screenshot": "/screenshots/mobile-home.png",
+      "author": {
+        "@type": "Organization",
+        "name": "Cosnap Team"
+      },
+      "inLanguage": "zh-CN",
+      "copyrightYear": "2024"
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

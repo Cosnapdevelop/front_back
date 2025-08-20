@@ -1,21 +1,24 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import Login from './pages/Login';
-import Register from './pages/Register';
 import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Layout/Navbar';
-import Home from './pages/Home';
-import Effects from './pages/Effects';
-import Community from './pages/Community';
-import Profile from './pages/Profile';
-import EffectDetail from './pages/EffectDetail';
-import ApplyEffect from './pages/ApplyEffect';
-import PostDetail from './pages/PostDetail';
-import UserProfile from './pages/UserProfile';
-import ImageLibrary from './pages/ImageLibrary';
+import { LazyLoadWrapper } from './components/UI/LazyLoadWrapper';
+
+// Lazy load pages for better performance
+const Home = lazy(() => import('./pages/Home'));
+const Effects = lazy(() => import('./pages/Effects'));
+const Community = lazy(() => import('./pages/Community'));
+const Profile = lazy(() => import('./pages/Profile'));
+const EffectDetail = lazy(() => import('./pages/EffectDetail'));
+const ApplyEffect = lazy(() => import('./pages/ApplyEffect'));
+const PostDetail = lazy(() => import('./pages/PostDetail'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const ImageLibrary = lazy(() => import('./pages/ImageLibrary'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
 
 function App() {
   return (
@@ -28,19 +31,21 @@ function App() {
               <Navbar />
             </ErrorBoundary>
             <ErrorBoundary>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/effects" element={<Effects />} />
-                <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/effect/:id" element={<EffectDetail />} />
-                <Route path="/apply/:id" element={<ProtectedRoute><ApplyEffect /></ProtectedRoute>} />
-                <Route path="/image-library" element={<ImageLibrary />} />
-                <Route path="/post/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
-                <Route path="/user/:userId" element={<UserProfile />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-              </Routes>
+              <LazyLoadWrapper fallbackMessage="Loading page...">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/effects" element={<Effects />} />
+                  <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="/effect/:id" element={<EffectDetail />} />
+                  <Route path="/apply/:id" element={<ProtectedRoute><ApplyEffect /></ProtectedRoute>} />
+                  <Route path="/image-library" element={<ImageLibrary />} />
+                  <Route path="/post/:postId" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
+                  <Route path="/user/:userId" element={<UserProfile />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                </Routes>
+              </LazyLoadWrapper>
             </ErrorBoundary>
           </div>
         </Router>

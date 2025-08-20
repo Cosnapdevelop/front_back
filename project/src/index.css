@@ -222,7 +222,7 @@
   }
 }
 
-/* Focus styles */
+/* Focus styles - Enhanced for mobile accessibility */
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
@@ -230,15 +230,30 @@ select:focus-visible {
   @apply ring-2 ring-mint-500 ring-offset-2 dark:ring-offset-obsidian-900 outline-none;
 }
 
+/* Mobile-specific focus styles */
+@media (max-width: 768px) {
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    ring-width: 3px;
+    ring-offset-width: 1px;
+  }
+}
+
 /* Dark mode image filters */
 .dark img {
   filter: brightness(0.9);
 }
 
-/* Mobile bottom navigation spacing */
+/* Mobile optimizations for Chinese market */
 @media (max-width: 768px) {
   body {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Optimize for mobile scrolling */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent zoom on input focus */
+    -webkit-text-size-adjust: 100%;
   }
   
   .pb-safe {
@@ -247,6 +262,35 @@ select:focus-visible {
   
   .safe-area-inset-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  
+  /* Touch-friendly interactions */
+  button, .btn, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Optimize input fields for mobile */
+  input, textarea, select {
+    font-size: 16px; /* Prevent zoom on iOS */
+    -webkit-appearance: none;
+    border-radius: 8px;
+  }
+  
+  /* Image optimization */
+  img {
+    max-width: 100%;
+    height: auto;
+    /* Improve image rendering */
+    image-rendering: -webkit-optimize-contrast;
+  }
+  
+  /* Smooth scrolling for mobile */
+  * {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -323,4 +367,323 @@ select:focus-visible {
   background: rgba(245, 101, 101, 0.1);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(245, 101, 101, 0.2);
+}
+
+/* Chinese Mobile UX Patterns */
+.wechat-style {
+  background: linear-gradient(135deg, #1aad19 0%, #00d100 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 500;
+  box-shadow: 0 2px 12px rgba(26, 173, 25, 0.3);
+  transition: all 0.2s ease;
+}
+
+.wechat-style:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(26, 173, 25, 0.4);
+}
+
+.alipay-style {
+  background: linear-gradient(135deg, #1677ff 0%, #40a9ff 100%);
+  color: white;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 500;
+  box-shadow: 0 2px 12px rgba(22, 119, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.alipay-style:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(22, 119, 255, 0.4);
+}
+
+/* Mobile Touch Interactions */
+.touch-feedback {
+  transition: all 0.1s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch-feedback:active {
+  transform: scale(0.98);
+  opacity: 0.8;
+}
+
+/* Mobile Card Styles */
+.mobile-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.mobile-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.dark .mobile-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(20, 184, 166, 0.1);
+}
+
+/* WeChat-style bottom sheet */
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  z-index: 1000;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.bottom-sheet.open {
+  transform: translateY(0);
+}
+
+.dark .bottom-sheet {
+  background: rgb(15, 23, 42);
+  border-top: 1px solid rgba(20, 184, 166, 0.2);
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.pull-to-refresh.active {
+  top: 20px;
+}
+
+/* Chinese mobile navigation */
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  min-height: 60px;
+  transition: all 0.2s ease;
+  border-radius: 12px;
+  margin: 0 4px;
+}
+
+.mobile-nav-item.active {
+  background: rgba(20, 184, 166, 0.1);
+  color: #14b8a6;
+}
+
+.mobile-nav-item:active {
+  transform: scale(0.95);
+  background: rgba(20, 184, 166, 0.15);
+}
+
+/* Image gallery swipe */
+.swipe-container {
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.swipe-container::-webkit-scrollbar {
+  display: none;
+}
+
+.swipe-item {
+  scroll-snap-align: center;
+  flex-shrink: 0;
+}
+
+/* Mobile payment UI */
+.payment-button {
+  width: 100%;
+  height: 48px;
+  border-radius: 24px;
+  font-weight: 600;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.payment-button:active {
+  transform: scale(0.98);
+}
+
+.payment-wechat {
+  background: linear-gradient(135deg, #1aad19 0%, #00d100 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(26, 173, 25, 0.3);
+}
+
+.payment-alipay {
+  background: linear-gradient(135deg, #1677ff 0%, #40a9ff 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
+}
+
+/* QR Code Scanner Overlay */
+.qr-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-scanner {
+  width: 280px;
+  height: 280px;
+  border: 2px solid #1aad19;
+  border-radius: 12px;
+  position: relative;
+}
+
+.qr-corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #1aad19;
+}
+
+.qr-corner.top-left {
+  top: -3px;
+  left: -3px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.qr-corner.top-right {
+  top: -3px;
+  right: -3px;
+  border-left: none;
+  border-bottom: none;
+}
+
+.qr-corner.bottom-left {
+  bottom: -3px;
+  left: -3px;
+  border-right: none;
+  border-top: none;
+}
+
+.qr-corner.bottom-right {
+  bottom: -3px;
+  right: -3px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Mobile Loading States */
+.mobile-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+.dark .mobile-skeleton {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Haptic feedback simulation */
+.haptic-light {
+  animation: haptic-pulse 0.1s ease;
+}
+
+.haptic-medium {
+  animation: haptic-pulse 0.15s ease;
+}
+
+.haptic-heavy {
+  animation: haptic-pulse 0.2s ease;
+}
+
+@keyframes haptic-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Chinese input method support */
+.chinese-input {
+  ime-mode: active;
+  composition-mode: active;
+}
+
+/* Network aware image loading */
+.image-loading {
+  background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+              linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+              linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+              linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  animation: loading-pattern 0.5s linear infinite;
+}
+
+@keyframes loading-pattern {
+  0% {
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+  100% {
+    background-position: 20px 20px, 20px 30px, 30px 10px, 10px 20px;
+  }
+}
+
+/* Optimized animations for mobile */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .mobile-card {
+    border: 2px solid currentColor;
+  }
+  
+  .wechat-style, .alipay-style {
+    border: 2px solid white;
+  }
 }

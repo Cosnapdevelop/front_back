@@ -1,0 +1,268 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Cosnap AI - Production Overview",
+    "tags": ["cosnap", "production", "overview"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"cosnap-backend\"}",
+            "legendFormat": "Backend",
+            "refId": "A"
+          },
+          {
+            "expr": "up{job=\"cosnap-frontend\"}",
+            "legendFormat": "Frontend",
+            "refId": "B"
+          },
+          {
+            "expr": "up{job=\"postgres\"}",
+            "legendFormat": "Database",
+            "refId": "C"
+          },
+          {
+            "expr": "up{job=\"redis\"}",
+            "legendFormat": "Cache",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            },
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate (RPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"cosnap-backend\"}[5m])",
+            "legendFormat": "{{method}} {{route}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Requests/sec",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 3,
+        "title": "Response Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"cosnap-backend\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"cosnap-backend\"}[5m]))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Seconds",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{job=\"cosnap-backend\",status=~\"5..\"}[5m]) / rate(http_requests_total{job=\"cosnap-backend\"}[5m]) * 100",
+            "legendFormat": "5xx Error Rate %",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(http_requests_total{job=\"cosnap-backend\",status=~\"4..\"}[5m]) / rate(http_requests_total{job=\"cosnap-backend\"}[5m]) * 100",
+            "legendFormat": "4xx Error Rate %",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Percentage",
+            "min": 0,
+            "max": 100
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 17
+        }
+      },
+      {
+        "id": 5,
+        "title": "Database Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(pg_stat_database_tup_fetched{datname=\"cosnap\"}[5m])",
+            "legendFormat": "Rows Fetched/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(pg_stat_database_tup_inserted{datname=\"cosnap\"}[5m])",
+            "legendFormat": "Rows Inserted/sec",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(pg_stat_database_tup_updated{datname=\"cosnap\"}[5m])",
+            "legendFormat": "Rows Updated/sec",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 17
+        }
+      },
+      {
+        "id": 6,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{job=\"cosnap-backend\"} / 1024 / 1024",
+            "legendFormat": "Backend Memory (MB)",
+            "refId": "A"
+          },
+          {
+            "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024",
+            "legendFormat": "System Memory Used (MB)",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "MB",
+            "min": 0
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 26
+        }
+      },
+      {
+        "id": 7,
+        "title": "Active Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends{datname=\"cosnap\"}",
+            "legendFormat": "Database Connections",
+            "refId": "A"
+          },
+          {
+            "expr": "redis_connected_clients",
+            "legendFormat": "Redis Connections",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 26
+        }
+      },
+      {
+        "id": 8,
+        "title": "API Tasks Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(cosnap_tasks_created_total[5m])",
+            "legendFormat": "Tasks Created",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(cosnap_tasks_completed_total[5m])",
+            "legendFormat": "Tasks Completed",
+            "refId": "B"
+          },
+          {
+            "expr": "increase(cosnap_tasks_failed_total[5m])",
+            "legendFormat": "Tasks Failed",
+            "refId": "C"
+          }
+        ],
+        "gridPos": {
+          "h": 9,
+          "w": 24,
+          "x": 0,
+          "y": 35
+        }
+      }
+    ],
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    },
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

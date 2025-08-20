@@ -23,6 +23,27 @@ model User {
   commentLikes  CommentLike[]
   notificationsReceived Notification[] @relation("NotificationReceiver")
   notificationsSent     Notification[] @relation("NotificationActor")
+  
+  // Chinese Payment and Subscription fields
+  subscriptionTier    SubscriptionTier @default(FREE)
+  subscriptionId      String?          @unique
+  subscriptionStatus  SubscriptionStatus @default(INACTIVE)
+  subscriptionStart   DateTime?
+  subscriptionEnd     DateTime?
+  monthlyUsage        Int              @default(0)
+  usageResetDate      DateTime?        @default(now())
+  preferredPayment    PaymentMethod?   @default(WECHAT_PAY)
+  
+  // Chinese billing information
+  realName            String?          // 真实姓名
+  phoneNumber         String?          // 手机号
+  idCardNumber        String?          // 身份证号（加密存储）
+  billingAddress      String?          // 账单地址
+  
+  // Relations
+  payments            Payment[]
+  usageHistory        UsageHistory[]
+  subscriptions       Subscription[]
 }
 
 model RefreshToken {
@@ -114,6 +135,152 @@ model Notification {
   @@index([actorId])
   @@index([postId])
   @@index([commentId])
+}
+
+// Chinese Payment System Models
+
+enum SubscriptionTier {
+  FREE      // 免费版: 每月5次AI特效处理，带水印
+  PRO       // 专业版: 无限特效处理，无水印，优先处理
+  VIP       // 会员版: 所有功能 + 独家特效 + 技术支持
+}
+
+enum SubscriptionStatus {
+  INACTIVE  // 未激活
+  ACTIVE    // 激活中
+  EXPIRED   // 已过期
+  CANCELLED // 已取消
+  SUSPENDED // 已暂停
+}
+
+enum PaymentMethod {
+  WECHAT_PAY // 微信支付
+  ALIPAY     // 支付宝支付
+}
+
+enum PaymentStatus {
+  PENDING   // 待支付
+  PAID      // 已支付
+  FAILED    // 支付失败
+  REFUNDED  // 已退款
+  CANCELLED // 已取消
+}
+
+enum UsageType {
+  AI_EFFECT    // AI特效处理
+  IMAGE_UPLOAD // 图片上传
+  PRIORITY_PROCESSING // 优先处理
+  EXCLUSIVE_EFFECT    // 独家特效
+}
+
+model Subscription {
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id])
+  tier            SubscriptionTier
+  status          SubscriptionStatus @default(INACTIVE)
+  startDate       DateTime
+  endDate         DateTime
+  autoRenew       Boolean            @default(true)
+  priceRMB        Decimal            @db.Decimal(10, 2) // 人民币价格
+  paymentMethod   PaymentMethod
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  
+  // Relations
+  payments        Payment[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([endDate])
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
+  subscriptionId     String?
+  subscription       Subscription? @relation(fields: [subscriptionId], references: [id])
+  
+  // Payment details
+  paymentMethod      PaymentMethod
+  status             PaymentStatus @default(PENDING)
+  amountRMB          Decimal       @db.Decimal(10, 2) // 人民币金额
+  currency           String        @default("CNY")
+  description        String        // 支付描述
+  
+  // Payment provider specific fields
+  wechatOrderId      String?       // 微信支付订单ID
+  wechatTransactionId String?      // 微信支付交易ID
+  alipayTradeNo      String?       // 支付宝交易号
+  alipayOutTradeNo   String?       // 支付宝商户订单号
+  
+  // Chinese payment specific
+  openId             String?       // 微信用户openid
+  buyerId            String?       // 支付宝买家用户号
+  
+  // Timestamps
+  paidAt             DateTime?
+  refundedAt         DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  
+  // Webhook verification
+  webhookReceived    Boolean       @default(false)
+  webhookVerified    Boolean       @default(false)
+  
+  @@index([userId])
+  @@index([status])
+  @@index([paymentMethod])
+  @@index([wechatOrderId])
+  @@index([alipayTradeNo])
+}
+
+model UsageHistory {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  usageType   UsageType
+  description String    // 使用描述
+  cost        Int       @default(1) // 消耗的使用次数
+  effectId    String?   // 特效ID（如果适用）
+  taskId      String?   // 任务ID（如果适用）
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([usageType])
+  @@index([createdAt])
+}
+
+model PaymentWebhook {
+  id              String        @id @default(cuid())
+  paymentMethod   PaymentMethod
+  webhookData     Json          // 原始webhook数据
+  signature       String        // 签名
+  verified        Boolean       @default(false)
+  processed       Boolean       @default(false)
+  paymentId       String?       // 关联的支付记录ID
+  errorMessage    String?       // 处理错误信息
+  createdAt       DateTime      @default(now())
+  processedAt     DateTime?
+  
+  @@index([paymentMethod])
+  @@index([verified])
+  @@index([processed])
+  @@index([createdAt])
+}
+
+model ChineseConfig {
+  id                String   @id @default(cuid())
+  configKey         String   @unique
+  configValue       String
+  description       String?  // 配置描述
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([configKey])
+  @@index([isActive])
 }
 
 

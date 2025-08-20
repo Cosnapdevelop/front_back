@@ -1,19 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useToast } from '../context/ToastContext';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Upload, 
-  Download, 
-  Play, 
-  X, 
-  AlertCircle,
-  Image as ImageIcon,
-  StopCircle
-} from 'lucide-react';
+import { X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { useTaskProcessing } from '../hooks/useTaskProcessing';
-import ImageCarousel from '../components/ImageCarousel';
+import { ParametersPanel } from '../components/EffectParameters/ParametersPanel';
+import { ProcessingControls } from '../components/ProcessingStatus/ProcessingControls';
+import { ResultsPanel } from '../components/Results/ResultsPanel';
+import { LoadingState } from '../components/UI/LoadingState';
 
 const ApplyEffect = () => {
   const { id } = useParams();
@@ -27,10 +22,10 @@ const ApplyEffect = () => {
   const [parameters, setParameters] = useState<Record<string, any>>({});
   const [imageParamFiles, setImageParamFiles] = useState<Record<string, {file?: File, url?: string, name?: string, size?: number, fileId?: string}>>({});
 
-  // 简单的测试状态
+  // Component initialization state
   const [testState, setTestState] = useState('Component loaded');
 
-  // 使用新的任务处理hook
+  // Use task processing hook
   const { 
     isProcessing, 
     progress, 
@@ -43,13 +38,13 @@ const ApplyEffect = () => {
     cancelTask
   } = useTaskProcessing();
 
-  // 简单的测试函数
+  // Test function for debugging
   const testFunction = () => {
-    console.log('[Test] 测试函数被调用');
+    console.log('[Test] Test function called');
     setTestState('Test button clicked at ' + new Date().toLocaleTimeString());
   };
 
-  console.log('[ApplyEffect] 组件渲染:', {
+  console.log('[ApplyEffect] Component render:', {
     id,
     testState,
     isProcessing,
@@ -57,28 +52,22 @@ const ApplyEffect = () => {
     activeTasksSize: activeTasks?.size || 0
   });
 
-  // 等待认证状态初始化
+  // Wait for authentication state initialization
   if (!bootstrapped) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState fullScreen message="Initializing..." />;
   }
 
-  // 检查用户是否已登录
+  // Check if user is authenticated
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">请先登录后再使用AI效果</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to use AI effects</p>
           <button
             onClick={() => navigate('/login')}
             className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
           >
-            去登录
+            Sign In
           </button>
         </div>
       </div>
@@ -103,13 +92,13 @@ const ApplyEffect = () => {
     effect.parameters.forEach(param => {
       defaultParams[param.name] = param.default;
     });
-    console.log('[ApplyEffect] 初始化默认参数:', defaultParams);
+    console.log('[ApplyEffect] Initialize default parameters:', defaultParams);
     setParameters(defaultParams);
   }, [effect.parameters]);
 
   const validateFile = (file: File): string | null => {
-    const maxSize = 100 * 1024 * 1024; // 100MB (系统支持云存储，最大100MB)
-    const runningHubLimit = 10 * 1024 * 1024; // 10MB (RunningHub原生限制)
+    const maxSize = 100 * 1024 * 1024; // 100MB (system supports cloud storage, max 100MB)
+    const runningHubLimit = 10 * 1024 * 1024; // 10MB (RunningHub native limit)
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     
     if (!allowedTypes.includes(file.type)) {
@@ -120,11 +109,11 @@ const ApplyEffect = () => {
       return `File too large. Maximum size: 100MB`;
     }
     
-    // 如果文件大于10MB，给用户一个提示
+    // If file is larger than 10MB, log a notice for cloud storage usage
     if (file.size > runningHubLimit) {
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
-      console.log(`[文件上传] 大文件检测: ${fileSizeMB}MB，将使用云存储上传`);
-      // 这里不返回错误，让用户知道会使用云存储
+      console.log(`[File Upload] Large file detected: ${fileSizeMB}MB, will use cloud storage upload`);
+      // Don't return error here, let user know cloud storage will be used
     }
     
     return null;
@@ -162,11 +151,11 @@ const ApplyEffect = () => {
         return;
       }
       
-      // 检查是否为大文件，给用户提示
+      // Check for large files and notify user
       if (file.size > runningHubLimit) {
         const fileSizeMB = formatFileSize(file.size);
-        console.log(`[文件上传] 检测到大文件: ${file.name} (${fileSizeMB})，将使用云存储上传`);
-        // 可以在这里添加一个用户提示，但不阻止上传
+        console.log(`[File Upload] Large file detected: ${file.name} (${fileSizeMB}), will use cloud storage upload`);
+        // Could add user notification here, but don't block upload
       }
       
       const reader = new FileReader();
@@ -215,23 +204,35 @@ const ApplyEffect = () => {
         }
       }));
       
-      // 更新参数值，确保参数被正确设置
-      // 对于图片参数，我们使用一个占位符值，因为实际的文件会通过FormData传递
+      // Update parameter value to ensure it's properly set
+      // For image parameters, we use a placeholder value as actual file will be passed through FormData
       setParameters(prev => ({
         ...prev,
-        [paramName]: `uploaded_${file.name}` // 使用一个标识符表示已上传
+        [paramName]: `uploaded_${file.name}` // Use identifier to indicate uploaded
       }));
     };
     reader.readAsDataURL(file);
     
-    console.log(`[ApplyEffect] 参数图片上传完成: ${paramName} = uploaded_${file.name}`);
+    console.log(`[ApplyEffect] Parameter image upload complete: ${paramName} = uploaded_${file.name}`);
+  };
+
+  const handleImageParamRemove = (paramName: string) => {
+    setImageParamFiles(prev => {
+      const newState = { ...prev };
+      delete newState[paramName];
+      return newState;
+    });
+    setParameters(prev => ({
+      ...prev,
+      [paramName]: undefined
+    }));
   };
 
   const handleParameterChange = (paramName: string, value: any) => {
-    console.log(`[参数变更] ${paramName}: ${value} (类型: ${typeof value})`);
+    console.log(`[Parameter Change] ${paramName}: ${value} (type: ${typeof value})`);
     
-    // 对于数值类型参数，确保转换为数字
-    // 使用精确匹配，避免误判
+    // For numeric type parameters, ensure conversion to number
+    // Use precise matching to avoid false positives
     if (paramName === 'scale_65' || 
         paramName === 'X_offset_65' || 
         paramName === 'Y_offset_65' || 
@@ -239,25 +240,25 @@ const ApplyEffect = () => {
       const numValue = parseFloat(value);
       if (!isNaN(numValue)) {
         setParameters(prev => ({ ...prev, [paramName]: numValue }));
-        console.log(`[参数变更] 数值转换: ${paramName} = ${numValue}`);
+        console.log(`[Parameter Change] Numeric conversion: ${paramName} = ${numValue}`);
       } else {
         setParameters(prev => ({ ...prev, [paramName]: value }));
-        console.log(`[参数变更] 数值转换失败，保持原值: ${paramName} = ${value}`);
+        console.log(`[Parameter Change] Numeric conversion failed, keeping original: ${paramName} = ${value}`);
       }
     } else {
       setParameters(prev => ({ ...prev, [paramName]: value }));
-      console.log(`[参数变更] 普通参数: ${paramName} = ${value}`);
+      console.log(`[Parameter Change] Regular parameter: ${paramName} = ${value}`);
     }
   };
 
   const handleDownload = async (imageUrl: string, index: number) => {
     try {
-      console.log('[下载] 开始下载图片:', imageUrl);
+      console.log('[Download] Starting image download:', imageUrl);
       
-      // 使用 fetch + blob 下载，避免页面跳转
+      // Use fetch + blob download to avoid page navigation
       const response = await fetch(imageUrl);
       if (!response.ok) {
-        throw new Error('下载失败');
+        throw new Error('Download failed');
       }
       
       const blob = await response.blob();
@@ -270,12 +271,12 @@ const ApplyEffect = () => {
       link.click();
       document.body.removeChild(link);
       
-      // 释放blob URL
+      // Release blob URL
       window.URL.revokeObjectURL(url);
-      console.log('[下载] 图片下载完成');
+      console.log('[Download] Image download complete');
     } catch (error) {
-      console.error('[下载] 下载失败:', error);
-      push('error','下载失败，请重试');
+      console.error('[Download] Download failed:', error);
+      push('error','Download failed, please try again');
     }
   };
 
@@ -283,137 +284,23 @@ const ApplyEffect = () => {
     setUploadedImages(prev => prev.filter(img => img.id !== imageId));
   };
 
-  const renderParameterInput = (param: any) => {
-    switch (param.type) {
-      case 'image':
-      return (
-        <div key={param.name} className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {param.label || param.name}
-            </label>
-            <div className="flex items-center space-x-4">
-              {imageParamFiles[param.name]?.url ? (
-                <div className="relative">
-                  <img 
-                    src={imageParamFiles[param.name].url} 
-                    alt={param.name}
-                    className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setImageParamFiles(prev => {
-                      const newState = { ...prev };
-                      delete newState[param.name];
-                      return newState;
-                    })}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-          <input
-            type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleImageParamUpload(param.name, file);
-                      }
-                    }}
-                    className="hidden"
-                    id={`param-${param.name}`}
-                  />
-                  <label
-                    htmlFor={`param-${param.name}`}
-                    className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-                  >
-                    <Upload size={16} className="inline mr-2" />
-                    Upload Image
-                  </label>
-                </div>
-              )}
-            </div>
-            {param.description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
-          )}
-        </div>
-      );
-      case 'range':
-      case 'slider':
-        return (
-          <div key={param.name} className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {param.label || param.name}: {parameters[param.name]}
-            </label>
-            <input
-              type="range"
-              min={param.min}
-              max={param.max}
-              step={param.step || 1}
-              value={parameters[param.name] || param.default}
-              onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-            />
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>{param.min}</span>
-              <span>{param.max}</span>
-            </div>
-            {param.description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
-            )}
-          </div>
-        );
-      case 'select':
-        return (
-          <div key={param.name} className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {param.label || param.name}
-            </label>
-            <select
-              value={parameters[param.name] || param.default}
-              onChange={(e) => handleParameterChange(param.name, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-            >
-              {param.options.map((option: any) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-              ))}
-            </select>
-            {param.description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
-            )}
-          </div>
-        );
-      default:
-        return (
-          <div key={param.name} className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {param.label || param.name}
-            </label>
-            <input
-              type="text"
-              value={parameters[param.name] !== undefined ? parameters[param.name] : (param.default || '')}
-              onChange={(e) => handleParameterChange(param.name, e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-              placeholder={param.placeholder}
-            />
-            {param.description && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
-            )}
-          </div>
-        );
-    }
+  const handleDebugState = () => {
+    console.log('[Debug] Current state:', {
+      isProcessing,
+      status,
+      progress,
+      activeTasks: activeTasks,
+      activeTasksSize: activeTasks.size,
+      activeTasksKeys: Array.from(activeTasks.keys())
+    });
   };
 
   const handleProcessImages = async () => {
-    // 检查是否有图片文件
+    // Check if there are image files
     const hasUploadedImages = uploadedImages.length > 0;
     const hasParamImages = Object.values(imageParamFiles).some(paramFile => paramFile.file);
     
-    console.log('[ApplyEffect] 图片检查:', {
+    console.log('[ApplyEffect] Image validation:', {
       uploadedImages: uploadedImages.length,
       imageParamFiles: Object.keys(imageParamFiles),
       hasUploadedImages,
@@ -426,49 +313,49 @@ const ApplyEffect = () => {
     }
 
     try {
-      // 收集所有图片文件对象，按照nodeInfoTemplate的顺序
+      // Collect all image file objects in nodeInfoTemplate order
       const imageFileObjects: Array<{file: File}> = [];
       
-      // 首先从参数图片中获取文件，按照nodeInfoTemplate的顺序
+      // First get files from parameter images in nodeInfoTemplate order
       if (effect.nodeInfoTemplate) {
         for (const nodeInfo of effect.nodeInfoTemplate) {
           const paramKey = nodeInfo.paramKey;
           if (paramKey && imageParamFiles[paramKey] && imageParamFiles[paramKey].file) {
             imageFileObjects.push({ file: imageParamFiles[paramKey].file! });
-            console.log(`[ApplyEffect] 添加参数图片: ${paramKey} -> ${imageParamFiles[paramKey].file!.name}`);
+            console.log(`[ApplyEffect] Adding parameter image: ${paramKey} -> ${imageParamFiles[paramKey].file!.name}`);
           }
         }
       }
       
-      // 然后从上传的图片中获取文件（如果有的话）
+      // Then get files from uploaded images (if any)
       for (const image of uploadedImages) {
-        // 这里需要从URL重新创建File对象
+        // Need to recreate File object from URL
         const response = await fetch(image.url);
         const blob = await response.blob();
         const file = new File([blob], image.name, { type: blob.type });
         imageFileObjects.push({ file });
-        console.log(`[ApplyEffect] 添加上传图片: ${image.name}`);
+        console.log(`[ApplyEffect] Adding uploaded image: ${image.name}`);
       }
 
-      console.log('[ApplyEffect] 收集到的图片文件:', {
+      console.log('[ApplyEffect] Collected image files:', {
         totalFiles: imageFileObjects.length,
         fileNames: imageFileObjects.map(obj => obj.file.name),
         nodeInfoTemplate: effect.nodeInfoTemplate,
         imageParamFiles: Object.keys(imageParamFiles)
       });
 
-      console.log('[ApplyEffect] 最终参数:', parameters);
-      console.log('[ApplyEffect] 参数详情:', Object.entries(parameters).map(([key, value]) => `${key}: ${value} (类型: ${typeof value})`));
+      console.log('[ApplyEffect] Final parameters:', parameters);
+      console.log('[ApplyEffect] Parameter details:', Object.entries(parameters).map(([key, value]) => `${key}: ${value} (type: ${typeof value})`));
 
       await processTask(effect, parameters, imageFileObjects);
     } catch (error) {
-      console.error('处理失败:', error);
+      console.error('Processing failed:', error);
     }
   };
 
   const handleCancelTask = async () => {
-    console.log('[ApplyEffect] 用户点击取消按钮');
-    console.log('[ApplyEffect] 当前状态:', {
+    console.log('[ApplyEffect] User clicked cancel button');
+    console.log('[ApplyEffect] Current state:', {
       isProcessing,
       status,
       activeTasks: activeTasks,
@@ -476,24 +363,24 @@ const ApplyEffect = () => {
       activeTasksKeys: Array.from(activeTasks.keys())
     });
     
-    // 获取当前活跃的任务ID
+    // Get current active task IDs
     const activeTaskIds = Array.from(activeTasks.keys());
-    console.log('[ApplyEffect] 当前活跃任务:', activeTaskIds);
+    console.log('[ApplyEffect] Current active tasks:', activeTaskIds);
     
     if (activeTaskIds.length === 0) {
-      console.log('[ApplyEffect] 没有活跃任务，显示错误');
-      push('warning','没有正在进行的任务可以取消');
+      console.log('[ApplyEffect] No active tasks, showing warning');
+      push('warning','No active tasks to cancel');
       return;
     }
     
-    // 取消所有活跃任务
+    // Cancel all active tasks
     for (const taskId of activeTaskIds) {
       try {
-        console.log(`[ApplyEffect] 开始取消任务: ${taskId}`);
+        console.log(`[ApplyEffect] Starting task cancellation: ${taskId}`);
         await cancelTask(taskId);
-        console.log(`[ApplyEffect] 成功取消任务: ${taskId}`);
+        console.log(`[ApplyEffect] Successfully cancelled task: ${taskId}`);
       } catch (error) {
-        console.error(`[ApplyEffect] 取消任务失败: ${taskId}`, error);
+        console.error(`[ApplyEffect] Task cancellation failed: ${taskId}`, error);
       }
     }
   };
@@ -528,127 +415,36 @@ const ApplyEffect = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Parameters */}
-                <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Parameters
-              </h2>
-              <div className="space-y-4">
-                  {effect.parameters.map(renderParameterInput)}
-              </div>
-                </div>
-                
-            {/* Process Button */}
-            <div className="space-y-3">
-                  <button
-                onClick={handleProcessImages}
-                    disabled={isProcessing}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
-                  >
-                    {isProcessing ? (
-                      <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                    Processing...
-                      </>
-                    ) : (
-                      <>
-                    <Play className="h-5 w-5 mr-2" />
-                    Start Processing
-                      </>
-                    )}
-                  </button>
-
-              {/* Debug Button */}
-              <button
-                onClick={() => {
-                  console.log('[Debug] 当前状态:', {
-                    isProcessing,
-                    status,
-                    progress,
-                    activeTasks: activeTasks,
-                    activeTasksSize: activeTasks.size,
-                    activeTasksKeys: Array.from(activeTasks.keys())
-                  });
-                }}
-                className="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm"
-              >
-                Debug State
-              </button>
-
-                {isProcessing && (
-                        <button 
-                  onClick={handleCancelTask}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center"
-                        >
-                  <StopCircle className="h-5 w-5 mr-2" />
-                  Cancel Processing
-                        </button>
-                )}
-            </div>
-
-            {/* Progress Bar */}
-            {isProcessing && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                <div className="mb-2 flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                  <span>Progress</span>
-                  <span>{Math.round(progress)}%</span>
-          </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
-
-            {/* Error Display - 只在非用户主动取消时显示 */}
-            {error && !isCancelled && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-                  <span className="text-red-800 dark:text-red-200">{error}</span>
-                </div>
-              </div>
-            )}
+          {/* Left Column - Parameters & Controls */}
+          <div className="space-y-6">
+            <ParametersPanel
+              parameters={effect.parameters}
+              values={parameters}
+              onChange={handleParameterChange}
+              imageParamFiles={imageParamFiles}
+              onImageUpload={handleImageParamUpload}
+              onImageRemove={handleImageParamRemove}
+            />
             
-            {/* Cancelled Status Display */}
-            {isCancelled && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                <div className="flex items-center">
-                  <AlertCircle className="h-5 w-5 text-yellow-400 mr-2" />
-                  <span className="text-yellow-800 dark:text-yellow-200">任务已取消</span>
-                </div>
-              </div>
-            )}
+            <ProcessingControls
+              isProcessing={isProcessing}
+              progress={progress}
+              error={error}
+              isCancelled={isCancelled}
+              onProcess={handleProcessImages}
+              onCancel={handleCancelTask}
+              onDebug={handleDebugState}
+              disabled={uploadedImages.length === 0 && Object.keys(imageParamFiles).length === 0}
+            />
           </div>
 
           {/* Right Column - Results */}
           <div className="space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Results
-              </h2>
-              
-              {results.length > 0 ? (
-                <div className="space-y-4">
-                  <ImageCarousel
-                    images={results}
-                    onDownload={handleDownload}
-                    className="w-full"
-                    showIndicators={true}
-                    showNavigation={true}
-                    autoPlay={false}
-                  />
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                  <ImageIcon className="mx-auto h-12 w-12 mb-4" />
-                  <p>No results yet. Upload images and start processing to see results.</p>
-                </div>
-              )}
-            </div>
+            <ResultsPanel
+              results={results}
+              onDownload={handleDownload}
+              isLoading={isProcessing}
+            />
           </div>
         </div>
       </div>

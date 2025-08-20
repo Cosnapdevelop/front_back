@@ -3,6 +3,22 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
+    screens: {
+      'xs': '320px',
+      'sm': '375px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+      // Chinese mobile market specific breakpoints
+      'mobile-s': '320px',
+      'mobile-m': '375px',
+      'mobile-l': '425px',
+      'tablet': '768px',
+      // Touch-optimized breakpoints
+      'touch': {'raw': '(hover: none) and (pointer: coarse)'},
+      'mouse': {'raw': '(hover: hover) and (pointer: fine)'},
+    },
     extend: {
       colors: {
         // Primary ACG-inspired palette
@@ -119,8 +135,106 @@ export default {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
         'acg-gradient': 'linear-gradient(135deg, #14b8a6 0%, #6366f1 50%, #f56565 100%)',
+        // WeChat-style gradients
+        'wechat-green': 'linear-gradient(135deg, #1aad19 0%, #00d100 100%)',
+        'alipay-blue': 'linear-gradient(135deg, #1677ff 0%, #40a9ff 100%)',
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        // Touch-friendly spacing
+        'touch-sm': '2.75rem', // 44px minimum
+        'touch-md': '3rem',     // 48px
+        'touch-lg': '3.5rem',   // 56px
+        'touch-xl': '4rem',     // 64px
+        // Safe area spacing
+        'safe-top': 'env(safe-area-inset-top)',
+        'safe-bottom': 'env(safe-area-inset-bottom)',
+        'safe-left': 'env(safe-area-inset-left)',
+        'safe-right': 'env(safe-area-inset-right)',
+      },
+      minHeight: {
+        'touch': '2.75rem', // 44px minimum touch target
+        'screen-mobile': '100vh',
+        'screen-safe': 'calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))',
+      },
+      maxWidth: {
+        'mobile': '425px',
+        'mobile-content': '100vw',
+      },
+      fontSize: {
+        // Chinese mobile optimized font sizes
+        'mobile-xs': ['0.75rem', { lineHeight: '1rem' }],
+        'mobile-sm': ['0.875rem', { lineHeight: '1.25rem' }],
+        'mobile-base': ['1rem', { lineHeight: '1.5rem' }],
+        'mobile-lg': ['1.125rem', { lineHeight: '1.75rem' }],
+        'mobile-xl': ['1.25rem', { lineHeight: '1.75rem' }],
+        'mobile-2xl': ['1.5rem', { lineHeight: '2rem' }],
+      },
+      // Touch interaction utilities
+      cursor: {
+        'touch': 'pointer',
+      },
+      // Mobile performance optimizations
+      transitionDuration: {
+        '50': '50ms',
+        '100': '100ms',
+      },
+      // Chinese mobile shadows
+      boxShadow: {
+        'mobile': '0 2px 8px rgba(0, 0, 0, 0.1)',
+        'mobile-lg': '0 4px 16px rgba(0, 0, 0, 0.12)',
+        'wechat': '0 2px 12px rgba(26, 173, 25, 0.15)',
+        'alipay': '0 2px 12px rgba(22, 119, 255, 0.15)',
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Add touch-friendly utilities
+    function({ addUtilities, theme }) {
+      const newUtilities = {
+        '.touch-manipulation': {
+          'touch-action': 'manipulation',
+        },
+        '.touch-pan-x': {
+          'touch-action': 'pan-x',
+        },
+        '.touch-pan-y': {
+          'touch-action': 'pan-y',
+        },
+        '.touch-none': {
+          'touch-action': 'none',
+        },
+        '.tap-highlight-none': {
+          '-webkit-tap-highlight-color': 'transparent',
+        },
+        '.scroll-smooth': {
+          'scroll-behavior': 'smooth',
+        },
+        '.overscroll-none': {
+          'overscroll-behavior': 'none',
+        },
+        // iOS safe area utilities
+        '.pt-safe': {
+          'padding-top': 'env(safe-area-inset-top)',
+        },
+        '.pb-safe': {
+          'padding-bottom': 'env(safe-area-inset-bottom)',
+        },
+        '.pl-safe': {
+          'padding-left': 'env(safe-area-inset-left)',
+        },
+        '.pr-safe': {
+          'padding-right': 'env(safe-area-inset-right)',
+        },
+        '.p-safe': {
+          'padding-top': 'env(safe-area-inset-top)',
+          'padding-right': 'env(safe-area-inset-right)',
+          'padding-bottom': 'env(safe-area-inset-bottom)',
+          'padding-left': 'env(safe-area-inset-left)',
+        },
+      }
+      addUtilities(newUtilities)
+    }
+  ],
 };

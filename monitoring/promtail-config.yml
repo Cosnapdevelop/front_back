@@ -1,0 +1,78 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Cosnap backend logs
+  - job_name: cosnap-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: cosnap-backend
+          service: backend
+          environment: production
+          __path__: /var/log/cosnap/app.log
+
+  # System logs
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/syslog
+
+  # Docker logs (if using Docker logging driver)
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'log_stream'
+
+  # Nginx access logs
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          service: frontend
+          __path__: /var/log/nginx/access.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<remote_addr>[\d\.]+) - (?P<remote_user>[^ ]*) \[(?P<time_local>[^\]]*)\] "(?P<method>[A-Z]+) (?P<request_uri>[^ ]*) (?P<http_version>[^"]*)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+      - labels:
+          method:
+          status:
+          remote_addr:
+
+  # Nginx error logs
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          service: frontend
+          __path__: /var/log/nginx/error.log
+
+  # PostgreSQL logs
+  - job_name: postgresql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgresql
+          service: database
+          __path__: /var/log/postgresql/*.log

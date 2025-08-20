@@ -58,14 +58,14 @@ export interface Comment {
 export interface Post {
   id: string;
   user: User;
-  effect: Effect;
-  images?: string[]; // 改为支持多张图片
-  image?: string; // 保留旧字段以支持向后兼容
+  effect?: Effect; // 后端最小化，不强制返回完整effect
+  images?: string[];
+  image?: string;
   caption: string;
   likesCount: number;
   commentsCount: number;
-  isLiked: boolean;
-  isBookmarked: boolean;
+  isLiked?: boolean;
+  isBookmarked?: boolean;
   createdAt: string;
   comments: Comment[];
 }

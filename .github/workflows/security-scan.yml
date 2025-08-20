@@ -1,0 +1,474 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  # =============================================================================
+  # DEPENDENCY VULNERABILITY SCANNING
+  # =============================================================================
+  
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # Backend dependency scan
+      - name: Install backend dependencies
+        working-directory: ./runninghub-backend
+        run: npm ci
+
+      - name: Run npm audit (backend)
+        working-directory: ./runninghub-backend
+        run: |
+          npm audit --audit-level=moderate --json > backend-audit.json || true
+          
+      - name: Check for high/critical vulnerabilities (backend)
+        working-directory: ./runninghub-backend
+        run: |
+          HIGH_VULNS=$(npm audit --audit-level=high --json | jq '.metadata.vulnerabilities.high + .metadata.vulnerabilities.critical' 2>/dev/null || echo "0")
+          echo "High/Critical vulnerabilities found: $HIGH_VULNS"
+          
+          if [ "$HIGH_VULNS" -gt "0" ]; then
+            echo "❌ High or critical vulnerabilities found in backend dependencies!"
+            npm audit --audit-level=high
+            exit 1
+          fi
+
+      # Frontend dependency scan
+      - name: Install frontend dependencies
+        working-directory: ./project
+        run: npm ci
+
+      - name: Run npm audit (frontend)
+        working-directory: ./project
+        run: |
+          npm audit --audit-level=moderate --json > frontend-audit.json || true
+
+      - name: Check for high/critical vulnerabilities (frontend)
+        working-directory: ./project
+        run: |
+          HIGH_VULNS=$(npm audit --audit-level=high --json | jq '.metadata.vulnerabilities.high + .metadata.vulnerabilities.critical' 2>/dev/null || echo "0")
+          echo "High/Critical vulnerabilities found: $HIGH_VULNS"
+          
+          if [ "$HIGH_VULNS" -gt "0" ]; then
+            echo "❌ High or critical vulnerabilities found in frontend dependencies!"
+            npm audit --audit-level=high
+            exit 1
+          fi
+
+      # Upload audit reports
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit-reports
+          path: |
+            ./runninghub-backend/backend-audit.json
+            ./project/frontend-audit.json
+          retention-days: 30
+
+  # =============================================================================
+  # DOCKER IMAGE SECURITY SCANNING
+  # =============================================================================
+
+  docker-security-scan:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build images for scanning
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./runninghub-backend
+          file: ./runninghub-backend/Dockerfile
+          tags: cosnap-backend:scan
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./project
+          file: ./project/Dockerfile
+          tags: cosnap-frontend:scan
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Scan backend image
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'cosnap-backend:scan'
+          format: 'sarif'
+          output: 'backend-trivy-results.sarif'
+
+      - name: Scan backend image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'cosnap-backend:scan'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      # Scan frontend image
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'cosnap-frontend:scan'
+          format: 'sarif'
+          output: 'frontend-trivy-results.sarif'
+
+      - name: Scan frontend image for critical vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'cosnap-frontend:scan'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      # Upload scan results
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'backend-trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'frontend-trivy-results.sarif'
+
+  # =============================================================================
+  # SECRET SCANNING
+  # =============================================================================
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+
+      - name: Install TruffleHog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan for secrets
+        run: |
+          trufflehog git file://. --json --no-update > secrets-scan.json || true
+
+      - name: Check for verified secrets
+        run: |
+          VERIFIED_SECRETS=$(jq '[.[] | select(.Verified == true)] | length' secrets-scan.json)
+          echo "Verified secrets found: $VERIFIED_SECRETS"
+          
+          if [ "$VERIFIED_SECRETS" -gt "0" ]; then
+            echo "❌ Verified secrets found in repository!"
+            jq '.[] | select(.Verified == true)' secrets-scan.json
+            exit 1
+          fi
+
+      - name: Upload secret scan results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: secret-scan-results
+          path: secrets-scan.json
+          retention-days: 30
+
+  # =============================================================================
+  # STATIC APPLICATION SECURITY TESTING (SAST)
+  # =============================================================================
+
+  sast-scan:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Semgrep SAST scanning
+      - name: Run Semgrep security scan
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/javascript
+            p/typescript
+            p/react
+            p/express
+            p/nodejs
+          generateSarif: "1"
+          auditOn: push
+
+      - name: Upload Semgrep results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+      # ESLint security scanning for additional rules
+      - name: Setup Node.js for ESLint security
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install ESLint security plugins
+        run: |
+          npm install -g \
+            eslint \
+            eslint-plugin-security \
+            eslint-plugin-no-secrets \
+            @typescript-eslint/eslint-plugin
+
+      - name: Run ESLint security scan (backend)
+        working-directory: ./runninghub-backend
+        run: |
+          npx eslint . \
+            --ext .js,.ts \
+            --plugin security \
+            --plugin no-secrets \
+            --rule "security/detect-object-injection: error" \
+            --rule "security/detect-non-literal-regexp: error" \
+            --rule "security/detect-unsafe-regex: error" \
+            --rule "security/detect-buffer-noassert: error" \
+            --rule "security/detect-child-process: error" \
+            --rule "security/detect-disable-mustache-escape: error" \
+            --rule "security/detect-eval-with-expression: error" \
+            --rule "security/detect-no-csrf-before-method-override: error" \
+            --rule "security/detect-non-literal-fs-filename: error" \
+            --rule "security/detect-non-literal-require: error" \
+            --rule "security/detect-possible-timing-attacks: error" \
+            --rule "security/detect-pseudoRandomBytes: error" \
+            --rule "no-secrets/no-secrets: error" \
+            --format json \
+            --output-file backend-security-eslint.json || true
+
+      - name: Run ESLint security scan (frontend)
+        working-directory: ./project
+        run: |
+          npx eslint . \
+            --ext .js,.ts,.tsx \
+            --plugin security \
+            --plugin no-secrets \
+            --rule "security/detect-object-injection: error" \
+            --rule "security/detect-non-literal-regexp: error" \
+            --rule "security/detect-unsafe-regex: error" \
+            --rule "no-secrets/no-secrets: error" \
+            --format json \
+            --output-file frontend-security-eslint.json || true
+
+      - name: Upload ESLint security results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eslint-security-results
+          path: |
+            ./runninghub-backend/backend-security-eslint.json
+            ./project/frontend-security-eslint.json
+          retention-days: 30
+
+  # =============================================================================
+  # LICENSE COMPLIANCE SCANNING
+  # =============================================================================
+
+  license-scan:
+    name: License Compliance Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install license-checker
+        run: npm install -g license-checker
+
+      # Backend license check
+      - name: Install backend dependencies
+        working-directory: ./runninghub-backend
+        run: npm ci
+
+      - name: Check backend licenses
+        working-directory: ./runninghub-backend
+        run: |
+          license-checker \
+            --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;Apache*;Unlicense" \
+            --excludePrivatePackages \
+            --json > backend-licenses.json
+
+      # Frontend license check
+      - name: Install frontend dependencies
+        working-directory: ./project
+        run: npm ci
+
+      - name: Check frontend licenses
+        working-directory: ./project
+        run: |
+          license-checker \
+            --onlyAllow "MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;0BSD;Apache*;Unlicense" \
+            --excludePrivatePackages \
+            --json > frontend-licenses.json
+
+      - name: Upload license reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: |
+            ./runninghub-backend/backend-licenses.json
+            ./project/frontend-licenses.json
+          retention-days: 30
+
+  # =============================================================================
+  # SECURITY REPORT SUMMARY
+  # =============================================================================
+
+  security-report:
+    name: Security Report Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, docker-security-scan, secret-scan, sast-scan, license-scan]
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 Security Scan Summary" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "**Scan Date:** $(date -u)" >> security-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> security-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          echo "## 📊 Scan Results" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Check each job status
+          DEPENDENCY_STATUS="${{ needs.dependency-scan.result }}"
+          DOCKER_STATUS="${{ needs.docker-security-scan.result }}"
+          SECRET_STATUS="${{ needs.secret-scan.result }}"
+          SAST_STATUS="${{ needs.sast-scan.result }}"
+          LICENSE_STATUS="${{ needs.license-scan.result }}"
+          
+          echo "| Scan Type | Status |" >> security-summary.md
+          echo "|-----------|--------|" >> security-summary.md
+          echo "| Dependency Vulnerabilities | $DEPENDENCY_STATUS |" >> security-summary.md
+          echo "| Docker Image Security | $DOCKER_STATUS |" >> security-summary.md
+          echo "| Secret Detection | $SECRET_STATUS |" >> security-summary.md
+          echo "| Static Analysis (SAST) | $SAST_STATUS |" >> security-summary.md
+          echo "| License Compliance | $LICENSE_STATUS |" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          # Overall status
+          if [[ "$DEPENDENCY_STATUS" == "success" && "$SECRET_STATUS" == "success" && "$SAST_STATUS" == "success" && "$LICENSE_STATUS" == "success" ]]; then
+            echo "## ✅ Overall Status: PASSED" >> security-summary.md
+            echo "All security scans completed successfully with no critical issues found." >> security-summary.md
+          else
+            echo "## ❌ Overall Status: FAILED" >> security-summary.md
+            echo "One or more security scans failed. Please review the detailed results." >> security-summary.md
+          fi
+          
+          echo "" >> security-summary.md
+          echo "## 📋 Recommendations" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "- Review and address any high/critical vulnerabilities found" >> security-summary.md
+          echo "- Ensure no verified secrets are committed to the repository" >> security-summary.md
+          echo "- Update dependencies regularly to latest secure versions" >> security-summary.md
+          echo "- Monitor security advisories for used dependencies" >> security-summary.md
+          echo "- Consider implementing automated dependency updates with Dependabot" >> security-summary.md
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 90
+
+      - name: Comment security summary on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  # =============================================================================
+  # SECURITY NOTIFICATIONS
+  # =============================================================================
+
+  security-notify:
+    name: Security Notifications
+    runs-on: ubuntu-latest
+    needs: [security-report]
+    if: always() && github.event_name == 'schedule'
+    
+    steps:
+      - name: Notify security scan results
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SECURITY_SLACK_WEBHOOK }}
+        run: |
+          OVERALL_STATUS="${{ needs.security-report.result }}"
+          
+          if [ "$OVERALL_STATUS" == "success" ]; then
+            STATUS="✅ PASSED"
+            COLOR="good"
+            MESSAGE="Daily security scan completed successfully - no critical issues found"
+          else
+            STATUS="❌ FAILED" 
+            COLOR="danger"
+            MESSAGE="Daily security scan found issues that require attention"
+          fi
+          
+          if [ -n "$SLACK_WEBHOOK" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"attachments\":[{\"color\":\"$COLOR\",\"title\":\"🔒 Cosnap AI Security Scan\",\"text\":\"$MESSAGE\",\"fields\":[{\"title\":\"Status\",\"value\":\"$STATUS\",\"short\":true},{\"title\":\"Repository\",\"value\":\"${{ github.repository }}\",\"short\":true},{\"title\":\"View Results\",\"value\":\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\",\"short\":false}]}]}" \
+              $SLACK_WEBHOOK
+          fi

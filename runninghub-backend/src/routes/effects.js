@@ -1,11 +1,27 @@
 import express from 'express';
-import { auth } from '../middleware/auth.js';
+import { auth, checkTokenExpiry } from '../middleware/auth.js';
 import crypto from 'crypto';
 import multer from 'multer';
+import { 
+  aiTaskLimiter, 
+  uploadLimiter, 
+  generalLimiter 
+} from '../middleware/rateLimiting.js';
+import { 
+  effectsValidation,
+  fileValidation,
+  sanitizeInput,
+  handleValidationErrors 
+} from '../middleware/validation.js';
+import {
+  checkFeatureAccess,
+  recordFeatureUsage
+} from '../middleware/chinesePayment.js';
 import { uploadImageService } from '../services/uploadImageService.js';
 import { startComfyUITaskService, waitForComfyUITaskAndGetImages, cancelComfyUITask, getComfyUITaskStatus, getComfyUITaskResult } from '../services/comfyUITaskService.js';
 import { startWebappTaskService, waitForWebappTaskAndGetImages, cancelWebappTask, getWebappTaskStatus, getWebappTaskResult } from '../services/webappTaskService.js';
 import { uploadLoraService, validateLoraFile } from '../services/loraUploadService.js';
+import { body, param } from 'express-validator';
 import axios from 'axios';
 
 const router = express.Router();
@@ -28,7 +44,9 @@ router.post('/test', (req, res) => {
   });
 });
 
-// 文件验证函数
+/**
+ * 增强的文件验证函数
+ */
 function validateFileType(file) {
   const allowedTypes = [
     'image/jpeg',
@@ -37,52 +55,148 @@ function validateFileType(file) {
     'image/gif',
     'image/webp'
   ];
-  return allowedTypes.includes(file.mimetype.toLowerCase());
+  
+  // 检查MIME类型
+  if (!allowedTypes.includes(file.mimetype.toLowerCase())) {
+    return false;
+  }
+  
+  // 检查文件扩展名
+  const extension = file.originalname.toLowerCase().split('.').pop();
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  
+  if (!allowedExtensions.includes(extension)) {
+    return false;
+  }
+  
+  return true;
 }
 
 function validateFileName(filename) {
   // 防止路径遍历攻击
-  const dangerous = /[<>:"/\\|?*\x00-\x1f]/;
+  const dangerous = /[<>:"/\\|?*\x00-\x1f\.\./;
   if (dangerous.test(filename)) {
     return false;
   }
-  // 限制文件名长度
-  if (filename.length > 255) {
+  
+  // 防止双扩展名攻击
+  const doubleExtension = /\.(exe|bat|cmd|com|pif|scr|vbs|js|jar|php|asp|jsp)\./i;
+  if (doubleExtension.test(filename)) {
     return false;
   }
+  
+  // 限制文件名长度
+  if (filename.length > 255 || filename.length < 1) {
+    return false;
+  }
+  
+  // 检查是否为隐藏文件
+  if (filename.startsWith('.')) {
+    return false;
+  }
+  
   return true;
 }
 
-// 配置multer用于处理文件上传
+function validateFileSize(file, maxSize = 30 * 1024 * 1024) {
+  return file.size <= maxSize;
+}
+
+/**
+ * 安全的文件上传配置
+ */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB (支持云存储，大文件自动转云存储)
-    files: 10, // 最多10个文件
+    fileSize: 30 * 1024 * 1024, // 30MB - 降低文件大小限制
+    files: 5, // 最多5个文件 - 减少并发上传数量
     fieldSize: 1024 * 1024, // 1MB字段大小限制
+    fieldNameSize: 100, // 字段名长度限制
+    fields: 20, // 最多20个字段
+    parts: 100 // 最多100个部分
   },
   fileFilter: (req, file, cb) => {
-    console.log(`[文件验证] 检查文件: ${file.originalname}, MIME: ${file.mimetype}`);
+    console.log(`[文件验证] 检查文件: ${file.originalname}, MIME: ${file.mimetype}, 大小: ${file.size || 'unknown'}`);
     
-    // 验证文件类型
-    if (!validateFileType(file)) {
-      console.warn(`[文件验证] 不支持的文件类型: ${file.mimetype}`);
-      return cb(new Error(`不支持的文件类型: ${file.mimetype}。只允许 JPEG, PNG, GIF, WebP 格式`), false);
+    try {
+      // 验证文件类型
+      if (!validateFileType(file)) {
+        console.warn(`[文件验证] 不支持的文件类型 - IP: ${req.ip}, 文件: ${file.originalname}, MIME: ${file.mimetype}`);
+        return cb(new Error(`不支持的文件类型: ${file.mimetype}。只允许 JPEG, PNG, GIF, WebP 格式`), false);
+      }
+      
+      // 验证文件名
+      if (!validateFileName(file.originalname)) {
+        console.warn(`[文件验证] 不安全的文件名 - IP: ${req.ip}, 文件名: ${file.originalname}`);
+        return cb(new Error('文件名包含不安全字符、过长或格式不正确'), false);
+      }
+      
+      console.log(`[文件验证] 文件通过验证 - IP: ${req.ip}, 文件: ${file.originalname}`);
+      cb(null, true);
+    } catch (error) {
+      console.error(`[文件验证] 验证过程出错 - IP: ${req.ip}, 错误:`, error);
+      cb(new Error('文件验证失败'), false);
     }
+  },
+});
+
+/**
+ * LoRA文件上传配置
+ */
+const loraUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024 * 1024, // 2GB
+    files: 1, // 只允许单个文件
+    fieldSize: 1024 * 1024,
+    fieldNameSize: 100,
+    fields: 10
+  },
+  fileFilter: (req, file, cb) => {
+    console.log(`[LoRA验证] 检查文件: ${file.originalname}, MIME: ${file.mimetype}`);
     
-    // 验证文件名
-    if (!validateFileName(file.originalname)) {
-      console.warn(`[文件验证] 不安全的文件名: ${file.originalname}`);
-      return cb(new Error('文件名包含不安全字符或过长'), false);
+    try {
+      // LoRA文件扩展名验证
+      const allowedExtensions = ['.safetensors', '.ckpt', '.pt', '.pth'];
+      const fileName = file.originalname.toLowerCase();
+      const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (!hasValidExtension) {
+        console.warn(`[LoRA验证] 不支持的LoRA文件格式 - IP: ${req.ip}, 文件: ${file.originalname}`);
+        return cb(new Error('仅支持 .safetensors、.ckpt、.pt、.pth 格式的LoRA文件'), false);
+      }
+      
+      // 验证文件名安全性
+      if (!validateFileName(file.originalname)) {
+        console.warn(`[LoRA验证] 不安全的文件名 - IP: ${req.ip}, 文件名: ${file.originalname}`);
+        return cb(new Error('文件名包含不安全字符或格式不正确'), false);
+      }
+      
+      console.log(`[LoRA验证] LoRA文件通过验证 - IP: ${req.ip}, 文件: ${file.originalname}`);
+      cb(null, true);
+    } catch (error) {
+      console.error(`[LoRA验证] 验证过程出错 - IP: ${req.ip}, 错误:`, error);
+      cb(new Error('LoRA文件验证失败'), false);
     }
-    
-    console.log(`[文件验证] 文件通过验证: ${file.originalname}`);
-    cb(null, true);
   },
 });
 
 // 通用的任务处理接口（支持ComfyUI和Webapp）
-router.post('/comfyui/apply', auth, upload.array('images', 10), async (req, res) => {
+router.post(
+  '/comfyui/apply',
+  aiTaskLimiter,
+  sanitizeInput,
+  auth,
+  checkTokenExpiry,
+  checkFeatureAccess('AI_EFFECT'), // 检查AI特效使用权限
+  upload.array('images', 5), // 减少最大文件数量
+  fileValidation.image, // 添加额外的文件验证
+  recordFeatureUsage('AI_EFFECT', (req) => {
+    const webappId = Array.isArray(req.body.webappId) ? req.body.webappId[0] : req.body.webappId;
+    const workflowId = Array.isArray(req.body.workflowId) ? req.body.workflowId[0] : req.body.workflowId;
+    return `使用AI特效 - WebApp: ${webappId || 'N/A'}, Workflow: ${workflowId || 'N/A'}`;
+  }),
+  async (req, res) => {
   try {
     console.log('[任务处理] 收到新的任务请求');
     console.log('[任务处理] Headers:', req.headers);
@@ -363,7 +477,13 @@ router.post('/comfyui/apply', auth, upload.array('images', 10), async (req, res)
         success: true,
         taskId: taskResult.taskId,
         taskType: taskType, // 添加任务类型信息
-        message: '任务已启动，正在后台处理'
+        message: '任务已启动，正在后台处理',
+        // 添加订阅相关信息
+        subscription: {
+          hasWatermark: req.featureAccess?.hasWatermark || false,
+          priorityProcessing: req.featureAccess?.priorityProcessing || false,
+          tier: req.featureAccess?.subscription?.tier || 'FREE'
+        }
       });
       
     } catch (error) {
@@ -396,7 +516,12 @@ router.post('/comfyui/apply', auth, upload.array('images', 10), async (req, res)
 });
 
 // 原有的apply接口（保持兼容性）
-router.post('/apply', upload.single('image'), async (req, res) => {
+router.post('/apply', 
+  upload.single('image'),
+  auth, // 确保用户已登录
+  checkFeatureAccess('AI_EFFECT'), // 检查AI特效使用权限
+  recordFeatureUsage('AI_EFFECT', (req) => `使用AI特效: ${req.body.effectId}`),
+  async (req, res) => {
   try {
     const { effectId, parameters } = req.body;
     const imageFile = req.file;
@@ -470,55 +595,84 @@ router.post('/apply', upload.single('image'), async (req, res) => {
 });
 
 // 查询任务状态接口
-router.post('/comfyui/status', auth, async (req, res) => {
+router.post(
+  '/comfyui/status',
+  generalLimiter,
+  sanitizeInput,
+  auth,
+  body('taskId')
+    .isString()
+    .withMessage('任务ID必须是字符串')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('任务ID长度必须在1-100个字符之间'),
+  body('regionId')
+    .optional()
+    .isIn(['hongkong', 'china'])
+    .withMessage('地区ID必须是 hongkong 或 china'),
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const { taskId, regionId = 'hongkong' } = req.body;
     
-    if (!taskId) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '缺少taskId参数' 
-      });
-    }
-    
-    console.log(`[状态查询] 查询任务状态: taskId=${taskId}, regionId=${regionId}`);
+    console.log(`[状态查询] 用户: ${req.user.username} (${req.user.id}), 查询任务: ${taskId}, 地区: ${regionId}, IP: ${req.ip}`);
     
     // 智能判断任务类型 - 先尝试ComfyUI，再尝试Webapp
-    // 因为ComfyUI服务更稳定，优先使用ComfyUI服务
     let status;
     
     try {
       // 首先尝试ComfyUI服务
       status = await getComfyUITaskStatus(taskId, regionId);
-      console.log('[状态查询] 使用ComfyUI服务查询成功');
+      console.log(`[状态查询] ComfyUI查询成功 - 任务: ${taskId}, 状态: ${typeof status === 'string' ? status : status.status}`);
     } catch (error) {
       // 如果ComfyUI服务失败，尝试Webapp服务
-      console.log('[状态查询] ComfyUI服务失败，尝试Webapp服务');
+      console.log(`[状态查询] ComfyUI失败，尝试Webapp - 任务: ${taskId}, 错误: ${error.message}`);
       try {
         status = await getWebappTaskStatus(taskId, regionId);
-        console.log('[状态查询] 使用Webapp服务查询成功');
+        console.log(`[状态查询] Webapp查询成功 - 任务: ${taskId}, 状态: ${typeof status === 'string' ? status : status.status}`);
       } catch (webappError) {
-        console.error('[状态查询] 两种服务都失败:', { comfyuiError: error.message, webappError: webappError.message });
-        throw new Error('无法查询任务状态');
+        console.error(`[状态查询] 所有服务失败 - 任务: ${taskId}, 用户: ${req.user.id}, IP: ${req.ip}`, { 
+          comfyuiError: error.message, 
+          webappError: webappError.message 
+        });
+        return res.status(404).json({
+          success: false,
+          error: '任务不存在或服务暂不可用'
+        });
       }
     }
     
     res.json({
       success: true,
-      status: typeof status === 'string' ? status : status.status // 兼容字符串和对象格式
+      status: typeof status === 'string' ? status : status.status,
+      taskId: taskId
     });
     
   } catch (error) {
-    console.error('[状态查询] 查询失败:', error);
+    console.error(`[状态查询] 查询失败 - 任务: ${req.body.taskId}, 用户: ${req.user?.id}, IP: ${req.ip}, 错误:`, error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: '查询任务状态失败，请稍后重试' 
     });
   }
 });
 
 // 获取任务结果接口
-router.post('/comfyui/results', auth, async (req, res) => {
+router.post(
+  '/comfyui/results',
+  generalLimiter,
+  sanitizeInput,
+  auth,
+  body('taskId')
+    .isString()
+    .withMessage('任务ID必须是字符串')
+    .isLength({ min: 1, max: 100 })
+    .withMessage('任务ID长度必须在1-100个字符之间'),
+  body('regionId')
+    .optional()
+    .isIn(['hongkong', 'china'])
+    .withMessage('地区ID必须是 hongkong 或 china'),
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const { taskId, regionId = 'hongkong' } = req.body;
     
@@ -638,7 +792,25 @@ router.post('/comfyui/retry', auth, async (req, res) => {
 export default router; 
 
 // 预签名直传（阿里云OSS）
-router.post('/upload/presign', auth, async (req, res) => {
+router.post(
+  '/upload/presign',
+  uploadLimiter,
+  sanitizeInput,
+  auth,
+  body('ext')
+    .optional()
+    .matches(/^[a-z0-9]+$/)
+    .withMessage('文件扩展名格式不正确')
+    .isLength({ max: 10 })
+    .withMessage('文件扩展名过长'),
+  body('dir')
+    .optional()
+    .matches(/^[a-zA-Z0-9/_-]+$/)
+    .withMessage('目录路径格式不正确')
+    .isLength({ max: 100 })
+    .withMessage('目录路径过长'),
+  handleValidationErrors,
+  async (req, res) => {
   try {
     const provider = process.env.CLOUD_STORAGE_PROVIDER || 'mock';
     const ext = (req.body?.ext || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -692,8 +864,20 @@ router.post('/upload/presign', auth, async (req, res) => {
   }
 });
 
-// Lora上传接口
-router.post('/lora/upload', auth, upload.single('loraFile'), async (req, res) => {
+// LoRA上传接口
+router.post(
+  '/lora/upload',
+  uploadLimiter,
+  sanitizeInput,
+  auth,
+  loraUpload.single('loraFile'),
+  fileValidation.lora,
+  body('regionId')
+    .optional()
+    .isIn(['hongkong', 'china'])
+    .withMessage('地区ID必须是 hongkong 或 china'),
+  handleValidationErrors,
+  async (req, res) => {
   try {
     console.log('[Lora上传] 收到Lora文件上传请求');
     

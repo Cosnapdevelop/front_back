@@ -1,0 +1,310 @@
+name: Performance Monitoring
+
+on:
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  performance-test:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+
+      - name: Install dependencies
+        run: |
+          npm install -g lighthouse k6
+
+      - name: Set environment URLs
+        run: |
+          if [ "${{ github.event.inputs.environment || 'production' }}" = "production" ]; then
+            echo "FRONTEND_URL=${{ secrets.PRODUCTION_FRONTEND_URL }}" >> $GITHUB_ENV
+            echo "BACKEND_URL=${{ secrets.PRODUCTION_BACKEND_URL }}" >> $GITHUB_ENV
+          else
+            echo "FRONTEND_URL=${{ secrets.STAGING_FRONTEND_URL }}" >> $GITHUB_ENV
+            echo "BACKEND_URL=${{ secrets.STAGING_BACKEND_URL }}" >> $GITHUB_ENV
+          fi
+
+      - name: Run Lighthouse CI
+        run: |
+          lighthouse --chrome-flags="--headless --no-sandbox" \
+            --output-path=./lighthouse-report.html \
+            --output=html \
+            --view \
+            ${{ env.FRONTEND_URL }}
+
+      - name: Create K6 performance test script
+        run: |
+          cat > performance-test.js << 'EOF'
+          import http from 'k6/http';
+          import { check, sleep } from 'k6';
+          import { Rate } from 'k6/metrics';
+
+          const errorRate = new Rate('errors');
+
+          export let options = {
+            stages: [
+              { duration: '2m', target: 10 }, // Ramp up
+              { duration: '5m', target: 10 }, // Stay at 10 users
+              { duration: '2m', target: 20 }, // Ramp up to 20 users
+              { duration: '5m', target: 20 }, // Stay at 20 users
+              { duration: '2m', target: 0 },  // Ramp down
+            ],
+            thresholds: {
+              http_req_duration: ['p(95)<2000'], // 95% of requests under 2s
+              http_req_failed: ['rate<0.05'],    // Error rate under 5%
+              errors: ['rate<0.05'],
+            },
+          };
+
+          const BASE_URL = '${{ env.BACKEND_URL }}';
+
+          export default function() {
+            // Test health endpoint
+            let healthRes = http.get(`${BASE_URL}/health`);
+            check(healthRes, {
+              'health check status is 200': (r) => r.status === 200,
+              'health check response time < 500ms': (r) => r.timings.duration < 500,
+            });
+
+            // Test effects endpoint
+            let effectsRes = http.get(`${BASE_URL}/api/effects`);
+            check(effectsRes, {
+              'effects endpoint status is 200': (r) => r.status === 200,
+              'effects response time < 2000ms': (r) => r.timings.duration < 2000,
+            });
+
+            errorRate.add(healthRes.status !== 200 || effectsRes.status !== 200);
+
+            sleep(1);
+          }
+
+          export function handleSummary(data) {
+            return {
+              'performance-results.json': JSON.stringify(data, null, 2),
+            };
+          }
+          EOF
+
+      - name: Run K6 performance test
+        run: |
+          k6 run performance-test.js
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            lighthouse-report.html
+            performance-results.json
+
+      - name: Parse performance results
+        run: |
+          # Extract key metrics from K6 results
+          if [ -f performance-results.json ]; then
+            echo "## Performance Test Results" > performance-summary.md
+            echo "" >> performance-summary.md
+            echo "**Environment:** ${{ github.event.inputs.environment || 'production' }}" >> performance-summary.md
+            echo "**Date:** $(date)" >> performance-summary.md
+            echo "" >> performance-summary.md
+            
+            # Extract metrics
+            AVG_RESPONSE_TIME=$(jq -r '.metrics.http_req_duration.avg' performance-results.json)
+            P95_RESPONSE_TIME=$(jq -r '.metrics.http_req_duration["p(95)"]' performance-results.json)
+            ERROR_RATE=$(jq -r '.metrics.http_req_failed.rate' performance-results.json)
+            
+            echo "### Key Metrics" >> performance-summary.md
+            echo "- Average Response Time: ${AVG_RESPONSE_TIME}ms" >> performance-summary.md
+            echo "- 95th Percentile Response Time: ${P95_RESPONSE_TIME}ms" >> performance-summary.md
+            echo "- Error Rate: $(echo "$ERROR_RATE * 100" | bc -l | cut -c1-5)%" >> performance-summary.md
+            echo "" >> performance-summary.md
+            
+            # Check thresholds
+            if (( $(echo "$P95_RESPONSE_TIME > 2000" | bc -l) )); then
+              echo "⚠️ **WARNING:** 95th percentile response time exceeds threshold (>2000ms)" >> performance-summary.md
+            fi
+            
+            if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
+              echo "❌ **ALERT:** Error rate exceeds threshold (>5%)" >> performance-summary.md
+            fi
+          fi
+
+      - name: Create performance alert
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            let summary = '';
+            try {
+              summary = fs.readFileSync('performance-summary.md', 'utf8');
+            } catch (e) {
+              summary = 'Performance test failed to complete.';
+            }
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚡ Performance Alert - ' + new Date().toISOString().split('T')[0],
+              body: `
+                ## Performance Alert
+                
+                Performance tests have detected issues that require attention.
+                
+                **Environment:** ${{ github.event.inputs.environment || 'production' }}
+                **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                **Date:** ${new Date().toISOString()}
+                
+                ${summary}
+                
+                ### Recommended Actions
+                
+                1. Review application performance metrics
+                2. Check for recent deployments that may have impacted performance
+                3. Monitor system resources (CPU, memory, database)
+                4. Consider scaling if needed
+                
+                ### Performance Reports
+                
+                Detailed performance reports are available in the workflow artifacts.
+              `,
+              labels: ['performance', 'monitoring']
+            });
+
+      - name: Notify performance issues
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'failure'
+          channel: '#performance'
+          text: |
+            ⚡ Performance issues detected in Cosnap AI
+            
+            Environment: ${{ github.event.inputs.environment || 'production' }}
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Please investigate performance metrics.
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.PERFORMANCE_SLACK_WEBHOOK_URL }}
+
+  lighthouse-audit:
+    name: Lighthouse Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v9
+        with:
+          urls: |
+            ${{ secrets.PRODUCTION_FRONTEND_URL }}
+            ${{ secrets.PRODUCTION_FRONTEND_URL }}/effects
+            ${{ secrets.PRODUCTION_FRONTEND_URL }}/community
+          configPath: './.lighthouserc.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+  uptime-check:
+    name: Uptime Monitoring
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check service availability
+        run: |
+          # Function to check endpoint
+          check_endpoint() {
+            local url=$1
+            local name=$2
+            local response_code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+            local response_time=$(curl -s -o /dev/null -w "%{time_total}" "$url")
+            
+            echo "Checking $name..."
+            echo "URL: $url"
+            echo "Status Code: $response_code"
+            echo "Response Time: ${response_time}s"
+            echo "---"
+            
+            if [ "$response_code" -ne 200 ]; then
+              echo "❌ $name is not responding correctly (HTTP $response_code)"
+              exit 1
+            fi
+            
+            if (( $(echo "$response_time > 5.0" | bc -l) )); then
+              echo "⚠️ $name is responding slowly (${response_time}s)"
+            fi
+          }
+
+          # Check all critical endpoints
+          check_endpoint "${{ secrets.PRODUCTION_FRONTEND_URL }}" "Frontend"
+          check_endpoint "${{ secrets.PRODUCTION_BACKEND_URL }}/health" "Backend Health"
+          check_endpoint "${{ secrets.PRODUCTION_BACKEND_URL }}/health/db" "Database Health"
+          check_endpoint "${{ secrets.PRODUCTION_BACKEND_URL }}/api/effects" "Effects API"
+
+      - name: Create uptime alert
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Service Downtime Alert - ' + new Date().toISOString(),
+              body: `
+                ## Service Downtime Alert
+                
+                **URGENT:** One or more critical services are not responding correctly.
+                
+                **Time:** ${new Date().toISOString()}
+                **Workflow:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                
+                ### Immediate Actions Required
+                
+                1. Check service status dashboards
+                2. Review application logs
+                3. Verify infrastructure health
+                4. Escalate to on-call engineer if needed
+                
+                ### Service Status
+                
+                Please check the workflow logs for detailed status of each service endpoint.
+              `,
+              labels: ['incident', 'urgent', 'downtime']
+            });
+
+      - name: Alert on-call team
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: 'failure'
+          channel: '#incidents'
+          text: |
+            🚨 **CRITICAL ALERT** 🚨
+            
+            Cosnap AI services are experiencing downtime!
+            
+            Time: $(date)
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            @channel - Immediate investigation required!
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.INCIDENT_SLACK_WEBHOOK_URL }}
