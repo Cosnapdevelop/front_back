@@ -67,9 +67,7 @@ router.post(
           email, 
           username, 
           passwordHash,
-          isActive: true, // 默认激活，可根据需要修改
-          createdAt: new Date(),
-          lastLoginAt: new Date()
+          // createdAt 由数据库默认值生成
         } 
       });
       
@@ -133,21 +131,7 @@ router.post(
       }
       
       // 检查账户状态
-      if (user.isBanned) {
-        console.warn(`[登录失败] 用户被封禁 - ID: ${user.id}, IP: ${req.ip}`);
-        return res.status(403).json({ 
-          success: false, 
-          error: '账户已被封禁' 
-        });
-      }
-      
-      if (!user.isActive) {
-        console.warn(`[登录失败] 账户未激活 - ID: ${user.id}, IP: ${req.ip}`);
-        return res.status(403).json({ 
-          success: false, 
-          error: '账户未激活，请检查邮箱激活链接' 
-        });
-      }
+      // 账户状态字段（isBanned/isActive）暂未在Schema中定义，移除相关校验
       
       // 验证密码
       const ok = await bcrypt.compare(password, user.passwordHash);
@@ -159,11 +143,7 @@ router.post(
         });
       }
 
-      // 更新最后登录时间
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() }
-      });
+      // lastLoginAt 字段暂未在Schema中定义，移除更新时间
 
       const accessToken = signAccessToken(user);
       const refreshToken = jwt.sign({ sub: user.id }, process.env.JWT_REFRESH_SECRET, {
