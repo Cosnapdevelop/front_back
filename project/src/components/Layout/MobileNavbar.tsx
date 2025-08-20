@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   ArrowLeft,
   Share2,
-  MoreHorizontal,
   Menu,
   X
 } from 'lucide-react';

@@ -1,4 +1,4 @@
-name: Cosnap AI CI/CD (Simplified)
+name: Code Quality Check
 
 on:
   push:
@@ -10,9 +10,9 @@ env:
   NODE_VERSION: '18'
 
 jobs:
-  # Simple build check that won't fail deployment
-  build-check:
-    name: Build Check
+  # Code quality check only (deployment handled by Vercel)
+  quality-check:
+    name: Code Quality Check
     runs-on: ubuntu-latest
     
     steps:
@@ -26,41 +26,30 @@ jobs:
           cache: 'npm'
           cache-dependency-path: project/package-lock.json
 
-      # Frontend build check (main requirement)
       - name: Install frontend dependencies
         working-directory: ./project
         run: npm ci
 
       - name: Run linter (non-blocking)
         working-directory: ./project
-        run: npm run lint || echo "⚠️ Linting issues found but not blocking deployment"
+        run: npm run lint || echo "⚠️ Linting issues found"
 
-      - name: Build frontend
+      - name: Build check
         working-directory: ./project
         run: npm run build
 
-      - name: Basic security audit (non-blocking)
+      - name: Security audit (non-blocking)
         working-directory: ./project
-        run: npm audit --audit-level=high || true
-
-      - name: Backend check (optional, non-blocking)
-        working-directory: ./runninghub-backend
-        run: |
-          if [ -f "package.json" ]; then
-            npm ci || true
-            echo "Backend dependencies installed successfully"
-          else
-            echo "No backend package.json found, skipping backend check"
-          fi
+        run: npm audit --audit-level=high || echo "⚠️ Security vulnerabilities found"
 
   # Success notification
-  notify-success:
-    name: Build Success
+  quality-passed:
+    name: Quality Check Passed
     runs-on: ubuntu-latest
-    needs: [build-check]
+    needs: [quality-check]
     if: success()
     
     steps:
-      - name: Success notification
+      - name: Quality passed notification
         run: |
-          echo "✅ All checks passed! Deployment can proceed."
+          echo "✅ Code quality checks passed! Vercel will handle deployment automatically."
