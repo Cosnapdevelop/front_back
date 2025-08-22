@@ -236,7 +236,21 @@ router.post(
       }
       
       // 检查账户状态
-      // 账户状态字段（isBanned/isActive）暂未在Schema中定义，移除相关校验
+      if (user.isBanned) {
+        console.warn(`[登录失败] 账户被封禁 - 用户: ${user.username} (${user.id}), IP: ${req.ip}`);
+        return res.status(403).json({ 
+          success: false, 
+          error: '账户已被封禁' 
+        });
+      }
+      
+      if (!user.isActive) {
+        console.warn(`[登录失败] 账户未激活 - 用户: ${user.username} (${user.id}), IP: ${req.ip}`);
+        return res.status(403).json({ 
+          success: false, 
+          error: '账户未激活' 
+        });
+      }
       
       // 验证密码
       const ok = await bcrypt.compare(password, user.passwordHash);
@@ -248,7 +262,11 @@ router.post(
         });
       }
 
-      // lastLoginAt 字段暂未在Schema中定义，移除更新时间
+      // Update last login time
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() }
+      });
 
       const accessToken = signAccessToken(user);
       const refreshToken = jwt.sign({ sub: user.id }, process.env.JWT_REFRESH_SECRET, {
@@ -607,6 +625,273 @@ router.put(
       return res.status(500).json({ 
         success: false, 
         error: '用户信息更新失败' 
+      });
+    }
+  }
+);
+
+// Account deletion endpoint
+router.delete(
+  '/me/account',
+  sensitiveOperationLimiter,
+  sanitizeInput,
+  auth,
+  body('password')
+    .notEmpty()
+    .withMessage('密码不能为空')
+    .isLength({ min: 6 })
+    .withMessage('密码至少6位'),
+  body('confirmationText')
+    .equals('DELETE MY ACCOUNT')
+    .withMessage('确认文本必须为 "DELETE MY ACCOUNT"'),
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('邮箱格式不正确'),
+  body('code')
+    .optional()
+    .isLength({ min: 6, max: 6 })
+    .withMessage('验证码必须为6位'),
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ 
+          success: false, 
+          error: '输入验证失败',
+          details: errors.array()
+        });
+      }
+
+      const { password, confirmationText, email, code } = req.body;
+      
+      // Get current user
+      const user = await prisma.user.findUnique({ 
+        where: { id: req.user.id } 
+      });
+      
+      if (!user) {
+        return res.status(404).json({ 
+          success: false, 
+          error: '用户不存在' 
+        });
+      }
+
+      // Verify password
+      const passwordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!passwordValid) {
+        console.warn(`[账户删除] 密码错误 - 用户: ${user.username} (${user.id}), IP: ${req.ip}`);
+        return res.status(401).json({ 
+          success: false, 
+          error: '密码错误' 
+        });
+      }
+
+      // If email and code provided, verify the code
+      if (email || code) {
+        if (!email || !code) {
+          return res.status(400).json({
+            success: false,
+            error: '邮箱和验证码都必须提供'
+          });
+        }
+
+        // Verify email matches user's email
+        if (email !== user.email) {
+          return res.status(400).json({
+            success: false,
+            error: '邮箱与账户邮箱不匹配'
+          });
+        }
+
+        // Verify email verification code
+        const now = new Date();
+        const found = await prisma.verificationCode.findFirst({
+          where: {
+            email,
+            scene: 'delete_account',
+            code,
+            expiresAt: { gt: now },
+            usedAt: null
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        if (!found) {
+          return res.status(400).json({ 
+            success: false, 
+            error: '验证码无效或已过期' 
+          });
+        }
+
+        // Mark verification code as used
+        await prisma.verificationCode.update({
+          where: { id: found.id },
+          data: { usedAt: new Date() }
+        });
+      }
+
+      // Start comprehensive transaction for account deletion
+      await prisma.$transaction(async (tx) => {
+        // 1. Delete user's authentication data
+        await tx.refreshToken.deleteMany({
+          where: { userId: user.id }
+        });
+
+        await tx.verificationCode.deleteMany({
+          where: { email: user.email }
+        });
+
+        // 2. Delete user's social interactions
+        await tx.postLike.deleteMany({
+          where: { userId: user.id }
+        });
+
+        await tx.commentLike.deleteMany({
+          where: { userId: user.id }
+        });
+
+        // 3. Delete notifications where user is receiver or actor
+        await tx.notification.deleteMany({
+          where: { 
+            OR: [
+              { userId: user.id },
+              { actorId: user.id }
+            ]
+          }
+        });
+
+        // 4. Handle user's comments (anonymize to preserve thread integrity)
+        await tx.comment.updateMany({
+          where: { userId: user.id },
+          data: { 
+            content: '[已删除的评论]',
+            // Keep userId for referential integrity, will be anonymized with user
+          }
+        });
+
+        // 5. Handle user's posts (anonymize to preserve community content)
+        await tx.post.updateMany({
+          where: { userId: user.id },
+          data: { 
+            caption: '[已删除的帖子]',
+            images: [], // Remove images for privacy
+            // Keep userId for referential integrity, will be anonymized with user
+          }
+        });
+
+        // 6. Cancel active subscriptions and mark as user-cancelled
+        await tx.subscription.updateMany({
+          where: { 
+            userId: user.id,
+            status: 'ACTIVE'
+          },
+          data: { 
+            status: 'CANCELLED',
+            autoRenew: false,
+            updatedAt: new Date()
+          }
+        });
+
+        // 7. Anonymize payment records (keep for legal compliance but remove PII)
+        await tx.payment.updateMany({
+          where: { userId: user.id },
+          data: {
+            // Remove personally identifiable payment info
+            openId: null,
+            buyerId: null,
+            // Keep transaction records for financial compliance
+          }
+        });
+
+        // 8. Preserve usage history for analytics but anonymize user reference
+        // (UsageHistory will reference anonymized user - no direct cleanup needed)
+
+        // 9. Anonymize user record (preserve for referential integrity)
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            email: `deleted_${user.id}_${Date.now()}@deleted.local`,
+            username: `deleted_user_${user.id}_${Date.now()}`,
+            passwordHash: 'DELETED_ACCOUNT',
+            bio: null,
+            avatar: null,
+            // Remove all personal/billing information for GDPR compliance
+            realName: null,
+            phoneNumber: null,
+            idCardNumber: null,
+            billingAddress: null,
+            // Reset subscription data
+            subscriptionTier: 'FREE',
+            subscriptionId: null,
+            subscriptionStatus: 'INACTIVE',
+            subscriptionStart: null,
+            subscriptionEnd: null,
+            monthlyUsage: 0,
+            preferredPayment: null,
+            // Mark as inactive and deleted
+            isActive: false,
+            isBanned: false
+          }
+        });
+      }, {
+        // Set transaction timeout to 30 seconds for large datasets
+        timeout: 30000
+      });
+
+      console.log(`[账户删除] 成功删除账户 - 原用户: ${user.username} (${user.id}), IP: ${req.ip}`);
+      
+      return res.json({ 
+        success: true,
+        message: '账户已成功删除'
+      });
+    } catch (error) {
+      console.error(`[账户删除] 失败 - 用户: ${req.user?.id}, IP: ${req.ip}, 错误:`, error);
+      
+      // Handle specific database constraint errors
+      if (error.code === 'P2003') {
+        console.error(`[账户删除] 外键约束错误 - 用户: ${req.user?.id}`, error.meta);
+        return res.status(500).json({ 
+          success: false, 
+          error: '数据库关联约束错误，请联系技术支持' 
+        });
+      }
+      
+      // Handle transaction timeout
+      if (error.message?.includes('timeout') || error.code === 'P2024') {
+        console.error(`[账户删除] 事务超时 - 用户: ${req.user?.id}`);
+        return res.status(500).json({ 
+          success: false, 
+          error: '账户删除操作超时，请稍后重试' 
+        });
+      }
+      
+      // Handle unique constraint violations (shouldn't happen but safety check)
+      if (error.code === 'P2002') {
+        console.error(`[账户删除] 唯一约束冲突 - 用户: ${req.user?.id}`, error.meta);
+        // Retry with different timestamp
+        try {
+          const timestamp = Date.now() + Math.floor(Math.random() * 1000);
+          await prisma.user.update({
+            where: { id: req.user.id },
+            data: {
+              email: `deleted_${req.user.id}_${timestamp}@deleted.local`,
+              username: `deleted_user_${req.user.id}_${timestamp}`,
+            }
+          });
+          console.log(`[账户删除] 重试成功 - 用户: ${req.user.id}`);
+          return res.json({ 
+            success: true,
+            message: '账户已成功删除'
+          });
+        } catch (retryError) {
+          console.error(`[账户删除] 重试失败 - 用户: ${req.user?.id}`, retryError);
+        }
+      }
+      
+      return res.status(500).json({ 
+        success: false, 
+        error: '账户删除失败，请稍后重试' 
       });
     }
   }

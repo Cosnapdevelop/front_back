@@ -7,10 +7,14 @@ class DatabaseManager {
   constructor() {
     this.prisma = null;
     this.connectionPool = {
-      min: parseInt(process.env.DB_POOL_MIN) || 5,
-      max: parseInt(process.env.DB_CONNECTION_LIMIT) || 20,
-      acquireTimeoutMillis: parseInt(process.env.DB_POOL_TIMEOUT) || 30000,
-      idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 10000
+      min: parseInt(process.env.DB_POOL_MIN) || 2,
+      max: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
+      acquireTimeoutMillis: parseInt(process.env.DB_POOL_TIMEOUT) || 60000,
+      idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 600000,
+      createTimeoutMillis: 30000,
+      destroyTimeoutMillis: 5000,
+      reapIntervalMillis: 1000,
+      createRetryIntervalMillis: 200
     };
     this.init();
   }

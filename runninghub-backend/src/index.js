@@ -5,6 +5,10 @@ import authRouter from './routes/auth.js';
 import communityRouter from './routes/community.js';
 import paymentsRouter from './routes/payments.js';
 import healthRouter from './routes/health.js';
+import analyticsRouter from './routes/analytics.js';
+import betaRouter from './routes/beta.js';
+import mobileRouter from './routes/mobile.js';
+import monitoringRouter from './routes/monitoring.js';
 import { warmupConnection } from './services/comfyUITaskService.js';
 import { PrismaClient } from '@prisma/client';
 import monitoringService from './services/monitoringService.js';
@@ -23,6 +27,7 @@ import {
   validateProductionSecurity
 } from './middleware/security.js';
 import { generalLimiter } from './middleware/rateLimiting.js';
+import { performanceMonitoring, responseOptimization } from './middleware/performanceOptimization.js';
 
 // 验证环境变量（必须在应用启动前完成）
 validateEnvironment();
@@ -83,6 +88,10 @@ app.use(generalLimiter); // 全局限流
 app.use(monitoringService.createHttpMiddleware());
 app.use(monitoringService.createErrorMiddleware());
 
+// Performance optimization middleware
+app.use(performanceMonitoring);
+app.use(responseOptimization);
+
 // 基础中间件
 app.use(cors(corsOptions));
 app.use(express.json({ 
@@ -117,6 +126,10 @@ app.use('/auth', authRouter);
 app.use('/api/effects', effectsRoutes);
 app.use('/api/community', communityRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/analytics', analyticsRouter);
+app.use('/api/beta', betaRouter);
+app.use('/api/mobile', mobileRouter);
+app.use('/api/monitoring', monitoringRouter);
 // 静态占位资源
 app.use('/assets', express.static('public'));
 

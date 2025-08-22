@@ -4,11 +4,21 @@ import { Sparkles, TrendingUp, Clock, ChevronRight } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import EffectCard from '../components/Cards/EffectCard';
 import { Link, useNavigate } from 'react-router-dom';
+import { HomePageLayout } from '../components/SEO/SEOLayout';
+import { FAQSection, homepageFAQs } from '../components/SEO/FAQSection';
+import { SEOOptimizedImage } from '../components/SEO/SEOOptimizedImage';
+import { useSEO } from '../hooks/useSEO';
 
 const Home = () => {
   const { state } = useApp();
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
+  
+  // SEO optimization for homepage
+  useSEO({
+    enableStructuredData: true,
+    enableBreadcrumbs: false // Don't show breadcrumbs on homepage
+  });
   
   const featuredEffects = state.effects.slice(0, 4);
   const trendingEffects = state.effects.filter(effect => effect.isTrending);
@@ -137,10 +147,13 @@ const Home = () => {
               }`}
             >
               <div className="relative w-full h-full">
-                <img
+                <SEOOptimizedImage
                   src={effect.afterImage}
-                  alt={effect.name}
+                  alt={`${effect.name} AI effect preview - Transform your photos with ${effect.category} effects`}
+                  title={`${effect.name} - AI ${effect.category} Effect`}
                   className="w-full h-full object-cover"
+                  priority={index === 0} // Prioritize first image for LCP
+                  loading={index === 0 ? 'eager' : 'lazy'}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                 <div className="absolute bottom-0 left-0 p-6 sm:p-8 lg:p-12 text-white max-w-2xl">
@@ -283,6 +296,15 @@ const Home = () => {
           </div>
         </section>
 
+        {/* FAQ Section for SEO */}
+        <section className="mb-12">
+          <FAQSection 
+            faqs={homepageFAQs}
+            title="Frequently Asked Questions"
+            className="bg-white dark:bg-gray-800 rounded-xl p-6"
+          />
+        </section>
+
         {/* CTA Section */}
         <motion.section
           initial={{ opacity: 0, y: 40 }}
@@ -292,9 +314,9 @@ const Home = () => {
         >
           <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.1%22%3E%3Ccircle cx=%2230%22 cy=%2230%22 r=%224%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30" />
           <div className="relative">
-            <h3 className="text-2xl sm:text-3xl font-bold mb-4">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4">
               Ready to Create Something Amazing?
-            </h3>
+            </h2>
             <p className="text-lg opacity-90 mb-6 max-w-2xl mx-auto">
               Join our community of creators and start transforming your images with
               cutting-edge AI effects today.
@@ -302,6 +324,7 @@ const Home = () => {
             <Link
               to="/effects"
               className="inline-flex items-center space-x-2 bg-white text-purple-600 hover:bg-gray-100 px-8 py-4 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105"
+              title="Explore all AI photo effects and filters"
             >
               <Sparkles className="h-5 w-5" />
               <span>Explore Effects</span>

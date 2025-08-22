@@ -1,5 +1,6 @@
 import React from 'react';
 import { Upload, X } from 'lucide-react';
+import MobileFileUploader from '../Mobile/MobileFileUploader';
 
 interface ParameterInputProps {
   param: {
@@ -52,46 +53,21 @@ export const ParameterInput: React.FC<ParameterInputProps> = ({
     case 'image':
       return (
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {param.label || param.name}
-          </label>
-          <div className="flex items-center space-x-4">
-            {imageParamFiles[param.name]?.url ? (
-              <div className="relative">
-                <img 
-                  src={imageParamFiles[param.name].url} 
-                  alt={param.name}
-                  className="w-20 h-20 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-700"
-                />
-                <button
-                  type="button"
-                  onClick={handleImageRemove}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id={`param-${param.name}`}
-                />
-                <label
-                  htmlFor={`param-${param.name}`}
-                  className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center"
-                >
-                  <Upload size={16} className="mr-2" />
-                  Upload Image
-                </label>
-              </div>
-            )}
-          </div>
+          <MobileFileUploader
+            label={param.label || param.name}
+            onUpload={(file: File) => onImageUpload?.(param.name, file)}
+            onError={(error: string) => console.error('Upload error:', error)}
+            currentFile={imageParamFiles[param.name] ? {
+              url: imageParamFiles[param.name].url,
+              name: imageParamFiles[param.name].name,
+              size: imageParamFiles[param.name].size
+            } : undefined}
+            maxSize={30}
+            showCameraOption={true}
+            showGalleryOption={true}
+          />
           {param.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">{param.description}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{param.description}</p>
           )}
         </div>
       );

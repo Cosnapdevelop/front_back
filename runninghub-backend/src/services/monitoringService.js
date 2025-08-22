@@ -3,9 +3,9 @@
  * Prometheus metrics, structured logging, and performance monitoring for Cosnap AI
  */
 
-import promClient from 'prom-client';
-import winston from 'winston';
-import { productionConfig } from '../config/production.js';
+const promClient = require('prom-client');
+const winston = require('winston');
+const { productionConfig } = require('../config/production');
 
 class MonitoringService {
   constructor() {
@@ -651,4 +651,4 @@ class MonitoringService {
 // Create singleton instance
 const monitoringService = new MonitoringService();
 
-export default monitoringService;
+module.exports = monitoringService;

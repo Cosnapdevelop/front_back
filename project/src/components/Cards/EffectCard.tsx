@@ -4,6 +4,7 @@ import { Heart, Bookmark, Clock, BarChart3, Eye } from 'lucide-react';
 import { Effect } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { trackFeatureUsage, trackEngagement } from '../../utils/analytics';
 
 interface EffectCardProps {
   effect: Effect;
@@ -18,16 +19,24 @@ const EffectCard: React.FC<EffectCardProps> = ({ effect, onClick }) => {
     e.preventDefault();
     e.stopPropagation();
     dispatch({ type: 'LIKE_EFFECT', payload: effect.id });
+    trackEngagement('effect_like');
+    trackFeatureUsage('effect_interaction', 'clicked');
   };
 
   const handleBookmark = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dispatch({ type: 'BOOKMARK_EFFECT', payload: effect.id });
+    trackEngagement('effect_bookmark');
+    trackFeatureUsage('effect_interaction', 'clicked');
   };
 
   const handleView = () => {
     dispatch({ type: 'VIEW_EFFECT', payload: effect });
+    // Track effect view
+    trackFeatureUsage('effect_card', 'clicked');
+    trackEngagement('effect_view');
+    
     // Scroll to top when navigating to effect detail
     setTimeout(() => {
       window.scrollTo({

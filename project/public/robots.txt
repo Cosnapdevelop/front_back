@@ -1,0 +1,88 @@
+# Robots.txt for Cosnap AI
+# https://cosnap.ai/robots.txt
+
+User-agent: *
+Allow: /
+
+# Disallow private and administrative areas
+Disallow: /admin/
+Disallow: /api/
+Disallow: /private/
+Disallow: /_next/
+Disallow: /static/
+
+# Allow important public API endpoints for crawling
+Allow: /api/effects/public/
+Allow: /api/gallery/public/
+Allow: /api/community/public/
+
+# Disallow user-specific private content
+Disallow: /profile/private/
+Disallow: /user/*/private/
+
+# Allow search engines to access effect pages and public content
+Allow: /effects/
+Allow: /effect/
+Allow: /community/
+Allow: /user/*/public/
+Allow: /post/
+
+# Sitemap locations
+Sitemap: https://cosnap.ai/sitemap.xml
+Sitemap: https://cosnap.ai/sitemap-effects.xml
+Sitemap: https://cosnap.ai/sitemap-users.xml
+Sitemap: https://cosnap.ai/sitemap-posts.xml
+
+# Crawl delay for respectful crawling (1 second)
+Crawl-delay: 1
+
+# Specific rules for different search engines
+
+# Google
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+# Bing
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Baidu (important for Chinese market)
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 2
+
+# Yandex
+User-agent: YandexBot
+Allow: /
+Crawl-delay: 1
+
+# Social media crawlers
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+# Block aggressive crawlers and scrapers
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+# Host directive (helps with canonicalization)
+Host: https://cosnap.ai

@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { APP_STRINGS } from '../../constants/strings';
+import { trackFeatureUsage, trackConversion, trackPerformance } from '../../utils/analytics';
+import { useUserProgress } from '../../hooks/useUserProgress';
+import { useAuth } from '../../context/AuthContext';
 
 interface OnboardingStep {
   id: string;
@@ -39,8 +42,21 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   onSkip,
   isVisible
 }) => {
+  const { user } = useAuth();
+  const { progress, trackActivity, getProgressSummary } = useUserProgress(user?.id);
   const [currentStep, setCurrentStep] = useState(0);
   const [isClosing, setIsClosing] = useState(false);
+  const [startTime, setStartTime] = useState<number>(0);
+  
+  const progressSummary = getProgressSummary();
+  
+  useEffect(() => {
+    if (isVisible) {
+      setStartTime(performance.now());
+      trackFeatureUsage('onboarding', 'viewed');
+      trackActivity('page_visit');
+    }
+  }, [isVisible, trackActivity]);
 
   const steps: OnboardingStep[] = [
     {
@@ -197,6 +213,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
+      trackFeatureUsage('onboarding', 'clicked');
     } else {
       handleComplete();
     }
@@ -205,10 +222,16 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   const handlePrevious = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      trackFeatureUsage('onboarding', 'clicked');
     }
   };
 
   const handleComplete = () => {
+    const completionTime = performance.now() - startTime;
+    trackFeatureUsage('onboarding', 'completed');
+    trackConversion('trial_started');
+    trackPerformance('api_response_time', completionTime);
+    
     setIsClosing(true);
     setTimeout(() => {
       onComplete();
@@ -216,6 +239,10 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
   };
 
   const handleSkip = () => {
+    const skipTime = performance.now() - startTime;
+    trackFeatureUsage('onboarding', 'clicked'); // Track skip as clicked
+    trackPerformance('api_response_time', skipTime);
+    
     setIsClosing(true);
     setTimeout(() => {
       onSkip();
@@ -263,6 +290,22 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({
               
               <h2 className="text-xl font-bold mb-2">{currentStepData.title}</h2>
               <p className="text-white/90 text-sm">{currentStepData.description}</p>
+              
+              {/* Progress indicator */}
+              {user && (
+                <div className="mt-4 flex items-center justify-center space-x-2 text-white/80 text-xs">
+                  <div className="flex items-center space-x-1">
+                    <span>Level {progress.level}</span>
+                    <div className="w-16 h-1 bg-white/20 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white/60 transition-all duration-300"
+                        style={{ width: `${progressSummary.onboardingPercentage}%` }}
+                      />
+                    </div>
+                    <span>{progress.totalPoints} pts</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

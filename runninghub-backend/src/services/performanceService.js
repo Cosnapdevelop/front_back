@@ -683,6 +683,401 @@ class PerformanceService {
   }
 
   // =============================================================================
+  // ANALYTICS AND METRICS COLLECTION
+  // =============================================================================
+
+  /**
+   * Record performance metric from frontend
+   */
+  async recordPerformanceMetric(metricData) {
+    try {
+      // Store in time-series collection for analysis
+      if (!this.performanceMetrics.has('frontend_metrics')) {
+        this.performanceMetrics.set('frontend_metrics', {
+          samples: [],
+          maxSamples: 10000
+        });
+      }
+
+      const metrics = this.performanceMetrics.get('frontend_metrics');
+      metrics.samples.push({
+        ...metricData,
+        recorded_at: new Date()
+      });
+
+      // Keep only recent samples to prevent memory issues
+      if (metrics.samples.length > metrics.maxSamples) {
+        metrics.samples.shift();
+      }
+
+      // Cache frequently accessed metrics
+      await this.cache(
+        `performance_metric:${metricData.type}:${metricData.user_id}`,
+        () => metricData,
+        { strategy: 'api_response', ttl: 3600 }
+      );
+
+      monitoringService.debug('Performance metric recorded', {
+        type: metricData.type,
+        value: metricData.value,
+        user_id: metricData.user_id
+      });
+
+    } catch (error) {
+      monitoringService.error('Failed to record performance metric', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record performance alert from frontend
+   */
+  async recordPerformanceAlert(alertData) {
+    try {
+      if (!this.performanceMetrics.has('performance_alerts')) {
+        this.performanceMetrics.set('performance_alerts', {
+          alerts: [],
+          maxAlerts: 1000
+        });
+      }
+
+      const alerts = this.performanceMetrics.get('performance_alerts');
+      alerts.alerts.push({
+        ...alertData,
+        id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        recorded_at: new Date()
+      });
+
+      // Keep only recent alerts
+      if (alerts.alerts.length > alerts.maxAlerts) {
+        alerts.alerts.shift();
+      }
+
+      // Trigger immediate notifications for critical alerts
+      if (alertData.severity === 'critical') {
+        await this.handleCriticalAlert(alertData);
+      }
+
+      monitoringService.info('Performance alert recorded', alertData);
+
+    } catch (error) {
+      monitoringService.error('Failed to record performance alert', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record conversion funnel step
+   */
+  async recordFunnelStep(funnelData) {
+    try {
+      if (!this.performanceMetrics.has('conversion_funnel')) {
+        this.performanceMetrics.set('conversion_funnel', {
+          steps: [],
+          maxSteps: 50000
+        });
+      }
+
+      const funnel = this.performanceMetrics.get('conversion_funnel');
+      funnel.steps.push({
+        ...funnelData,
+        id: `step_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        recorded_at: new Date()
+      });
+
+      // Keep only recent steps
+      if (funnel.steps.length > funnel.maxSteps) {
+        funnel.steps.shift();
+      }
+
+      // Cache user funnel progress
+      await this.cache(
+        `funnel_progress:${funnelData.user_id}:${funnelData.session_id}`,
+        () => this.calculateFunnelProgress(funnelData.user_id, funnelData.session_id),
+        { strategy: 'api_response', ttl: 1800 }
+      );
+
+    } catch (error) {
+      monitoringService.error('Failed to record funnel step', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Record user engagement event
+   */
+  async recordUserEvent(eventData) {
+    try {
+      if (!this.performanceMetrics.has('user_events')) {
+        this.performanceMetrics.set('user_events', {
+          events: [],
+          maxEvents: 100000
+        });
+      }
+
+      const events = this.performanceMetrics.get('user_events');
+      events.events.push({
+        ...eventData,
+        id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        recorded_at: new Date()
+      });
+
+      // Keep only recent events
+      if (events.events.length > events.maxEvents) {
+        events.events.shift();
+      }
+
+      // Update user engagement score
+      await this.updateUserEngagementScore(eventData.user_id, eventData.event_type);
+
+    } catch (error) {
+      monitoringService.error('Failed to record user event', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user funnel progress
+   */
+  async getUserFunnelProgress(userId, sessionId) {
+    try {
+      return await this.cache(
+        `funnel_progress:${userId}:${sessionId}`,
+        () => this.calculateFunnelProgress(userId, sessionId),
+        { strategy: 'api_response', ttl: 300 }
+      );
+    } catch (error) {
+      monitoringService.error('Failed to get funnel progress', error);
+      return { completion_rate: 0, current_step: 'unknown' };
+    }
+  }
+
+  /**
+   * Calculate funnel progress for user session
+   */
+  calculateFunnelProgress(userId, sessionId) {
+    const funnelSteps = [
+      'effect_discovered', 'effect_viewed', 'effect_started', 'image_uploaded',
+      'parameters_set', 'processing_started', 'processing_completed',
+      'result_downloaded', 'result_shared'
+    ];
+
+    const funnel = this.performanceMetrics.get('conversion_funnel');
+    if (!funnel) return { completion_rate: 0, current_step: 'unknown' };
+
+    const userSteps = funnel.steps.filter(step => 
+      step.user_id === userId && step.session_id === sessionId
+    );
+
+    const completedSteps = new Set(userSteps.map(step => step.step));
+    const completionRate = (completedSteps.size / funnelSteps.length) * 100;
+    
+    // Find current step
+    let currentStep = 'not_started';
+    for (let i = funnelSteps.length - 1; i >= 0; i--) {
+      if (completedSteps.has(funnelSteps[i])) {
+        currentStep = funnelSteps[i];
+        break;
+      }
+    }
+
+    return {
+      completion_rate: Math.round(completionRate),
+      current_step: currentStep,
+      completed_steps: Array.from(completedSteps),
+      total_steps: funnelSteps.length
+    };
+  }
+
+  /**
+   * Update user engagement score
+   */
+  async updateUserEngagementScore(userId, eventType) {
+    try {
+      const scoreWeights = {
+        'image_upload': 10,
+        'result_download': 15,
+        'result_share': 20,
+        'profile_update': 5,
+        'feature_discovery': 3,
+        'tutorial_completion': 8,
+        'error_occurrence': -2
+      };
+
+      const weight = scoreWeights[eventType] || 1;
+      
+      // Cache user engagement score
+      const currentScore = await this.cache(
+        `engagement_score:${userId}`,
+        () => 0,
+        { strategy: 'user_session', ttl: 86400 }
+      );
+
+      const newScore = Math.max(0, currentScore + weight);
+      
+      await redisService.set(`engagement_score:${userId}`, newScore, 86400);
+      
+      return newScore;
+    } catch (error) {
+      monitoringService.error('Failed to update engagement score', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get dashboard metrics for admin panel
+   */
+  async getDashboardMetrics(timeframe = '24h', metricType = null) {
+    try {
+      const now = new Date();
+      let startTime;
+
+      switch (timeframe) {
+        case '1h':
+          startTime = new Date(now.getTime() - 60 * 60 * 1000);
+          break;
+        case '24h':
+          startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      }
+
+      const metrics = {
+        performance: await this.getPerformanceMetrics(startTime, metricType),
+        funnel: await this.getFunnelMetrics(startTime),
+        user_engagement: await this.getUserEngagementMetrics(startTime),
+        alerts: await this.getAlertMetrics(startTime),
+        system: this.getSystemMetrics()
+      };
+
+      return metrics;
+    } catch (error) {
+      monitoringService.error('Failed to get dashboard metrics', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get performance metrics for dashboard
+   */
+  async getPerformanceMetrics(startTime, metricType = null) {
+    const frontendMetrics = this.performanceMetrics.get('frontend_metrics');
+    if (!frontendMetrics) return {};
+
+    const filteredMetrics = frontendMetrics.samples.filter(metric => 
+      new Date(metric.timestamp) >= startTime &&
+      (!metricType || metric.type === metricType)
+    );
+
+    const grouped = filteredMetrics.reduce((acc, metric) => {
+      if (!acc[metric.type]) {
+        acc[metric.type] = [];
+      }
+      acc[metric.type].push(metric.value);
+      return acc;
+    }, {});
+
+    const summary = {};
+    Object.keys(grouped).forEach(type => {
+      const values = grouped[type];
+      summary[type] = {
+        count: values.length,
+        average: values.reduce((sum, val) => sum + val, 0) / values.length,
+        min: Math.min(...values),
+        max: Math.max(...values),
+        p95: this.calculatePercentile(values, 95),
+        p99: this.calculatePercentile(values, 99)
+      };
+    });
+
+    return summary;
+  }
+
+  /**
+   * Get cache statistics
+   */
+  async getCacheStats() {
+    try {
+      const cacheMetrics = this.performanceMetrics.get('cache_hit_rates');
+      const hitRate = cacheMetrics.totalRequests > 0 
+        ? (cacheMetrics.hits / cacheMetrics.totalRequests * 100).toFixed(2)
+        : 0;
+
+      return {
+        hit_rate: `${hitRate}%`,
+        total_requests: cacheMetrics.totalRequests,
+        hits: cacheMetrics.hits,
+        misses: cacheMetrics.misses,
+        memory_cache_size: this.memoryCache.size,
+        redis_connected: await redisService.isConnected()
+      };
+    } catch (error) {
+      monitoringService.error('Failed to get cache stats', error);
+      return { error: 'Unable to retrieve cache statistics' };
+    }
+  }
+
+  /**
+   * Get database statistics
+   */
+  async getDatabaseStats() {
+    try {
+      // This would typically query your database for connection pool stats
+      // For now, return basic info
+      return {
+        status: 'connected',
+        queries_per_second: 'N/A', // Would need to implement query tracking
+        avg_query_time: 'N/A',
+        active_connections: 'N/A'
+      };
+    } catch (error) {
+      monitoringService.error('Failed to get database stats', error);
+      return { error: 'Unable to retrieve database statistics' };
+    }
+  }
+
+  /**
+   * Handle critical performance alerts
+   */
+  async handleCriticalAlert(alertData) {
+    try {
+      // Log critical alert
+      monitoringService.error('CRITICAL_PERFORMANCE_ALERT', null, alertData);
+
+      // Could integrate with external alerting systems here
+      // e.g., Slack, PagerDuty, email notifications
+
+      console.log('🚨 CRITICAL PERFORMANCE ALERT:', {
+        metric: alertData.metric,
+        threshold: alertData.threshold,
+        actual_value: alertData.actual_value,
+        user_id: alertData.user_id
+      });
+
+    } catch (error) {
+      monitoringService.error('Failed to handle critical alert', error);
+    }
+  }
+
+  /**
+   * Calculate percentile from array of values
+   */
+  calculatePercentile(values, percentile) {
+    if (values.length === 0) return 0;
+    
+    const sorted = [...values].sort((a, b) => a - b);
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1;
+    return sorted[Math.max(0, index)];
+  }
+
+  // =============================================================================
   // STARTUP AND MONITORING
   // =============================================================================
 

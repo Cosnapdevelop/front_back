@@ -1,14 +1,63 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, Grid, List, SlidersHorizontal } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import EffectCard from '../components/Cards/EffectCard';
+import { trackPageView, trackFeatureUsage, trackEngagement } from '../utils/analytics';
+import { useRenderPerformance } from '../hooks/usePerformanceMonitoring';
+import { useSEO } from '../hooks/useSEO';
+import { BreadcrumbNavigation } from '../components/SEO/BreadcrumbNavigation';
+import { FAQSection, effectsFAQs } from '../components/SEO/FAQSection';
+import { categoryPageSEO } from '../utils/seo/metaUtils';
 
 const Effects = () => {
   const { state, dispatch } = useApp();
+  const { measureRender } = useRenderPerformance('EffectsPage');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState('popular');
   const [showFilters, setShowFilters] = useState(false);
+
+  // SEO optimization based on current category
+  const seoData = useMemo(() => {
+    if (state.selectedCategory !== 'All' && categoryPageSEO[state.selectedCategory]) {
+      return categoryPageSEO[state.selectedCategory];
+    }
+    return {
+      title: "AI Photo Effects Gallery - Professional Image Enhancement | Cosnap AI",
+      description: "Explore 50+ AI-powered photo effects. Portrait enhancement, artistic filters, background removal, and professional image editing tools. Free online photo editor.",
+      keywords: [
+        "AI photo effects", "image filters", "photo enhancement", "artistic effects",
+        "智能特效", "图片滤镜", "照片处理", "艺术效果"
+      ]
+    };
+  }, [state.selectedCategory]);
+
+  useSEO({
+    customSEO: seoData,
+    enableStructuredData: true,
+    enableBreadcrumbs: true
+  });
+
+  // Track page view and interactions
+  useEffect(() => {
+    trackPageView('/effects', 'AI Effects Gallery');
+    trackFeatureUsage('effects_gallery', 'viewed');
+  }, []);
+
+  // Track search interactions
+  useEffect(() => {
+    if (state.searchQuery) {
+      trackEngagement('search_effects');
+      trackFeatureUsage('effects_search', 'viewed');
+    }
+  }, [state.searchQuery]);
+
+  // Track category filter changes
+  useEffect(() => {
+    if (state.selectedCategory !== 'All') {
+      trackFeatureUsage('effects_filter', 'clicked');
+    }
+  }, [state.selectedCategory]);
 
   const categories = ['All', 'Portrait', 'Artistic', 'Photography', 'Fantasy', 'Vintage', 'Modern', 'Video', 'Ecommerce', 'Upscale', 'FaceSwap', 'Edit'];
   const difficulties = ['All', 'Easy', 'Medium', 'Hard'];
@@ -71,13 +120,22 @@ const Effects = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Breadcrumb Navigation */}
+        <BreadcrumbNavigation className="mb-6" />
+        
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            AI Effects Gallery
+            {state.selectedCategory !== 'All' 
+              ? `AI ${state.selectedCategory} Effects` 
+              : 'AI Effects Gallery'
+            }
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Discover and apply amazing AI effects to transform your images
+            {state.selectedCategory !== 'All'
+              ? `Professional ${state.selectedCategory.toLowerCase()} enhancement tools powered by AI`
+              : 'Discover and apply amazing AI effects to transform your images'
+            }
           </p>
         </div>
 
@@ -90,7 +148,12 @@ const Effects = () => {
               type="text"
               placeholder="Search effects..."
               value={state.searchQuery}
-              onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
+              onChange={(e) => {
+                measureRender(() => {
+                  dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value });
+                });
+              }}
+              onFocus={() => trackFeatureUsage('effects_search', 'clicked')}
               className="w-full pl-12 pr-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 dark:text-white"
             />
           </div>
@@ -301,6 +364,15 @@ const Effects = () => {
             </button>
           </div>
         )}
+
+        {/* FAQ Section for SEO */}
+        <section className="mt-16">
+          <FAQSection 
+            faqs={effectsFAQs}
+            title="Effects FAQ"
+            className="bg-white dark:bg-gray-800 rounded-xl p-6"
+          />
+        </section>
       </div>
     </div>
   );

@@ -15,6 +15,9 @@ model User {
   passwordHash  String
   avatar        String?
   bio           String?
+  isActive      Boolean        @default(true)
+  isBanned      Boolean        @default(false)
+  lastLoginAt   DateTime?
   createdAt     DateTime       @default(now())
   refreshTokens RefreshToken[]
   posts         Post[]
@@ -44,6 +47,13 @@ model User {
   payments            Payment[]
   usageHistory        UsageHistory[]
   subscriptions       Subscription[]
+  
+  // Analytics Relations
+  performanceMetrics  PerformanceMetric[]
+  performanceAlerts   PerformanceAlert[]
+  conversionFunnels   ConversionFunnel[]
+  userEvents          UserEvent[]
+  apiResponseTimes    ApiResponseTime[]
 }
 
 model RefreshToken {
@@ -52,6 +62,7 @@ model RefreshToken {
   userId     String
   user       User     @relation(fields: [userId], references: [id])
   isRevoked  Boolean  @default(false)
+  revokedAt  DateTime?
   expiresAt  DateTime
   createdAt  DateTime @default(now())
 
@@ -295,5 +306,108 @@ model VerificationCode {
 
   @@index([email, scene, code])
   @@index([expiresAt])
+}
+
+// Analytics and Performance Tracking Models
+
+model PerformanceMetric {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  sessionId    String
+  type         String   // page_load_time, api_response_time, effect_processing_time, core_web_vitals
+  value        Float    // metric value in milliseconds or score
+  timestamp    DateTime
+  metadata     Json?    // additional context data
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([type])
+  @@index([timestamp])
+  @@index([type, timestamp])
+}
+
+model PerformanceAlert {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  severity     String   // warning, error, critical
+  metric       String   // metric name that triggered alert
+  threshold    Float    // threshold value
+  actualValue  Float    // actual value that exceeded threshold
+  userContext  Json     // browser, device_type, etc.
+  ip           String?
+  resolved     Boolean  @default(false)
+  resolvedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([severity])
+  @@index([metric])
+  @@index([createdAt])
+  @@index([resolved])
+}
+
+model ConversionFunnel {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  sessionId    String
+  step         String   // effect_discovered, effect_viewed, effect_started, etc.
+  effectId     String?
+  metadata     Json?    // additional step context
+  timestamp    DateTime
+  ip           String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([step])
+  @@index([effectId])
+  @@index([timestamp])
+  @@index([userId, sessionId])
+}
+
+model UserEvent {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  sessionId    String
+  eventType    String   // image_upload, result_download, result_share, etc.
+  eventData    Json     // event-specific data
+  timestamp    DateTime
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([userId, eventType])
+}
+
+model ApiResponseTime {
+  id           String   @id @default(cuid())
+  endpoint     String   // API endpoint path
+  method       String   // HTTP method
+  statusCode   Int      // HTTP status code
+  responseTime Float    // response time in milliseconds
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  sessionId    String?
+  region       String?  // server region
+  timestamp    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([endpoint])
+  @@index([method])
+  @@index([statusCode])
+  @@index([timestamp])
+  @@index([userId])
+  @@index([endpoint, timestamp])
 }
 

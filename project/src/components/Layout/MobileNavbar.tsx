@@ -92,19 +92,23 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
           {/* Left Section */}
           <div className="flex items-center space-x-3">
             {showBack ? (
-              <button
+              <motion.button
                 onClick={onBack}
-                className="flex items-center justify-center w-11 h-11 rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                className="flex items-center justify-center min-w-touch min-h-touch rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.05 }}
               >
                 <ArrowLeft className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
-              </button>
+              </motion.button>
             ) : (
-              <button
+              <motion.button
                 onClick={handleMenuToggle}
-                className="flex items-center justify-center w-11 h-11 rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                className="flex items-center justify-center min-w-touch min-h-touch rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.05 }}
               >
                 <Menu className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
-              </button>
+              </motion.button>
             )}
           </div>
 
@@ -127,36 +131,47 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
           {/* Right Section */}
           <div className="flex items-center space-x-2">
             {showSearch && (
-              <button
+              <motion.button
                 onClick={onSearch}
-                className="flex items-center justify-center w-11 h-11 rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                className="flex items-center justify-center min-w-touch min-h-touch rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.05 }}
               >
                 <Search className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
-              </button>
+              </motion.button>
             )}
             
             {showShare && (
-              <button
+              <motion.button
                 onClick={onShare}
-                className="flex items-center justify-center w-11 h-11 rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                className="flex items-center justify-center min-w-touch min-h-touch rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.05 }}
               >
                 <Share2 className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
-              </button>
+              </motion.button>
             )}
 
-            <button
+            <motion.button
               onClick={() => dispatch({ type: 'TOGGLE_NOTIFICATIONS' })}
-              className="flex items-center justify-center w-11 h-11 rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback relative"
+              className="flex items-center justify-center min-w-touch min-h-touch rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback relative"
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.05 }}
             >
               <Bell className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
               {state.notifications && state.notifications.length > 0 && (
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-sakura-500 rounded-full flex items-center justify-center">
+                <motion.div 
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-sakura-500 rounded-full flex items-center justify-center"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                >
                   <span className="text-white text-xs font-medium">
                     {state.notifications.filter(n => !n.read).length > 9 ? '9+' : state.notifications.filter(n => !n.read).length}
                   </span>
-                </div>
+                </motion.div>
               )}
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -178,46 +193,81 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
         )}
       </motion.header>
 
-      {/* Bottom Navigation - WeChat Style */}
+      {/* Bottom Navigation - Enhanced WeChat Style */}
       {!isDetailPage && (
-        <nav 
+        <motion.nav 
           className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 dark:bg-obsidian-900/95 backdrop-blur-lg border-t border-pearl-200 dark:border-obsidian-700"
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          initial={{ y: 100 }}
+          animate={{ y: 0 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 40 }}
         >
           <div className="flex justify-around py-2">
-            {navigation.map((item) => {
+            {navigation.map((item, index) => {
               const Icon = item.icon;
               const active = isActive(item.href);
               
               return (
-                <Link
+                <motion.div
                   key={item.name}
-                  to={item.href}
-                  className="mobile-nav-item touch-feedback"
-                  style={{ minHeight: '60px' }}
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex-1"
                 >
-                  <motion.div
-                    whileTap={{ scale: 0.95 }}
-                    className={`flex flex-col items-center ${active ? 'text-mint-600 dark:text-mint-400' : 'text-obsidian-600 dark:text-pearl-400'}`}
+                  <Link
+                    to={item.href}
+                    className="mobile-nav-item touch-feedback flex flex-col items-center justify-center min-h-touch relative"
                   >
-                    <div className="relative mb-1">
-                      <Icon className="h-6 w-6" />
-                      {active && (
+                    <motion.div
+                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.1 }}
+                      className={`flex flex-col items-center transition-colors duration-200 ${
+                        active ? 'text-mint-600 dark:text-mint-400' : 'text-obsidian-600 dark:text-pearl-400'
+                      }`}
+                    >
+                      <div className="relative mb-1">
                         <motion.div
-                          layoutId="mobile-nav-indicator"
-                          className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-mint-500 rounded-full"
-                          initial={false}
-                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        />
-                      )}
-                    </div>
-                    <span className="text-xs font-medium">{item.name}</span>
-                  </motion.div>
-                </Link>
+                          animate={active ? { scale: 1.1 } : { scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        >
+                          <Icon className="h-6 w-6" />
+                        </motion.div>
+                        
+                        {active && (
+                          <>
+                            {/* Active indicator dot */}
+                            <motion.div
+                              layoutId="mobile-nav-indicator"
+                              className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-mint-500 rounded-full"
+                              initial={false}
+                              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                            />
+                            
+                            {/* Glow effect for active item */}
+                            <motion.div
+                              className="absolute inset-0 bg-mint-500/20 rounded-full blur-xl"
+                              initial={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1.5 }}
+                              transition={{ duration: 0.3 }}
+                            />
+                          </>
+                        )}
+                      </div>
+                      
+                      <motion.span 
+                        className="text-xs font-medium"
+                        animate={active ? { fontWeight: 600 } : { fontWeight: 500 }}
+                      >
+                        {item.name}
+                      </motion.span>
+                    </motion.div>
+                  </Link>
+                </motion.div>
               );
             })}
           </div>
-        </nav>
+        </motion.nav>
       )}
 
       {/* Slide-out Menu - WeChat Style */}
@@ -251,12 +301,14 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
                   </div>
                   <span className="text-xl font-bold gradient-text">Cosnap</span>
                 </div>
-                <button
+                <motion.button
                   onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                  className="flex items-center justify-center min-w-touch min-h-touch rounded-full hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                  whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
                 >
                   <X className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
-                </button>
+                </motion.button>
               </div>
 
               {/* User Profile Section */}
@@ -285,20 +337,46 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
 
               {/* Menu Items */}
               <div className="p-4 space-y-2">
-                {navigation.map((item) => {
+                {navigation.map((item, index) => {
                   const Icon = item.icon;
+                  const active = isActive(item.href);
                   return (
-                    <Link
+                    <motion.div
                       key={item.name}
-                      to={item.href}
-                      onClick={() => setIsMenuOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-pearl-100 dark:hover:bg-obsidian-800 transition-colors touch-feedback"
+                      initial={{ x: -20, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ delay: index * 0.1 + 0.2 }}
                     >
-                      <Icon className="h-5 w-5 text-obsidian-700 dark:text-pearl-300" />
-                      <span className="text-obsidian-900 dark:text-pearl-100 font-medium">
-                        {item.name}
-                      </span>
-                    </Link>
+                      <Link
+                        to={item.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className={`flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 touch-feedback min-h-touch ${
+                          active 
+                            ? 'bg-mint-100 dark:bg-mint-900/30 text-mint-600 dark:text-mint-400' 
+                            : 'hover:bg-pearl-100 dark:hover:bg-obsidian-800 text-obsidian-700 dark:text-pearl-300'
+                        }`}
+                      >
+                        <motion.div
+                          whileTap={{ scale: 0.9 }}
+                          className={`p-2 rounded-full ${
+                            active ? 'bg-mint-200 dark:bg-mint-800' : 'bg-transparent'
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </motion.div>
+                        <span className="font-medium">
+                          {item.name}
+                        </span>
+                        {active && (
+                          <motion.div
+                            className="ml-auto w-2 h-2 bg-mint-500 rounded-full"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                          />
+                        )}
+                      </Link>
+                    </motion.div>
                   );
                 })}
               </div>

@@ -9,6 +9,14 @@ import { ParametersPanel } from '../components/EffectParameters/ParametersPanel'
 import { ProcessingControls } from '../components/ProcessingStatus/ProcessingControls';
 import { ResultsPanel } from '../components/Results/ResultsPanel';
 import { LoadingState } from '../components/UI/LoadingState';
+import { trackEffectCreated, trackEngagement, trackFeatureUsage, trackPerformance } from '../utils/analytics';
+import { useAPIPerformance, useRenderPerformance } from '../hooks/usePerformanceMonitoring';
+import { 
+  trackFunnelStep, 
+  trackEngagementAction, 
+  FunnelStep, 
+  EngagementAction 
+} from '../utils/conversionFunnel';
 
 const ApplyEffect = () => {
   const { id } = useParams();
@@ -24,6 +32,11 @@ const ApplyEffect = () => {
 
   // Component initialization state
   const [testState, setTestState] = useState('Component loaded');
+  
+  // Performance monitoring
+  const { measureAPICall } = useAPIPerformance();
+  const { measureRender } = useRenderPerformance('ApplyEffect');
+  const [effectStartTime, setEffectStartTime] = useState<number>(0);
 
   // Use task processing hook
   const { 
@@ -76,6 +89,15 @@ const ApplyEffect = () => {
 
   const effect = state.effects.find(e => e.id === id);
 
+  // Track effect start when component mounts
+  useEffect(() => {
+    if (effect) {
+      trackFunnelStep(FunnelStep.EFFECT_STARTED, effect.id);
+      trackFeatureUsage('ai_effect_application', 'viewed');
+      setEffectStartTime(performance.now());
+    }
+  }, [effect]);
+
   if (!effect) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -121,6 +143,18 @@ const ApplyEffect = () => {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    trackEngagement('image_upload');
+    trackFeatureUsage('image_upload', 'clicked');
+    
+    // Track funnel step for image upload
+    if (effect && files.length > 0) {
+      trackFunnelStep(FunnelStep.IMAGE_UPLOADED, effect.id, 'webapp', {
+        file_count: files.length,
+        total_size: files.reduce((sum, file) => sum + file.size, 0),
+      });
+      trackEngagementAction(EngagementAction.BROWSE_EFFECTS, effect.id);
+    }
+    
     handleMultipleFiles(files);
   };
 
@@ -249,6 +283,15 @@ const ApplyEffect = () => {
       setParameters(prev => ({ ...prev, [paramName]: value }));
       console.log(`[Parameter Change] Regular parameter: ${paramName} = ${value}`);
     }
+
+    // Track parameter setting in funnel
+    if (effect) {
+      trackFunnelStep(FunnelStep.PARAMETERS_SET, effect.id, 'webapp', {
+        parameter_name: paramName,
+        parameter_value: value,
+        total_parameters: Object.keys(parameters).length + 1,
+      });
+    }
   };
 
   const handleDownload = async (imageUrl: string, index: number) => {
@@ -274,6 +317,17 @@ const ApplyEffect = () => {
       // Release blob URL
       window.URL.revokeObjectURL(url);
       console.log('[Download] Image download complete');
+
+      // Track download in funnel
+      if (effect) {
+        trackFunnelStep(FunnelStep.RESULT_DOWNLOADED, effect.id, 'webapp', {
+          image_index: index,
+          download_method: 'direct',
+        });
+        trackEngagementAction(EngagementAction.RATE_RESULT, effect.id);
+      }
+      
+      trackEngagement('result_download');
     } catch (error) {
       console.error('[Download] Download failed:', error);
       push('error','Download failed, please try again');
@@ -296,6 +350,10 @@ const ApplyEffect = () => {
   };
 
   const handleProcessImages = async () => {
+    // Track effect start
+    setEffectStartTime(performance.now());
+    trackFeatureUsage('ai_effect_processing', 'clicked');
+    
     // Check if there are image files
     const hasUploadedImages = uploadedImages.length > 0;
     const hasParamImages = Object.values(imageParamFiles).some(paramFile => paramFile.file);
@@ -347,9 +405,31 @@ const ApplyEffect = () => {
       console.log('[ApplyEffect] Final parameters:', parameters);
       console.log('[ApplyEffect] Parameter details:', Object.entries(parameters).map(([key, value]) => `${key}: ${value} (type: ${typeof value})`));
 
-      await processTask(effect, parameters, imageFileObjects);
+      // Track processing start
+      trackFunnelStep(FunnelStep.PROCESSING_STARTED, effect.id, 'webapp', {
+        parameter_count: Object.keys(parameters).length,
+        image_count: imageFileObjects.length,
+      });
+
+      // Measure API call performance
+      await measureAPICall(
+        async () => await processTask(effect, parameters, imageFileObjects),
+        `effect_${effect.id}`
+      );
+      
+      // Track successful effect creation and completion
+      const processingTime = performance.now() - effectStartTime;
+      trackEffectCreated(effect.id, 'webapp', processingTime);
+      trackFeatureUsage('ai_effect_processing', 'completed');
+      trackFunnelStep(FunnelStep.PROCESSING_COMPLETED, effect.id, 'webapp', {
+        processing_time: processingTime,
+        success: true,
+      });
+      
     } catch (error) {
       console.error('Processing failed:', error);
+      const processingTime = performance.now() - effectStartTime;
+      trackPerformance('effect_processing_time', processingTime);
     }
   };
 

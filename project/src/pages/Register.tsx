@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, User, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { APP_STRINGS } from '../constants/strings';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { useSEO } from '../hooks/useSEO';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -23,6 +24,24 @@ export default function Register() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const debounceRef = useRef<number | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{email?: string; username?: string; password?: string; confirmPassword?: string}>({});
+
+  // SEO optimization for register page
+  useSEO({
+    customSEO: {
+      title: 'Register - Join Cosnap AI Community | Free AI Photo Editor',
+      description: 'Join Cosnap AI to transform your photos with cutting-edge AI effects. Free registration gives you access to 50+ AI filters, background removal, and artistic transformations.',
+      keywords: [
+        'register cosnap ai',
+        'free ai photo editor signup',
+        'join ai community',
+        'ai photo effects account',
+        'free photo editing tools',
+        'AI image processing registration'
+      ],
+      canonicalUrl: 'https://cosnap.ai/register',
+      noindex: false
+    }
+  });
 
   const validateForm = () => {
     const errors: {email?: string; username?: string; password?: string; confirmPassword?: string} = {};
@@ -154,6 +173,10 @@ export default function Register() {
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  enterKeyHint="next"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -162,7 +185,7 @@ export default function Register() {
                     }
                   }}
                   placeholder={APP_STRINGS.AUTH.EMAIL_PLACEHOLDER}
-                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.email 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
                       : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'
@@ -195,6 +218,10 @@ export default function Register() {
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="text"
+                  inputMode="text"
+                  autoComplete="username"
+                  enterKeyHint="next"
+                  spellCheck={false}
                   value={username}
                   onChange={(e) => {
                     setUsername(e.target.value);
@@ -203,7 +230,7 @@ export default function Register() {
                     }
                   }}
                   placeholder={APP_STRINGS.AUTH.USERNAME_PLACEHOLDER}
-                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.username 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
                       : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'
@@ -273,6 +300,8 @@ export default function Register() {
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  enterKeyHint="next"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -281,7 +310,7 @@ export default function Register() {
                     }
                   }}
                   placeholder={APP_STRINGS.AUTH.PASSWORD_PLACEHOLDER}
-                  className={`w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  className={`w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.password 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
                       : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'
@@ -317,6 +346,8 @@ export default function Register() {
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  enterKeyHint="done"
                   value={confirmPassword}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
@@ -325,7 +356,7 @@ export default function Register() {
                     }
                   }}
                   placeholder="Confirm your password"
-                  className={`w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  className={`w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.confirmPassword 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
                       : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'

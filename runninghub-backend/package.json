@@ -12,6 +12,9 @@
     "test:unit": "jest --testPathPattern=unit",
     "db:push": "prisma db push",
     "migrate:deploy": "prisma migrate deploy",
+    "migrate:run": "node scripts/run-migration.js",
+    "validate:auth": "node scripts/validate-auth-endpoints.js",
+    "verify:production": "node scripts/verify-production-ready.js",
     "user:delete": "node scripts/delete-user-by-email.js"
   },
   "dependencies": {

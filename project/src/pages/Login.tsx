@@ -5,6 +5,7 @@ import { Eye, EyeOff, Mail, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { APP_STRINGS } from '../constants/strings';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { useSEO } from '../hooks/useSEO';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,10 +15,24 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<{email?: string; password?: string}>({});
 
-  const validateForm = () => {
-    const errors: {email?: string; password?: string} = {};
+  // SEO optimization for login page
+  useSEO({
+    customSEO: {
+      title: 'Login - Access Your Cosnap AI Account | AI Photo Editor',
+      description: 'Log in to your Cosnap AI account to access premium AI photo effects, save your projects, and join the creative community. Fast, secure login process.',
+      keywords: [
+        'login cosnap ai',
+        'ai photo editor login',
+        'access ai effects',
+        'photo editing account',
+        'ai image processing login',
+        'secure photo editor access'
+      ],
+      canonicalUrl: 'https://cosnap.ai/login',
+      noindex: false
+    }
+  });
     
     if (!email.trim()) {
       errors.email = 'Email is required';
@@ -106,6 +121,10 @@ export default function Login() {
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  enterKeyHint="next"
+                  spellCheck={false}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -114,7 +133,7 @@ export default function Login() {
                     }
                   }}
                   placeholder={APP_STRINGS.AUTH.EMAIL_PLACEHOLDER}
-                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.email 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
                       : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'
@@ -142,6 +161,8 @@ export default function Login() {
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  enterKeyHint="done"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
@@ -150,7 +171,7 @@ export default function Login() {
                     }
                   }}
                   placeholder={APP_STRINGS.AUTH.PASSWORD_PLACEHOLDER}
-                  className={`w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                  className={`w-full pl-10 pr-12 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.password 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
                       : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'

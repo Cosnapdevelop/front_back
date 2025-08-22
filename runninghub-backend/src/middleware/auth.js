@@ -19,8 +19,22 @@ export function auth(req, res, next) {
       });
     }
     
+    // 验证JWT密钥存在
+    if (!process.env.JWT_ACCESS_SECRET || process.env.JWT_ACCESS_SECRET.length < 32) {
+      console.error('[安全错误] JWT密钥未配置或强度不足');
+      return res.status(500).json({ 
+        success: false, 
+        error: '服务器配置错误' 
+      });
+    }
+    
     // 验证JWT令牌
-    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET, {
+      algorithms: ['HS256'],
+      issuer: process.env.JWT_ISSUER || 'cosnap-api',
+      audience: process.env.JWT_AUDIENCE || 'cosnap-app',
+      clockTolerance: 30
+    });
     
     // 验证令牌结构
     if (!payload.sub || !payload.email) {

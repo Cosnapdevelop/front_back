@@ -322,11 +322,14 @@ export const clientOptimization = (req, res, next) => {
 };
 
 /**
- * Performance monitoring and alerting
+ * Enhanced performance monitoring with database persistence
  */
 export const performanceMonitoring = (req, res, next) => {
   const startTime = process.hrtime.bigint();
   const startMemory = process.memoryUsage();
+  
+  // Store start time for response time calculation
+  req.startTime = Date.now();
   
   // Override res.end to collect performance metrics
   const originalEnd = res.end;
@@ -344,16 +347,73 @@ export const performanceMonitoring = (req, res, next) => {
       statusCode: res.statusCode,
       responseTime: Math.round(responseTime * 100) / 100, // Round to 2 decimal places
       memoryUsed: Math.round(memoryUsed / 1024), // KB
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      userId: req.user?.id,
+      sessionId: req.sessionId || req.headers['x-session-id'],
+      ip: req.ip,
+      userAgent: req.get('User-Agent')
     };
     
-    // Alert on performance issues
-    if (responseTime > 5000) { // > 5 seconds
+    // Enhanced alerting thresholds
+    if (responseTime > 3000) { // > 3 seconds (lowered from 5s)
       console.warn('🐌 慢响应检测:', metrics);
+      
+      // Record performance alert if user is authenticated
+      if (req.user?.id) {
+        const alertData = {
+          user_id: req.user.id,
+          severity: responseTime > 5000 ? 'critical' : 'warning',
+          metric: 'api_response_time',
+          threshold: 3000,
+          actual_value: responseTime,
+          user_context: {
+            browser: req.get('User-Agent'),
+            device_type: req.get('User-Agent')?.includes('Mobile') ? 'mobile' : 'desktop'
+          },
+          ip: req.ip
+        };
+        
+        // Async record without blocking response
+        setImmediate(async () => {
+          try {
+            const performanceService = await import('../services/performanceService.js');
+            await performanceService.default.recordPerformanceAlert(alertData);
+          } catch (error) {
+            console.error('Failed to record performance alert:', error);
+          }
+        });
+      }
     }
     
     if (memoryUsed > 50 * 1024 * 1024) { // > 50MB
       console.warn('🧠 高内存使用检测:', metrics);
+    }
+    
+    // Record API response time in database (async, non-blocking)
+    if (req.path.startsWith('/api/')) {
+      setImmediate(async () => {
+        try {
+          const { PrismaClient } = await import('@prisma/client');
+          const prisma = new PrismaClient();
+          
+          await prisma.apiResponseTime.create({
+            data: {
+              endpoint: req.path,
+              method: req.method,
+              statusCode: res.statusCode,
+              responseTime: responseTime,
+              userId: req.user?.id,
+              sessionId: req.sessionId || req.headers['x-session-id'],
+              region: process.env.SERVER_REGION || 'unknown',
+              timestamp: new Date()
+            }
+          });
+          
+          await prisma.$disconnect();
+        } catch (error) {
+          console.error('Failed to record API response time:', error);
+        }
+      });
     }
     
     // Store metrics for monitoring dashboard

@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AnimatePresence } from 'framer-motion';
+import { useEffectSEO } from '../hooks/useSEO';
+import { BreadcrumbNavigation } from '../components/SEO/BreadcrumbNavigation';
 
 const EffectDetail = () => {
   const { id } = useParams();
@@ -32,6 +34,9 @@ const EffectDetail = () => {
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   const effect = state.effects.find(e => e.id === id);
+
+  // SEO optimization for effect detail page
+  useEffectSEO(effect);
 
   // Scroll to top when effect changes
   useEffect(() => {
@@ -157,6 +162,15 @@ const EffectDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Breadcrumb Navigation for SEO */}
+      <BreadcrumbNavigation 
+        items={[
+          { label: 'Home', href: '/' },
+          { label: 'Effects', href: '/effects' },
+          { label: effect?.name || 'Effect Detail', href: `/effect/${id}` }
+        ]}
+      />
+      
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">

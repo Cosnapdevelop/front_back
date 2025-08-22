@@ -13,10 +13,14 @@ import {
   Shield,
   Palette,
   Download,
-  Share
+  Share,
+  Trash2,
+  AlertTriangle,
+  Send
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import EffectCard from '../components/Cards/EffectCard';
+import Avatar from '../components/Avatar';
 
 const Profile = () => {
   const { state, dispatch } = useApp();
@@ -25,6 +29,24 @@ const Profile = () => {
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const bioRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Account deletion state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'confirm' | 'verify'>('confirm');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteVerificationCode, setDeleteVerificationCode] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  
+  // Username availability checking
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const [usernameDebounceTimeout, setUsernameDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Loading states
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const tabs = [
     { id: 'history', label: 'Recent History', icon: Clock },
@@ -194,6 +216,76 @@ const Profile = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteStep === 'confirm') {
+      // Send verification code first
+      try {
+        const res = await fetch(`${API}/auth/send-code`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+          },
+          body: JSON.stringify({
+            email: state.user?.email,
+            scene: 'delete_account'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setCodeSent(true);
+          setDeleteStep('verify');
+          push('success', 'Verification code sent to your email');
+        } else {
+          push('error', data.error || 'Failed to send verification code');
+        }
+      } catch (error) {
+        push('error', 'Failed to send verification code');
+      }
+    } else {
+      // Actually delete the account
+      setIsDeleting(true);
+      try {
+        const res = await fetch(`${API}/auth/me/account`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+          },
+          body: JSON.stringify({
+            password: deletePassword,
+            confirmationText: deleteConfirmText,
+            email: state.user?.email,
+            code: deleteVerificationCode
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          push('success', 'Account deleted successfully');
+          localStorage.clear();
+          dispatch({ type: 'SET_USER', payload: null as any });
+          window.location.href = '/';
+        } else {
+          push('error', data.error || 'Failed to delete account');
+        }
+      } catch (error) {
+        push('error', 'Failed to delete account');
+      } finally {
+        setIsDeleting(false);
+      }
+    }
+  };
+
+  const resetDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteStep('confirm');
+    setDeletePassword('');
+    setDeleteConfirmText('');
+    setDeleteVerificationCode('');
+    setCodeSent(false);
+    setIsDeleting(false);
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'history':
@@ -303,12 +395,65 @@ const Profile = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Username
                   </label>
-                  <input
-                    type="text"
-                    defaultValue={state.user?.username}
-                    ref={usernameRef}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      defaultValue={state.user?.username}
+                      ref={usernameRef}
+                      onChange={(e) => {
+                        const newUsername = e.target.value.trim();
+                        if (usernameDebounceTimeout) {
+                          clearTimeout(usernameDebounceTimeout);
+                        }
+                        
+                        if (newUsername && newUsername !== state.user?.username) {
+                          setCheckingUsername(true);
+                          setUsernameAvailable(null);
+                          
+                          const timeout = setTimeout(async () => {
+                            try {
+                              const res = await fetch(`${API}/auth/check-availability?username=${encodeURIComponent(newUsername)}`);
+                              const data = await res.json();
+                              setUsernameAvailable(data.usernameAvailable);
+                            } catch (error) {
+                              console.error('Username availability check failed:', error);
+                            } finally {
+                              setCheckingUsername(false);
+                            }
+                          }, 500);
+                          
+                          setUsernameDebounceTimeout(timeout);
+                        } else {
+                          setUsernameAvailable(null);
+                          setCheckingUsername(false);
+                        }
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors ${
+                        usernameAvailable === false 
+                          ? 'border-red-300 dark:border-red-600' 
+                          : usernameAvailable === true 
+                          ? 'border-green-300 dark:border-green-600'
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center">
+                      {checkingUsername && (
+                        <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                      )}
+                      {usernameAvailable === false && (
+                        <div className="text-red-500 text-sm">✗</div>
+                      )}
+                      {usernameAvailable === true && (
+                        <div className="text-green-500 text-sm">✓</div>
+                      )}
+                    </div>
+                  </div>
+                  {usernameAvailable === false && (
+                    <p className="text-sm text-red-500 mt-1">This username is already taken</p>
+                  )}
+                  {usernameAvailable === true && (
+                    <p className="text-sm text-green-500 mt-1">This username is available</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -416,6 +561,31 @@ const Profile = () => {
               </div>
             </div>
 
+            {/* Danger Zone */}
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 border border-red-200 dark:border-red-800">
+              <h3 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-4 flex items-center">
+                <AlertTriangle className="h-5 w-5 mr-2" />
+                Danger Zone
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-red-900 dark:text-red-100">Delete Account</p>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Once you delete your account, there is no going back. Please be certain.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowDeleteModal(true)}
+                    className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete Account</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Save Button */}
             <div className="flex justify-end">
               <button
@@ -486,11 +656,11 @@ const Profile = () => {
           {/* Profile Info */}
           <div className="relative px-6 pb-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-16 sm:-mt-20">
-              <img
-                src={state.user.avatar || `${API}/assets/placeholder-user.png`}
-                alt={state.user.username}
-                className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white dark:border-gray-800 object-cover mx-auto sm:mx-0"
-                onError={(e)=>{(e.currentTarget as HTMLImageElement).src=`${API}/assets/placeholder-user.png`;}}
+              <Avatar
+                src={state.user.avatar}
+                name={state.user.username}
+                size="xl"
+                className="mx-auto sm:mx-0"
               />
               
               <div className="flex-1 text-center sm:text-left mt-4 sm:mt-0 sm:pb-4">
@@ -529,27 +699,7 @@ const Profile = () => {
                   <span>Share</span>
                 </button>
                 <button
-                  onClick={async ()=>{
-                    const input = document.createElement('input');
-                    input.type='file'; input.accept='image/*';
-                    input.onchange = async ()=>{
-                      const file = input.files && input.files[0];
-                      if (!file) return;
-                      const ext = (file.name.split('.').pop()||'jpg').toLowerCase();
-                      const resp = await fetch(`${API}/api/effects/upload/presign`, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ ext, dir:'cosnap/avatar' }) });
-                      const ps = await resp.json();
-                      if (ps.success) {
-                        if (ps.provider==='aliyun-oss'){
-                          const form = new FormData(); Object.entries(ps.form).forEach(([k,v])=> form.append(k, v as string)); if(!form.has('key')) form.append('key', ps.form.key); form.append('file', file); await fetch(ps.uploadUrl, { method:'POST', body: form });
-                        }
-                        const avatarUrl = ps.publicUrl;
-                        const res = await fetch(`${API}/auth/me/avatar`, { method:'PUT', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${localStorage.getItem('cosnap_access_token')||''}` }, body: JSON.stringify({ avatar: avatarUrl }) });
-                        const data = await res.json();
-                        if (data.success){ localStorage.setItem('user', JSON.stringify(data.user)); dispatch({ type:'SET_USER', payload: data.user }); }
-                      }
-                    };
-                    input.click();
-                  }}
+                  onClick={() => setAvatarModalOpen(true)}
                   className="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
                 >
                   <Edit3 className="h-4 w-4" />
@@ -698,6 +848,126 @@ const Profile = () => {
                   <button disabled={!avatarPreview} onClick={saveAvatar} className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50">Save</button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account Deletion Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={resetDeleteModal} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-red-600 dark:text-red-400 flex items-center">
+                  <AlertTriangle className="h-6 w-6 mr-2" />
+                  Delete Account
+                </h3>
+                <button onClick={resetDeleteModal} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                  ×
+                </button>
+              </div>
+
+              {deleteStep === 'confirm' ? (
+                <div className="space-y-4">
+                  <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      <strong>Warning:</strong> This action cannot be undone. This will permanently delete your account, 
+                      remove all your data, and you will lose access to all your creations and settings.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Enter your password to confirm
+                    </label>
+                    <input
+                      type="password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="Enter your password"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Type "DELETE MY ACCOUNT" to confirm
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      placeholder="DELETE MY ACCOUNT"
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      onClick={resetDeleteModal}
+                      className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={!deletePassword || deleteConfirmText !== 'DELETE MY ACCOUNT'}
+                      className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      <Send className="h-4 w-4" />
+                      <span>Send Verification Code</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      A verification code has been sent to your email address. Please enter it below to complete the account deletion.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteVerificationCode}
+                      onChange={(e) => setDeleteVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center font-mono text-lg"
+                      placeholder="000000"
+                      maxLength={6}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      onClick={() => setDeleteStep('confirm')}
+                      className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleteVerificationCode.length !== 6 || isDeleting}
+                      className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Deleting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete Account</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

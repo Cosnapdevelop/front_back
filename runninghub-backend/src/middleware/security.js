@@ -219,7 +219,7 @@ export const securityCheck = (req, res, next) => {
 /**
  * 错误处理中间件
  */
-export const errorHandler = (err, req, res, next) => {
+export const errorHandler = async (err, req, res, next) => {
   // 记录错误日志
   console.error(`[${req.requestId || 'unknown'}] 服务器错误:`, {
     error: err.message,
@@ -230,6 +230,21 @@ export const errorHandler = (err, req, res, next) => {
     userAgent: req.get('User-Agent'),
     body: req.body ? JSON.stringify(req.body).substring(0, 200) : null
   });
+
+  // Record production error for monitoring and alerting
+  try {
+    const { default: productionAlertingService } = await import('../services/productionAlertingService.js');
+    await productionAlertingService.recordError(err, {
+      userId: req.user?.id,
+      endpoint: req.path,
+      method: req.method,
+      userAgent: req.get('User-Agent'),
+      ip: req.ip,
+      body: req.body ? JSON.stringify(req.body).substring(0, 200) : null
+    });
+  } catch (alertingError) {
+    console.warn('[Production Alerting] Failed to record error:', alertingError.message);
+  }
   
   // 防止错误信息泄露
   if (process.env.NODE_ENV === 'production') {
