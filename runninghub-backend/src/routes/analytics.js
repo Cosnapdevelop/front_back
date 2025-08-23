@@ -1,8 +1,8 @@
-const express = require('express');
-const { PrismaClient } = require('@prisma/client');
-const auth = require('../middleware/auth');
-const rateLimit = require('express-rate-limit');
-const monitoringService = require('../services/monitoringService');
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+import { auth } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
+import monitoringService from '../services/monitoringService.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -579,4 +579,4 @@ router.get('/realtime', auth, async (req, res) => {
 
 
 
-module.exports = router;
+export default router;

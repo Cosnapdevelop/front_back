@@ -1,11 +1,11 @@
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
-const { PrismaClient } = require('@prisma/client');
-const { body, validationResult } = require('express-validator');
-const auth = require('../middleware/auth');
-const rateLimit = require('express-rate-limit');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { PrismaClient } from '@prisma/client';
+import { body, validationResult } from 'express-validator';
+import { auth } from '../middleware/auth.js';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -460,4 +460,4 @@ Please review and respond promptly.
   }
 }
 
-module.exports = router;
+export default router;
