@@ -24,7 +24,7 @@ class ProductionAlertingService {
     try {
       // Initialize email transporter if SMTP is configured
       if (process.env.SMTP_HOST && process.env.SMTP_USER) {
-        this.emailTransporter = nodemailer.createTransporter({
+        this.emailTransporter = nodemailer.createTransport({
           host: process.env.SMTP_HOST,
           port: parseInt(process.env.SMTP_PORT) || 587,
           secure: process.env.SMTP_SECURE === 'true',
