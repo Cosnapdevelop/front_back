@@ -21,22 +21,15 @@ const CACHE_TTL = 30000; // 30 seconds
  * Basic health check - minimal response time
  * Used by load balancers for quick availability checks
  */
-router.get('/', async (req, res) => {
-  try {
-    res.status(200).json({
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      service: 'cosnap-backend'
-    });
-  } catch (error) {
-    monitoringService.error('Basic health check failed', error);
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      service: 'cosnap-backend',
-      error: 'Service unavailable'
-    });
-  }
+router.get('/', (req, res) => {
+  // Ultra-fast health check for Render deployment - no async operations
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    service: 'cosnap-backend',
+    uptime: process.uptime(),
+    memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
+  });
 });
 
 /**
@@ -330,18 +323,14 @@ async function checkDatabase() {
   const timer = monitoringService.startTimer('health_check_database');
   
   try {
-    // Test basic connectivity
+    // Simplified database check - just test connectivity
     await prisma.$queryRaw`SELECT 1 as test`;
-    
-    // Test a simple operation
-    const userCount = await prisma.user.count();
     
     const duration = timer.end();
     
     return {
       status: 'healthy',
       responseTime: `${duration.toFixed(2)}ms`,
-      userCount: userCount,
       message: 'Database connection successful'
     };
     
@@ -399,37 +388,18 @@ async function checkRunningHubAPI() {
   try {
     const { apis } = productionConfig;
     
-    // Test both regions
-    const promises = [
-      axios.get(`${apis.runningHub.baseUrl.china}/health`, { 
-        timeout: 5000,
-        headers: { 'Authorization': `Bearer ${apis.runningHub.apiKey}` }
-      }).catch(err => ({ error: err.message, region: 'china' })),
-      
-      axios.get(`${apis.runningHub.baseUrl.hongkong}/health`, { 
-        timeout: 5000,
-        headers: { 'Authorization': `Bearer ${apis.runningHub.apiKey}` }
-      }).catch(err => ({ error: err.message, region: 'hongkong' }))
-    ];
-
-    const [chinaResult, hkResult] = await Promise.all(promises);
-    const duration = timer.end();
-
-    const chinaOk = chinaResult.status === 200;
-    const hkOk = hkResult.status === 200;
-
-    if (!chinaOk && !hkOk) {
-      throw new Error('Both RunningHub regions unavailable');
+    // Skip external API health checks for faster response
+    // Just verify configuration is present
+    if (!apis.runningHub.apiKey) {
+      throw new Error('RunningHub API key not configured');
     }
 
+    const duration = timer.end();
+
     return {
-      status: chinaOk && hkOk ? 'healthy' : 'degraded',
+      status: 'healthy',
       responseTime: `${duration.toFixed(2)}ms`,
-      regions: {
-        china: chinaOk ? 'healthy' : `failed: ${chinaResult.error}`,
-        hongkong: hkOk ? 'healthy' : `failed: ${hkResult.error}`
-      },
-      message: chinaOk && hkOk ? 'All regions available' : 'Some regions unavailable'
+      message: 'RunningHub configuration valid (external check skipped for performance)'
     };
     
   } catch (error) {
