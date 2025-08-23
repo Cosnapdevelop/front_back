@@ -7,11 +7,22 @@
  * - Global test utilities and mocks
  */
 
-import { expect, afterEach, beforeAll, afterAll } from 'vitest';
+import React from 'react';
+import { expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
+
+// Top-level mock for lucide-react: provide stub components for any icon export
+vi.mock('lucide-react', () => {
+  const handler: ProxyHandler<Record<string, any>> = {
+    get: (_target, _prop: string) => {
+      return () => null;
+    },
+  };
+  return new Proxy({}, handler) as any;
+});
 
 // Extend Vitest's expect with Testing Library matchers
 expect.extend(matchers);
@@ -162,6 +173,32 @@ export const server = setupServer(
 // Start server before all tests
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
+  // Mock fetch as jest-like mock to support mockResolvedValue in tests
+  if (!('fetch' in global)) {
+    (global as any).fetch = vi.fn();
+  }
+  if (typeof (global as any).fetch.mockResolvedValue !== 'function') {
+    (global as any).fetch = vi.fn();
+  }
+
+  // Polyfill Touch / TouchEvent minimal objects for jsdom
+  if (!(global as any).Touch) {
+    class MockTouch {
+      identifier: number;
+      target: EventTarget;
+      clientX: number;
+      clientY: number;
+      constructor(init: any) {
+        Object.assign(this, init);
+      }
+    }
+    (global as any).Touch = MockTouch as any;
+  }
+
+  // Polyfill navigator.vibrate used in mobile interactions
+  if (!('vibrate' in navigator)) {
+    (navigator as any).vibrate = () => {};
+  }
 });
 
 // Clean up after each test

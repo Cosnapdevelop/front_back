@@ -59,9 +59,9 @@ class Analytics {
 
       // Initialize gtag
       window.dataLayer = window.dataLayer || [];
-      window.gtag = function() {
-        window.dataLayer.push(arguments);
-      };
+      window.gtag = function(...args: any[]) {
+        window.dataLayer.push(args as unknown as IArguments);
+      } as unknown as (...args: any[]) => void;
       window.gtag('js', new Date());
       window.gtag('config', GA_MEASUREMENT_ID, {
         send_page_view: false, // We'll send page views manually

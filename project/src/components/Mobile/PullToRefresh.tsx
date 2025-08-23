@@ -40,7 +40,9 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
     if (!enabled || isRefreshing) return;
     
     if (checkCanPull()) {
-      startY.current = e.touches[0].clientY;
+      const touch = (e.touches && e.touches[0]) as any;
+      if (!touch) return;
+      startY.current = touch.clientY || 0;
       setCanPull(true);
     }
   }, [enabled, isRefreshing, checkCanPull]);
@@ -49,7 +51,9 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!enabled || isRefreshing || !canPull) return;
     
-    currentY.current = e.touches[0].clientY;
+    const touch = (e.touches && e.touches[0]) as any;
+    if (!touch) return;
+    currentY.current = touch.clientY || 0;
     const deltaY = currentY.current - startY.current;
     
     if (deltaY > 0 && checkCanPull()) {

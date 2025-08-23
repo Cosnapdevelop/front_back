@@ -576,7 +576,7 @@ const MobileFileUploader: React.FC<MobileFileUploaderProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       {/* Error Message */}
       {error && (

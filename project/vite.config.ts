@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react-swc';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@jest/globals': 'vitest',
+    },
+  },
   optimizeDeps: {
     exclude: ['lucide-react'],
     include: ['react', 'react-dom', 'framer-motion', '@headlessui/react', '@tanstack/react-query']
@@ -159,6 +164,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['e2e/**'],
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [

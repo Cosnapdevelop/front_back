@@ -50,9 +50,9 @@ class SentryErrorTracker {
           tracePropagationTargets: [
             'localhost',
             /^\//,
-            /^https:\/\/[^\/]*\.vercel\.app/,
-            /^https:\/\/[^\/]*\.runninghub\.(ai|cn)/,
-            /^https:\/\/api\.cosnap\.ai/
+            /https:\/\/[^/]*\.vercel\.app/,
+            /https:\/\/[^/]*\.runninghub\.(ai|cn)/,
+            /https:\/\/api\.cosnap\.ai/
           ]
         })
       ],

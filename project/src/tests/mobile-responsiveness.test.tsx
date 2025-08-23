@@ -32,25 +32,35 @@ vi.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: any) => children,
 }));
 
-vi.mock('lucide-react', () => ({
-  Home: () => <span data-testid="home-icon">Home</span>,
-  Sparkles: () => <span data-testid="sparkles-icon">Sparkles</span>,
-  Users: () => <span data-testid="users-icon">Users</span>,
-  User: () => <span data-testid="user-icon">User</span>,
-  Bell: () => <span data-testid="bell-icon">Bell</span>,
-  Search: () => <span data-testid="search-icon">Search</span>,
-  Menu: () => <span data-testid="menu-icon">Menu</span>,
-  X: () => <span data-testid="x-icon">X</span>,
-  ArrowLeft: () => <span data-testid="arrow-left-icon">ArrowLeft</span>,
-  Share2: () => <span data-testid="share-icon">Share2</span>,
-  Download: () => <span data-testid="download-icon">Download</span>,
-  Heart: () => <span data-testid="heart-icon">Heart</span>,
-  MessageCircle: () => <span data-testid="message-icon">MessageCircle</span>,
-  RefreshCw: () => <span data-testid="refresh-icon">RefreshCw</span>,
-  QrCode: () => <span data-testid="qr-icon">QrCode</span>,
-  Copy: () => <span data-testid="copy-icon">Copy</span>,
-  Check: () => <span data-testid="check-icon">Check</span>,
-}));
+vi.mock('lucide-react', async (importOriginal) => {
+  const actual = await importOriginal();
+  const base: Record<string, any> = {
+    Home: (props: any) => <span data-testid="home-icon" {...props}>Home</span>,
+    Sparkles: (props: any) => <span data-testid="sparkles-icon" {...props}>Sparkles</span>,
+    Users: (props: any) => <span data-testid="users-icon" {...props}>Users</span>,
+    User: (props: any) => <span data-testid="user-icon" {...props}>User</span>,
+    Bell: (props: any) => <span data-testid="bell-icon" {...props}>Bell</span>,
+    Search: (props: any) => <span data-testid="search-icon" {...props}>Search</span>,
+    Menu: (props: any) => <span data-testid="menu-icon" {...props}>Menu</span>,
+    X: (props: any) => <span data-testid="x-icon" {...props}>X</span>,
+    ArrowLeft: (props: any) => <span data-testid="arrow-left-icon" {...props}>ArrowLeft</span>,
+    Share2: (props: any) => <span data-testid="share-icon" {...props}>Share2</span>,
+    Download: (props: any) => <span data-testid="download-icon" {...props}>Download</span>,
+    Heart: (props: any) => <span data-testid="heart-icon" {...props}>Heart</span>,
+    MessageCircle: (props: any) => <span data-testid="message-icon" {...props}>MessageCircle</span>,
+    RefreshCw: (props: any) => <span data-testid="refresh-icon" {...props}>RefreshCw</span>,
+    QrCode: (props: any) => <span data-testid="qr-icon" {...props}>QrCode</span>,
+    Copy: (props: any) => <span data-testid="copy-icon" {...props}>Copy</span>,
+    Check: (props: any) => <span data-testid="check-icon" {...props}>Check</span>,
+  };
+  return new Proxy({ ...actual, ...base }, {
+    get(target, prop: string) {
+      if (prop in target) return (target as any)[prop];
+      // Fallback generic icon component for any missing export
+      return (props: any) => <span data-testid={`${String(prop)}-icon`} {...props}>{String(prop)}</span>;
+    },
+  });
+});
 
 // Test wrapper component
 const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {

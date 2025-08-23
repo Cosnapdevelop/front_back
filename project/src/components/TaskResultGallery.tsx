@@ -7,11 +7,11 @@ import { trackEngagement, trackPerformance, trackFeatureUsage } from '../utils/a
 import { useRenderPerformance } from '../hooks/usePerformanceMonitoring';
 
 interface TaskResultGalleryProps {
-  images: Array<{ id: string; url: string }>;
+  images?: Array<{ id: string; url: string }>;
   onPreview?: (image: { id: string; url: string }) => void;
 }
 
-const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview }) => {
+const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images = [], onPreview }) => {
   const { push } = useToast();
   const { measureRender } = useRenderPerformance('TaskResultGallery');
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
@@ -22,7 +22,7 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
 
   // Track gallery performance metrics
   useEffect(() => {
-    if (images.length > 0) {
+    if (images && images.length > 0) {
       trackFeatureUsage('ai_results_gallery', 'viewed');
       const startTime = performance.now();
       
@@ -31,7 +31,7 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
         trackPerformance('effect_processing_time', endTime - startTime);
       };
     }
-  }, [images.length]);
+  }, [images]);
 
   // Progressive loading implementation
   useEffect(() => {
@@ -142,10 +142,7 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
   }, [push]);
 
   // Memoize visible images for performance
-  const visibleImages = useMemo(() => 
-    images.slice(0, visibleImageCount), 
-    [images, visibleImageCount]
-  );
+  const visibleImages = useMemo(() => images.slice(0, visibleImageCount), [images, visibleImageCount]);
 
   // Calculate gallery performance stats
   const galleryStats = useMemo(() => ({
@@ -204,9 +201,9 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
               height={192} // 48 * 4 (for Tailwind's h-48)
               priority={index < 2} // Prioritize first 2 images
               onClick={() => {
-                onPreview && onPreview(image);
+                if (onPreview) onPreview(image);
                 trackFeatureUsage('ai_results_gallery', 'clicked');
-                trackEngagement('result_download'); // Track preview interaction
+                trackEngagement('result_download');
               }}
               onLoad={() => {
                 handleImageLoad(image.id);
@@ -263,7 +260,7 @@ const TaskResultGallery: React.FC<TaskResultGalleryProps> = ({ images, onPreview
               {downloadingImages.has(image.id) ? 'Downloading...' : 'Download Result'}
             </span>
           </button>
-        </div>
+        </motion.div>
       ))}
       
       {/* Load more button for remaining images */}

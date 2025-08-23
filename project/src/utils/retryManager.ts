@@ -251,25 +251,26 @@ export class RetryManager {
     let delay: number;
     
     switch (config.backoffStrategy) {
-      case 'exponential':
+      case 'exponential': {
         delay = config.baseDelay * Math.pow(config.backoffMultiplier, attempt - 1);
         break;
-        
-      case 'linear':
+      }
+      case 'linear': {
         delay = config.baseDelay * attempt;
         break;
-        
-      case 'jitter':
+      }
+      case 'jitter': {
         // Exponential backoff with jitter to avoid thundering herd
         const exponentialDelay = config.baseDelay * Math.pow(config.backoffMultiplier, attempt - 1);
         const jitter = Math.random() * 0.5 + 0.5; // 0.5 to 1.0
         delay = exponentialDelay * jitter;
         break;
-        
+      }
       case 'fixed':
-      default:
+      default: {
         delay = config.baseDelay;
         break;
+      }
     }
     
     return Math.min(delay, config.maxDelay);

@@ -264,7 +264,7 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
                     <span className="text-gray-900 dark:text-white">{resources.length}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600 dark:text-gray-400">Large (>1MB)</span>
+                    <span className="text-gray-600 dark:text-gray-400">Large ({'>'}1MB)</span>
                     <span className={resources.filter(r => r.size > 1000000).length > 0 ? 'text-red-500' : 'text-green-500'}>
                       {resources.filter(r => r.size > 1000000).length}
                     </span>

@@ -368,7 +368,7 @@ export const ErrorProvider: React.FC<ErrorProviderProps> = ({
     }) as T;
   };
   
-  const executeWithCircuitBreaker = async <T>(
+  const executeWithCircuitBreaker = async <T,>(
     serviceName: string,
     operation: () => Promise<T>
   ): Promise<T> => {
@@ -447,13 +447,13 @@ export const useCircuitBreaker = () => {
     resetCircuitBreaker,
     
     // Service-specific methods
-    executeWithRunningHubAPI: <T>(operation: () => Promise<T>) =>
+    executeWithRunningHubAPI: <T,>(operation: () => Promise<T>) =>
       executeWithCircuitBreaker('runninghub_api', operation),
       
-    executeWithDatabase: <T>(operation: () => Promise<T>) =>
+    executeWithDatabase: <T,>(operation: () => Promise<T>) =>
       executeWithCircuitBreaker('database', operation),
       
-    executeWithPaymentGateway: <T>(operation: () => Promise<T>) =>
+    executeWithPaymentGateway: <T,>(operation: () => Promise<T>) =>
       executeWithCircuitBreaker('payment_gateway', operation)
   };
 };
