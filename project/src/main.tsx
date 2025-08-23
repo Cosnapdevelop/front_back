@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ToastProvider } from './context/ToastContext';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } });
 
@@ -166,9 +165,7 @@ document.body.appendChild(loadingSpinner);
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
+      <App />
     </QueryClientProvider>
   </StrictMode>
 );
