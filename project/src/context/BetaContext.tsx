@@ -139,11 +139,6 @@ export const BetaProvider: React.FC<BetaProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Analytics object to match component expectations
-  const analytics = {
-    trackEvent: trackBetaEvent
-  };
-  
   // User access object
   const userAccess = betaUser ? {
     accessLevel: betaUser.betaAccessLevel
@@ -422,6 +417,11 @@ export const BetaProvider: React.FC<BetaProviderProps> = ({ children }) => {
     trackBetaEvent('beta_onboarding_completed', {
       completion_time: Date.now(),
     });
+  };
+
+  // Analytics object to match component expectations (defined after trackBetaEvent)
+  const analytics = {
+    trackEvent: trackBetaEvent
   };
 
   const value: BetaContextType = {
