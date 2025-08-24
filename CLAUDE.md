@@ -145,7 +145,40 @@ The project includes comprehensive test scripts in `runninghub-backend/`:
 
 ## File Upload Configuration
 
-- Maximum file size: 30MB
-- Supported formats: JPEG, PNG, GIF, WebP
-- Upload endpoint: `/api/effects/upload-image`
-- Storage: Ali OSS cloud storage
+- **RunningHub API limit**: 10MB (files ≤10MB uploaded directly to RunningHub)
+- **Cloud storage**: Files >10MB automatically uploaded to Ali OSS cloud storage
+- **Frontend limit**: 10MB (matches RunningHub API limit for optimal UX)
+- **Supported formats**: JPEG, PNG, GIF, WebP
+- **Upload endpoint**: `/api/effects/upload-image`
+- **Storage**: RunningHub direct upload (≤10MB) + Ali OSS cloud storage (>10MB)
+
+## RunningHub API Official Documentation
+
+### Main Documentation
+- [使用须知](https://www.runninghub.cn/runninghub-api-doc/doc-6332954.md) - Important usage guidelines
+- [关于nodeInfoList](https://www.runninghub.cn/runninghub-api-doc/doc-6332955.md) - Understanding nodeInfoList structure
+- [关于企业级API介绍](https://www.runninghub.cn/runninghub-api-doc/doc-6465949.md) - Enterprise API introduction
+- [原生ComfyUI接口支持](https://www.runninghub.cn/runninghub-api-doc/doc-6768545.md) - Native ComfyUI interface support
+- [接口错误码说明](https://www.runninghub.cn/runninghub-api-doc/doc-6913922.md) - API error code explanations
+
+### API Endpoints Documentation
+- [发起ComfyUI任务1-简易](https://www.runninghub.cn/runninghub-api-doc/api-276613248.md) - Simple ComfyUI task creation (no parameter changes)
+- [发起ComfyUI任务2-高级](https://www.runninghub.cn/runninghub-api-doc/api-276613249.md) - Advanced ComfyUI task creation (with nodeInfoList)
+- [发起AI应用任务](https://www.runninghub.cn/runninghub-api-doc/api-279098421.md) - AI webapp task creation (see webapp details for nodeInfoList examples)
+- [获取工作流Json](https://www.runninghub.cn/runninghub-api-doc/api-276613251.md) - Get workflow JSON
+- [查询任务状态](https://www.runninghub.cn/runninghub-api-doc/api-276613252.md) - Query task status
+- [查询任务生成结果](https://www.runninghub.cn/runninghub-api-doc/api-276613253.md) - Get task results
+- [取消ComfyUI任务](https://www.runninghub.cn/runninghub-api-doc/api-276613254.md) - Cancel ComfyUI tasks
+- [获取账户信息](https://www.runninghub.cn/runninghub-api-doc/api-276613255.md) - Get account information
+- [上传资源（图片、视频、音频）](https://www.runninghub.cn/runninghub-api-doc/api-276613256.md) - Upload resources for image-to-image scenarios
+- [上传Lora-获取Lora上传地址](https://www.runninghub.cn/runninghub-api-doc/api-276613257.md) - RHLoraLoader LoRA upload interface
+- [获取webhook事件详情](https://www.runninghub.cn/runninghub-api-doc/api-276613258.md) - Get webhook event details for debugging
+- [重新发送指定webhook事件](https://www.runninghub.cn/runninghub-api-doc/api-276613259.md) - Resend specific webhook events
+- [获取AI应用API调用示例](https://www.runninghub.cn/runninghub-api-doc/api-335439604.md) - Get AI webapp API call examples and demos
+
+### Key API Integration Notes
+1. **Parameter Types**: ALL parameters (webappId, workflowId, nodeId, fieldName, fieldValue) MUST be strings
+2. **Regional Support**: China (.cn) and Hong Kong (.ai) domains available
+3. **Task Flow**: Create → Poll Status → Get Results
+4. **Resource Upload**: Separate endpoints for images/media and LoRA models
+5. **Webhook Support**: Event-driven notifications with retry mechanisms

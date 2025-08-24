@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { API_BASE_URL } from '../config/api';
 
 type AuthUser = { id: string; email: string; username: string; avatar?: string } | null;
@@ -24,6 +24,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
+  
+  // TODO(human) - Add mutex mechanism for token refresh concurrency control
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
 
   const saveTokens = useCallback((access?: string, refresh?: string) => {
     if (access) {
@@ -53,22 +57,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
+    // If already refreshing, return the existing promise
+    if (isRefreshing || refreshPromiseRef.current) {
+      return refreshPromiseRef.current || Promise.resolve(false);
+    }
+    
     const refreshToken = localStorage.getItem(REFRESH_KEY);
     if (!refreshToken) return false;
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken })
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      saveTokens(data.accessToken);
-      return true;
-    } catch {
-      return false;
-    }
-  }, [saveTokens]);
+    
+    setIsRefreshing(true);
+    refreshPromiseRef.current = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+        
+        if (!res.ok) {
+          if (res.status === 401) {
+            clearTokens(); // Force re-login on invalid refresh token
+            setUser(null);
+          }
+          return false;
+        }
+        
+        const data = await res.json();
+        saveTokens(data.accessToken);
+        
+        // Update user data with refreshed token
+        const me = await fetchMe(data.accessToken);
+        if (me) setUser(me);
+        
+        return true;
+      } catch (error) {
+        console.error('Token refresh error:', error);
+        clearTokens(); // Ensure cleanup on failure
+        setUser(null);
+        return false;
+      } finally {
+        setIsRefreshing(false);
+        refreshPromiseRef.current = null;
+      }
+    })();
+    
+    return refreshPromiseRef.current;
+  }, [saveTokens, clearTokens, fetchMe, isRefreshing]);
 
   useEffect(() => {
     (async () => {

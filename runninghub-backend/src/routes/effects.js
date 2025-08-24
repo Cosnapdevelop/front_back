@@ -103,7 +103,7 @@ function validateFileName(filename) {
   return true;
 }
 
-function validateFileSize(file, maxSize = 30 * 1024 * 1024) {
+function validateFileSize(file, maxSize = 10 * 1024 * 1024) {
   return file.size <= maxSize;
 }
 
@@ -113,7 +113,7 @@ function validateFileSize(file, maxSize = 30 * 1024 * 1024) {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 30 * 1024 * 1024, // 30MB - 降低文件大小限制
+    fileSize: 10 * 1024 * 1024, // 10MB - RunningHub官方API限制，超过此大小自动使用云存储
     files: 5, // 最多5个文件 - 减少并发上传数量
     fieldSize: 1024 * 1024, // 1MB字段大小限制
     fieldNameSize: 100, // 字段名长度限制

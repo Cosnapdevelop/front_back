@@ -157,7 +157,7 @@ async function uploadToAWSS3(fileBuffer, fileName, mimeType) {
  * @returns {boolean} - 是否需要云存储
  */
 export function shouldUseCloudStorage(fileSize) {
-  const RUNNINGHUB_LIMIT = 10 * 1024 * 1024; // 10MB
+  const RUNNINGHUB_LIMIT = 10 * 1024 * 1024; // 10MB - RunningHub官方API限制
   return fileSize > RUNNINGHUB_LIMIT;
 }
 

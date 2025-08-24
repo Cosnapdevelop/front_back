@@ -3,7 +3,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { body, validationResult, query } from 'express-validator';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
 import { 
   authLimiter, 
   loginLimiter, 
@@ -16,9 +15,10 @@ import {
 } from '../middleware/validation.js';
 import { auth, checkTokenExpiry } from '../middleware/auth.js';
 import { isEmailEnabled, sendVerificationEmail } from '../services/emailService.js';
+import prismaClient from '../config/prisma.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = prismaClient;
 
 const ACCESS_EXPIRES = '15m';
 const REFRESH_EXPIRES_DAYS = 30; // days

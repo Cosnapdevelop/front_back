@@ -48,8 +48,8 @@ export const RUNNING_HUB_CONFIG = {
   // 背景替换特效workflowId（ComfyUI工作流）
   backgroundChangeWorkflowId: '1949831786093264897',
   
-  // 文件限制
-  maxFileSize: 30 * 1024 * 1024, // 30MB (匹配后端限制)
+  // 文件限制 - 根据RunningHub官方API文档
+  maxFileSize: 10 * 1024 * 1024, // 10MB (RunningHub官方限制，超过此大小自动使用云存储)
   supportedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'],
   maxProcessingTime: 5 * 60 * 1000 // 5分钟
 };

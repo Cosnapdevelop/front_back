@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prismaClient from '../config/prisma.js';
 
-const prisma = new PrismaClient();
+const prisma = prismaClient;
 
 /**
  * 增强的JWT认证中间件

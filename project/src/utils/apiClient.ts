@@ -127,26 +127,10 @@ export async function apiCall<T>(
     return await handleAPIResponse<T>(response);
   } catch (error) {
     if (error instanceof APIError) {
-      // 401时尝试刷新一次
+      // 401错误让AuthContext处理token刷新，避免重复刷新逻辑
       if (error.status === 401) {
-        const refreshToken = localStorage.getItem('cosnap_refresh_token');
-        if (refreshToken) {
-          try {
-            const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken })
-            });
-            if (res.ok) {
-              const data = await res.json();
-              localStorage.setItem('cosnap_access_token', data.accessToken);
-              const retryHeaders: any = { ...(options.headers || {}) };
-              retryHeaders['Authorization'] = `Bearer ${data.accessToken}`;
-              const retryRes = await fetchWithRetry(url, { ...options, headers: retryHeaders }, retryConfig);
-              return await handleAPIResponse<T>(retryRes);
-            }
-          } catch {}
-        }
+        console.warn('[API] Authentication error detected. AuthContext should handle token refresh.');
+        // 不在这里处理token刷新，让AuthContext的interceptor处理
       }
       throw error;
     }

@@ -4,14 +4,14 @@
  */
 
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import redisService from '../services/redisService.js';
 import monitoringService from '../services/monitoringService.js';
 import { productionConfig } from '../config/production.js';
 import axios from 'axios';
+import prismaClient from '../config/prisma.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = prismaClient;
 
 // Health check cache to avoid overloading services
 const healthCache = new Map();

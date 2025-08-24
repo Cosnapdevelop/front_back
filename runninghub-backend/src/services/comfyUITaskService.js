@@ -48,6 +48,8 @@ function createRunningHubAxiosInstance(regionId = DEFAULT_REGION) {
  * 启动ComfyUI任务服务
  * ⚠️ 重要：RunningHub API要求所有参数都必须是字符串类型！
  * @param {string} workflowId - 工作流ID (必须转换为字符串)
+ * 
+ * TODO(human) - 添加详细的调试日志来帮助诊断503错误问题
  * @param {Array} nodeInfoList - 节点信息列表
  * @param {string} regionId - 地区ID
  * @param {string} instanceType - 实例类型
