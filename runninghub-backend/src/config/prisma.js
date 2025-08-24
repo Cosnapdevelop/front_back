@@ -70,7 +70,6 @@ class PrismaManager {
       
       // Optimize for production performance
       ...(process.env.NODE_ENV === 'production' && {
-        rejectOnNotFound: false,
         __internal: {
           engine: {
             enableEngineDebugMode: false
