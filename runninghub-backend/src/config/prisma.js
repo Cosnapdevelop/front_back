@@ -25,6 +25,7 @@ class PrismaManager {
     this.maxConnectionAttempts = 5;
     this.connectionRetryDelay = 1000; // 1 second
     this.slowQueryThreshold = 2000; // 2 seconds
+    this.processExitHandlersSetup = false; // Track if process handlers are setup
     this.connectionMetrics = {
       totalQueries: 0,
       slowQueries: 0,
@@ -126,33 +127,53 @@ class PrismaManager {
 
   /**
    * Setup event handlers for connection monitoring
+   * Note: beforeExit hook is not available in Prisma 5.0.0+
    */
   setupEventHandlers() {
     if (!this.client) return;
 
-    // Handle database connection events
-    this.client.$on('beforeExit', async () => {
-      console.log('🔌 Prisma client disconnecting...');
-      await this.gracefulDisconnect();
-    });
+    // Setup process-level exit handlers instead of Prisma beforeExit
+    if (!this.processExitHandlersSetup) {
+      process.on('SIGTERM', async () => {
+        console.log('🔌 Received SIGTERM, gracefully disconnecting Prisma...');
+        await this.gracefulDisconnect();
+        process.exit(0);
+      });
 
-    // Monitor database errors
-    this.client.$on('error', (error) => {
-      console.error('🚨 Database error:', error);
-      this.connectionMetrics.errors++;
-      
-      // Emit alert for critical database errors
-      if (global.monitoringService) {
-        global.monitoringService.error('Database connection error', error);
-      }
-    });
+      process.on('SIGINT', async () => {
+        console.log('🔌 Received SIGINT, gracefully disconnecting Prisma...');
+        await this.gracefulDisconnect();
+        process.exit(0);
+      });
 
-    // Monitor warnings
-    this.client.$on('warn', (warning) => {
-      console.warn('⚠️  Database warning:', warning.message);
-    });
+      this.processExitHandlersSetup = true;
+    }
 
-    console.log('📊 Database event handlers configured');
+    // Monitor database errors (still supported)
+    try {
+      this.client.$on('error', (error) => {
+        console.error('🚨 Database error:', error);
+        this.connectionMetrics.errors++;
+        
+        // Emit alert for critical database errors
+        if (global.monitoringService) {
+          global.monitoringService.error('Database connection error', error);
+        }
+      });
+    } catch (error) {
+      console.warn('⚠️  Could not setup error event handler:', error.message);
+    }
+
+    // Monitor warnings (still supported)
+    try {
+      this.client.$on('warn', (warning) => {
+        console.warn('⚠️  Database warning:', warning.message);
+      });
+    } catch (error) {
+      console.warn('⚠️  Could not setup warn event handler:', error.message);
+    }
+
+    console.log('📊 Database event handlers configured for Prisma 5.0.0+');
   }
 
   /**
