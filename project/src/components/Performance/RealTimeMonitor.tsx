@@ -319,9 +319,11 @@ const RealTimeMonitor: React.FC = () => {
 
   // WebSocket connection for real-time data
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' && process.env.REACT_APP_ENABLE_WEBSOCKET === 'true') {
       try {
-        const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/performance`;
+        // Connect to backend WebSocket endpoint, not frontend
+        const backendUrl = process.env.REACT_APP_BACKEND_URL || 'https://cosnap-back.onrender.com';
+        const wsUrl = `${backendUrl.replace('https:', 'wss:').replace('http:', 'ws:')}/ws/performance`;
         websocketRef.current = new WebSocket(wsUrl);
         
         websocketRef.current.onopen = () => {

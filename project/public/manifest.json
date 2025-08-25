@@ -12,32 +12,8 @@
   "categories": ["photo", "graphics", "entertainment", "productivity"],
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
       "src": "/icons/icon-144x144.png",
       "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
-      "src": "/icons/icon-152x152.png",
-      "sizes": "152x152",
       "type": "image/png",
       "purpose": "maskable any"
     },
@@ -48,136 +24,16 @@
       "purpose": "maskable any"
     },
     {
-      "src": "/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "maskable any"
-    },
-    {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshots/mobile-home.png",
-      "sizes": "375x812",
-      "type": "image/png",
-      "platform": "mobile",
-      "label": "主页 - 浏览最新AI特效"
-    },
-    {
-      "src": "/screenshots/mobile-effects.png",
-      "sizes": "375x812",
-      "type": "image/png",
-      "platform": "mobile",
-      "label": "特效库 - 丰富的AI处理效果"
-    },
-    {
-      "src": "/screenshots/mobile-editor.png",
-      "sizes": "375x812",
-      "type": "image/png",
-      "platform": "mobile",
-      "label": "编辑器 - 强大的图像处理工具"
-    },
-    {
-      "src": "/screenshots/desktop-home.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "platform": "wide",
-      "label": "桌面版 - 专业的创作环境"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "快速特效",
-      "short_name": "特效",
-      "description": "立即使用AI特效处理图片",
-      "url": "/effects",
-      "icons": [
-        {
-          "src": "/icons/shortcut-effects.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "上传图片",
-      "short_name": "上传",
-      "description": "上传图片开始创作",
-      "url": "/upload",
-      "icons": [
-        {
-          "src": "/icons/shortcut-upload.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "我的作品",
-      "short_name": "作品",
-      "description": "查看已创作的作品",
-      "url": "/profile",
-      "icons": [
-        {
-          "src": "/icons/shortcut-profile.png",
-          "sizes": "96x96"
-        }
-      ]
-    }
-  ],
   "prefer_related_applications": false,
-  "related_applications": [
-    {
-      "platform": "play",
-      "url": "https://play.google.com/store/apps/details?id=com.cosnap.ai",
-      "id": "com.cosnap.ai"
-    },
-    {
-      "platform": "ios",
-      "url": "https://apps.apple.com/app/cosnap-ai/id123456789"
-    }
-  ],
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "protocol_handlers": [
-    {
-      "protocol": "web+cosnap",
-      "url": "/share?url=%s"
-    }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url",
-      "files": [
-        {
-          "name": "images",
-          "accept": ["image/*"]
-        }
-      ]
-    }
-  },
-  "file_handlers": [
-    {
-      "action": "/handle-image",
-      "accept": {
-        "image/*": [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"]
-      }
-    }
-  ],
   "launch_handler": {
     "client_mode": "navigate-existing"
   },
-  "handle_links": "preferred",
-  "id": "cosnap-ai-app",
-  "iarc_rating_id": "e58c174a-81d2-5c3c-32cc-34b8de4a52e9"
+  "id": "cosnap-ai-app"
 }
