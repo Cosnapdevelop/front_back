@@ -178,12 +178,52 @@ router.post(
   '/send-code',
   authLimiter,
   sanitizeInput,
-  body('email').isEmail().withMessage('请提供有效邮箱'),
+  ...authValidation.sendCode,
   async (req, res) => {
     try {
       const emailRaw = String(req.body.email || '');
       const scene = (req.body.scene || 'register').trim();
       const email = emailRaw.trim().toLowerCase();
+
+      // 对于邮箱更改场景，需要额外的权限验证
+      if (scene === 'change_email') {
+        // 获取并验证认证令牌（可选的认证检查，因为这是发送验证码）
+        const authHeader = req.get('Authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return res.status(401).json({ 
+            success: false, 
+            error: '邮箱更改需要先登录' 
+          });
+        }
+
+        try {
+          const token = authHeader.substring(7);
+          const payload = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+          req.user = payload; // 临时设置用户信息用于后续检查
+        } catch (error) {
+          return res.status(401).json({ 
+            success: false, 
+            error: '登录状态已过期，请重新登录' 
+          });
+        }
+
+        // 检查新邮箱是否已被其他用户使用
+        const existingUser = await prisma.user.findUnique({ where: { email } });
+        if (existingUser && existingUser.id !== req.user.sub) {
+          return res.status(409).json({
+            success: false,
+            error: '该邮箱已被其他用户使用'
+          });
+        }
+
+        // 防止用户给自己当前邮箱发送更改验证码
+        if (email === req.user.email) {
+          return res.status(400).json({
+            success: false,
+            error: '新邮箱不能与当前邮箱相同'
+          });
+        }
+      }
 
       // 生成6位数字验证码
       const code = ('' + Math.floor(100000 + Math.random() * 900000));
@@ -195,7 +235,7 @@ router.post(
 
       if (await isEmailEnabled()) {
         try {
-          await sendVerificationEmail(email, code);
+          await sendVerificationEmail(email, code, scene);
         } catch (e) {
           console.warn('[Email] 发送失败，降级为日志输出:', e?.message);
           console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
@@ -896,6 +936,164 @@ router.delete(
       return res.status(500).json({ 
         success: false, 
         error: '账户删除失败，请稍后重试' 
+      });
+    }
+  }
+);
+
+// 邮箱更改端点 - 需要双重验证（当前邮箱+新邮箱）
+router.post(
+  '/change-email',
+  sensitiveOperationLimiter,
+  sanitizeInput,
+  auth,
+  ...authValidation.changeEmail,
+  async (req, res) => {
+    try {
+      const { newEmail, currentEmailCode, newEmailCode, password } = req.body;
+      const userId = req.user.sub;
+
+      // 获取当前用户信息
+      const currentUser = await prisma.user.findUnique({
+        where: { id: userId }
+      });
+
+      if (!currentUser) {
+        return res.status(404).json({
+          success: false,
+          error: '用户不存在'
+        });
+      }
+
+      // 1. 验证用户密码
+      const passwordValid = await bcrypt.compare(password, currentUser.passwordHash);
+      if (!passwordValid) {
+        console.warn(`[邮箱更改] 密码错误 - 用户: ${currentUser.username} (${currentUser.id}), IP: ${req.ip}`);
+        return res.status(401).json({
+          success: false,
+          error: '密码错误'
+        });
+      }
+
+      // 2. 检查新邮箱是否已被其他用户使用
+      const emailExists = await prisma.user.findUnique({ where: { email: newEmail } });
+      if (emailExists && emailExists.id !== userId) {
+        return res.status(409).json({
+          success: false,
+          error: '该邮箱已被其他用户使用'
+        });
+      }
+
+      // 3. 防止设置相同邮箱
+      if (newEmail === currentUser.email) {
+        return res.status(400).json({
+          success: false,
+          error: '新邮箱不能与当前邮箱相同'
+        });
+      }
+
+      const now = new Date();
+
+      // 4. 验证当前邮箱的验证码
+      const currentEmailVerification = await prisma.verificationCode.findFirst({
+        where: {
+          email: currentUser.email,
+          scene: 'change_email',
+          code: currentEmailCode,
+          expiresAt: { gt: now },
+          usedAt: null
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (!currentEmailVerification) {
+        return res.status(400).json({
+          success: false,
+          error: '当前邮箱验证码无效或已过期'
+        });
+      }
+
+      // 5. 验证新邮箱的验证码
+      const newEmailVerification = await prisma.verificationCode.findFirst({
+        where: {
+          email: newEmail,
+          scene: 'change_email',
+          code: newEmailCode,
+          expiresAt: { gt: now },
+          usedAt: null
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (!newEmailVerification) {
+        return res.status(400).json({
+          success: false,
+          error: '新邮箱验证码无效或已过期'
+        });
+      }
+
+      // 6. 在事务中执行邮箱更改操作
+      await prisma.$transaction(async (tx) => {
+        // 标记验证码为已使用
+        await tx.verificationCode.update({
+          where: { id: currentEmailVerification.id },
+          data: { usedAt: new Date() }
+        });
+
+        await tx.verificationCode.update({
+          where: { id: newEmailVerification.id },
+          data: { usedAt: new Date() }
+        });
+
+        // 更新用户邮箱
+        await tx.user.update({
+          where: { id: userId },
+          data: { 
+            email: newEmail,
+            // 更新时间戳以便追踪变更历史
+            // createdAt 保持不变，这是注册时间
+          }
+        });
+
+        // 撤销所有现有的刷新令牌，强制用户重新登录
+        // 这是一个安全措施，确保邮箱更改后需要重新认证
+        await tx.refreshToken.updateMany({
+          where: { userId: userId, isRevoked: false },
+          data: { 
+            isRevoked: true,
+            revokedAt: new Date()
+          }
+        });
+      });
+
+      // 7. 记录安全日志
+      console.log(`[邮箱更改] 成功 - 用户: ${currentUser.username} (${currentUser.id}), IP: ${req.ip}, 旧邮箱: ${currentUser.email}, 新邮箱: ${newEmail}`);
+
+      // 8. 返回成功响应
+      return res.json({
+        success: true,
+        message: '邮箱更改成功，请重新登录',
+        user: {
+          id: currentUser.id,
+          username: currentUser.username,
+          email: newEmail
+        }
+      });
+
+    } catch (error) {
+      console.error(`[邮箱更改] 失败 - 用户: ${req.user?.sub}, IP: ${req.ip}, 错误:`, error);
+
+      // 处理特定的数据库约束错误
+      if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+        return res.status(409).json({
+          success: false,
+          error: '邮箱已被其他用户使用'
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: '邮箱更改失败，请稍后重试'
       });
     }
   }

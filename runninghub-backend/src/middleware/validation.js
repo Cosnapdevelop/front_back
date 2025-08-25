@@ -243,6 +243,41 @@ export const authValidation = {
       .isURL()
       .withMessage('头像必须是有效的URL地址'),
     handleValidationErrors
+  ],
+
+  changeEmail: [
+    body('newEmail')
+      .isEmail()
+      .withMessage('请提供有效的新邮箱地址')
+      .normalizeEmail()
+      .isLength({ max: 254 })
+      .withMessage('邮箱地址过长'),
+    body('currentEmailCode')
+      .isLength({ min: 6, max: 6 })
+      .withMessage('当前邮箱验证码必须为6位数字')
+      .isNumeric()
+      .withMessage('验证码必须为数字'),
+    body('newEmailCode')
+      .isLength({ min: 6, max: 6 })
+      .withMessage('新邮箱验证码必须为6位数字')
+      .isNumeric()
+      .withMessage('验证码必须为数字'),
+    stringValidation.password,
+    handleValidationErrors
+  ],
+
+  sendCode: [
+    body('email')
+      .isEmail()
+      .withMessage('请提供有效邮箱')
+      .normalizeEmail()
+      .isLength({ max: 254 })
+      .withMessage('邮箱地址过长'),
+    body('scene')
+      .optional()
+      .isIn(['register', 'reset_password', 'delete_account', 'change_email'])
+      .withMessage('无效的验证场景'),
+    handleValidationErrors
   ]
 };
 

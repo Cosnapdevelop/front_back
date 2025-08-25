@@ -16,14 +16,18 @@ import {
   Share,
   Trash2,
   AlertTriangle,
-  Send
+  Send,
+  Mail
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import EffectCard from '../components/Cards/EffectCard';
 import Avatar from '../components/Avatar';
+import EmailChangeModal from '../components/EmailChangeModal';
 
 const Profile = () => {
   const { state, dispatch } = useApp();
+  const { user: authUser, isAuthenticated, bootstrapped } = useAuth();
   const { push } = useToast();
   const [activeTab, setActiveTab] = useState<'history' | 'bookmarks' | 'posts' | 'settings'>('history');
   const usernameRef = useRef<HTMLInputElement>(null);
@@ -47,6 +51,8 @@ const Profile = () => {
   // Loading states
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [loadingProfileData, setLoadingProfileData] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const tabs = [
     { id: 'history', label: 'Recent History', icon: Clock },
@@ -56,6 +62,51 @@ const Profile = () => {
   ];
 
   const bookmarkedEffects = state.effects.filter(effect => effect.isBookmarked);
+
+  // Fetch additional profile data when authenticated user is available
+  useEffect(() => {
+    const fetchProfileData = async () => {
+      if (!authUser || !isAuthenticated) return;
+
+      setLoadingProfileData(true);
+      setProfileError(null);
+      
+      try {
+        const response = await fetch(`${API}/auth/me/profile`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.profile) {
+            // Update AppContext with extended profile data
+            const extendedUser = {
+              ...authUser,
+              bio: data.profile.bio || 'No bio available',
+              effectsCreated: data.profile.effectsCreated || 0,
+              totalLikes: data.profile.totalLikes || 0,
+              joinDate: data.profile.joinDate || new Date().toISOString(),
+              preferences: data.profile.preferences || {
+                theme: state.theme,
+                notifications: true,
+                privacy: 'public'
+              }
+            };
+            dispatch({ type: 'SET_USER', payload: extendedUser });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile data:', error);
+        setProfileError('Failed to load additional profile information');
+      } finally {
+        setLoadingProfileData(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [authUser, isAuthenticated, API, dispatch, state.theme]);
 
   const API = API_BASE_URL;
   const [myPosts, setMyPosts] = useState<any[]>([]);
@@ -73,6 +124,9 @@ const Profile = () => {
   const [editImages, setEditImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
+  
+  // Email Change Modal state
+  const [showEmailChangeModal, setShowEmailChangeModal] = useState(false);
 
   const fetchMyPosts = async () => {
     setLoadingPosts(true);
@@ -227,7 +281,7 @@ const Profile = () => {
             Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}`
           },
           body: JSON.stringify({
-            email: state.user?.email,
+            email: authUser?.email,
             scene: 'delete_account'
           })
         });
@@ -255,7 +309,7 @@ const Profile = () => {
           body: JSON.stringify({
             password: deletePassword,
             confirmationText: deleteConfirmText,
-            email: state.user?.email,
+            email: authUser?.email,
             code: deleteVerificationCode
           })
         });
@@ -284,6 +338,25 @@ const Profile = () => {
     setDeleteVerificationCode('');
     setCodeSent(false);
     setIsDeleting(false);
+  };
+
+  // Handle successful email change
+  const handleEmailChangeSuccess = (newEmail: string) => {
+    // Update the email reference input value
+    if (emailRef.current) {
+      emailRef.current.value = newEmail;
+    }
+    
+    // Update the user data in AuthContext by triggering a refresh
+    // This will fetch updated user data from the server
+    if (authUser) {
+      // Update local state immediately for better UX
+      const updatedUser = { ...authUser, email: newEmail };
+      // Note: The AuthContext doesn't expose a direct user update method,
+      // but the user data will be refreshed on next auth check
+    }
+    
+    push('info', 'Please log in again with your new email address on your next session for enhanced security.');
   };
 
   const renderTabContent = () => {
@@ -398,7 +471,7 @@ const Profile = () => {
                   <div className="relative">
                     <input
                       type="text"
-                      defaultValue={state.user?.username}
+                      defaultValue={displayUser.username}
                       ref={usernameRef}
                       onChange={(e) => {
                         const newUsername = e.target.value.trim();
@@ -406,7 +479,7 @@ const Profile = () => {
                           clearTimeout(usernameDebounceTimeout);
                         }
                         
-                        if (newUsername && newUsername !== state.user?.username) {
+                        if (newUsername && newUsername !== displayUser.username) {
                           setCheckingUsername(true);
                           setUsernameAvailable(null);
                           
@@ -459,19 +532,33 @@ const Profile = () => {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Email
                   </label>
-                  <input
-                    type="email"
-                    defaultValue={state.user?.email}
-                    ref={emailRef}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
+                  <div className="flex space-x-2">
+                    <input
+                      type="email"
+                      defaultValue={displayUser.email}
+                      ref={emailRef}
+                      readOnly
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white cursor-not-allowed"
+                      title="Use the 'Change Email' button to update your email address"
+                    />
+                    <button
+                      onClick={() => setShowEmailChangeModal(true)}
+                      className="flex items-center space-x-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                    >
+                      <Mail className="h-4 w-4" />
+                      <span>Change Email</span>
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Your email address is used for login and important notifications
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Bio
                   </label>
                   <textarea
-                    defaultValue={state.user?.bio}
+                    defaultValue={displayUser.bio}
                     ref={bioRef}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
@@ -586,13 +673,24 @@ const Profile = () => {
               </div>
             </div>
 
+            {/* Error Display */}
+            {profileError && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                  <p className="text-red-800 dark:text-red-200 text-sm">{profileError}</p>
+                </div>
+              </div>
+            )}
+
             {/* Save Button */}
             <div className="flex justify-end">
               <button
                 onClick={async () => {
+                  setSavingProfile(true);
                   const payload = {
                     username: usernameRef.current?.value,
-                    email: emailRef.current?.value,
+                    // email: emailRef.current?.value, // Email changes handled via EmailChangeModal
                     bio: bioRef.current?.value,
                   };
                   try {
@@ -608,21 +706,38 @@ const Profile = () => {
                     if (data.success) {
                       localStorage.setItem('user', JSON.stringify(data.user));
                       dispatch({ type: 'SET_USER', payload: data.user });
-                      push('success','Saved');
-                      // 立即刷新顶部展示
+                      push('success','Profile updated successfully');
+                      // Clear any previous errors
+                      setProfileError(null);
+                      // Refresh the page display
                       setActiveTab('settings');
                     } else if (res.status === 409) {
-                      push('warning', data.error || '用户名或邮箱已被占用');
+                      push('warning', data.error || 'Username or email already taken');
                     } else {
-                      push('error','Failed: ' + (data.error || ''));
+                      push('error','Failed to save: ' + (data.error || 'Unknown error'));
                     }
                   } catch (e) {
-                    push('error','Failed to save');
+                    console.error('Profile save error:', e);
+                    push('error','Failed to save profile');
+                  } finally {
+                    setSavingProfile(false);
                   }
                 }}
-                className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                disabled={savingProfile}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+                  savingProfile 
+                    ? 'bg-purple-400 cursor-not-allowed' 
+                    : 'bg-purple-500 hover:bg-purple-600'
+                } text-white`}
               >
-                Save Changes
+                {savingProfile ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Save Changes</span>
+                )}
               </button>
             </div>
           </div>
@@ -633,14 +748,112 @@ const Profile = () => {
     }
   };
 
-  if (!state.user) {
+  // Show loading state while authentication is being checked
+  if (!bootstrapped) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mx-auto"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading profile...</p>
         </div>
       </div>
     );
+  }
+
+  // Show error state if user is not authenticated
+  if (!isAuthenticated || !authUser) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="text-red-500 text-6xl">⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Authentication Required</h2>
+          <p className="text-gray-600 dark:text-gray-400">Please log in to view your profile.</p>
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Use authenticated user data with fallbacks from AppContext for additional profile data
+  const displayUser = {
+    id: authUser.id,
+    username: authUser.username,
+    email: authUser.email,
+    avatar: authUser.avatar || 'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+    bio: state.user?.bio || 'No bio available',
+    effectsCreated: state.user?.effectsCreated || 0,
+    totalLikes: state.user?.totalLikes || 0
+  };
+
+  // Skeleton loading component
+  const ProfileSkeleton = () => (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Profile Header Skeleton */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+          {/* Cover Image Skeleton */}
+          <div className="h-32 sm:h-48 bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-600 dark:to-gray-700 animate-pulse" />
+          
+          {/* Profile Info Skeleton */}
+          <div className="relative px-6 pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-16 sm:-mt-20">
+              {/* Avatar Skeleton */}
+              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse mx-auto sm:mx-0" />
+              
+              <div className="flex-1 text-center sm:text-left mt-4 sm:mt-0 sm:pb-4">
+                {/* Username Skeleton */}
+                <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded animate-pulse w-48 mx-auto sm:mx-0 mb-2" />
+                {/* Bio Skeleton */}
+                <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded animate-pulse w-72 mx-auto sm:mx-0 mb-4" />
+                
+                {/* Stats Skeleton */}
+                <div className="flex items-center justify-center sm:justify-start space-x-6 text-sm">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="text-center">
+                      <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded animate-pulse w-8 mb-1" />
+                      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded animate-pulse w-16" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Action Buttons Skeleton */}
+              <div className="flex items-center space-x-3 mt-4 sm:mt-0 justify-center sm:justify-end">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-10 bg-gray-300 dark:bg-gray-600 rounded-lg animate-pulse w-24" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs Skeleton */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-1 mb-8 border border-gray-200 dark:border-gray-700">
+          <div className="flex space-x-1">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-10 bg-gray-300 dark:bg-gray-600 rounded-md animate-pulse flex-1" />
+            ))}
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-32 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Show skeleton while loading profile data
+  if (loadingProfileData && !state.user) {
+    return <ProfileSkeleton />;
   }
 
   return (
@@ -657,30 +870,38 @@ const Profile = () => {
           <div className="relative px-6 pb-6">
             <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-16 sm:-mt-20">
               <Avatar
-                src={state.user.avatar}
-                name={state.user.username}
+                src={displayUser.avatar}
+                name={displayUser.username}
                 size="xl"
                 className="mx-auto sm:mx-0"
               />
               
               <div className="flex-1 text-center sm:text-left mt-4 sm:mt-0 sm:pb-4">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  @{state.user.username}
-                </h1>
+                <div className="flex items-center justify-center sm:justify-start space-x-2">
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    @{displayUser.username}
+                  </h1>
+                  {loadingProfileData && (
+                    <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  )}
+                </div>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  {state.user.bio}
+                  {displayUser.bio}
+                  {loadingProfileData && !state.user?.bio && (
+                    <span className="text-purple-500 ml-2">Loading profile data...</span>
+                  )}
                 </p>
                 
                 <div className="flex items-center justify-center sm:justify-start space-x-6 text-sm">
                   <div className="text-center">
                     <p className="font-semibold text-gray-900 dark:text-white">
-                      {state.user.effectsCreated}
+                      {displayUser.effectsCreated}
                     </p>
                     <p className="text-gray-600 dark:text-gray-400">Effects</p>
                   </div>
                   <div className="text-center">
                     <p className="font-semibold text-gray-900 dark:text-white">
-                      {state.user.totalLikes}
+                      {displayUser.totalLikes}
                     </p>
                     <p className="text-gray-600 dark:text-gray-400">Likes</p>
                   </div>
@@ -851,6 +1072,13 @@ const Profile = () => {
             </div>
           </div>
         )}
+
+        {/* Email Change Modal */}
+        <EmailChangeModal
+          isOpen={showEmailChangeModal}
+          onClose={() => setShowEmailChangeModal(false)}
+          onSuccess={handleEmailChangeSuccess}
+        />
 
         {/* Account Deletion Modal */}
         {showDeleteModal && (
