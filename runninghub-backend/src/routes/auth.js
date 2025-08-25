@@ -27,7 +27,11 @@ function signAccessToken(user) {
   return jwt.sign(
     { sub: user.id, email: user.email, username: user.username },
     process.env.JWT_ACCESS_SECRET,
-    { expiresIn: ACCESS_EXPIRES }
+    { 
+      expiresIn: ACCESS_EXPIRES,
+      issuer: process.env.JWT_ISSUER || 'cosnap-api',
+      audience: process.env.JWT_AUDIENCE || 'cosnap-app'
+    }
   );
 }
 

@@ -12,8 +12,32 @@
   "categories": ["photo", "graphics", "entertainment", "productivity"],
   "icons": [
     {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
       "src": "/icons/icon-144x144.png",
       "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
       "type": "image/png",
       "purpose": "maskable any"
     },
@@ -24,10 +48,42 @@
       "purpose": "maskable any"
     },
     {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "快速特效",
+      "short_name": "特效",
+      "description": "立即使用AI特效处理图片",
+      "url": "/effects",
+      "icons": [
+        {
+          "src": "/icons/shortcut-effects.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "上传图片",
+      "short_name": "上传",
+      "description": "上传图片开始创作",
+      "url": "/upload",
+      "icons": [
+        {
+          "src": "/icons/shortcut-upload.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ],
   "prefer_related_applications": false,
