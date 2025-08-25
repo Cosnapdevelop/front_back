@@ -5,6 +5,8 @@ function getSmtpConfig() {
 	const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
 	const user = process.env.SMTP_USER;
 	const pass = process.env.SMTP_PASS;
+	// TODO(human): Add logic to handle secure setting based on port
+	// Port 465 requires secure: true (SSL), Port 587 uses secure: false (STARTTLS)
 	const secure = String(process.env.SMTP_SECURE || '').toLowerCase() === 'true';
 	const from = process.env.SMTP_FROM;
 	const fromName = process.env.SMTP_FROM_NAME || 'Cosnap AI';
@@ -21,6 +23,12 @@ export async function sendVerificationEmail(toEmail, code) {
 	if (!isEmailEnabled()) {
 		console.warn('[Email] SMTP 未配置，跳过真实发信。验证码:', code, '收件人:', toEmail);
 		return false;
+	}
+	// Auto-configure secure setting based on port
+	if (cfg.port === 465) {
+		cfg.secure = true;  // SSL encryption for port 465
+	} else if (cfg.port === 587) {
+		cfg.secure = false; // STARTTLS encryption for port 587
 	}
 
 	const transporter = nodemailer.createTransport({
