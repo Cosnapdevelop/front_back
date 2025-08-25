@@ -18,6 +18,7 @@ import { useBeta } from '../../context/BetaContext';
 interface MobileFileUploaderProps {
   onUpload: (file: File) => void;
   onError?: (error: string) => void;
+  onClear?: () => void; // Add clear callback
   accept?: string;
   maxSize?: number; // in MB
   label?: string;
@@ -38,6 +39,7 @@ interface MobileFileUploaderProps {
 const MobileFileUploader: React.FC<MobileFileUploaderProps> = ({
   onUpload,
   onError,
+  onClear,
   accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp",
   maxSize = 30, // 30MB default
   label = "Upload Image",
@@ -365,7 +367,10 @@ const MobileFileUploader: React.FC<MobileFileUploaderProps> = ({
     setShowPreviewModal(false);
     triggerHaptic('medium');
     trackBetaEvent('mobile_file_clear');
-    // This would need to call a prop to clear the current file
+    // Call the parent component's clear callback
+    if (onClear) {
+      onClear();
+    }
   };
 
   // Network status indicator

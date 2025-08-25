@@ -9,6 +9,8 @@ import { ParametersPanel } from '../components/EffectParameters/ParametersPanel'
 import { ProcessingControls } from '../components/ProcessingStatus/ProcessingControls';
 import { ResultsPanel } from '../components/Results/ResultsPanel';
 import { LoadingState } from '../components/UI/LoadingState';
+import TaskImageUploader from '../components/TaskImageUploader';
+import MobileFileUploader from '../components/Mobile/MobileFileUploader';
 import { trackEffectCreated, trackEngagement, trackFeatureUsage, trackPerformance } from '../utils/analytics';
 import { useAPIPerformance, useRenderPerformance } from '../hooks/usePerformanceMonitoring';
 import { 
@@ -495,8 +497,90 @@ const ApplyEffect = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Parameters & Controls */}
+          {/* Left Column - Image Upload, Parameters & Controls */}
           <div className="space-y-6">
+            {/* Main Image Upload Area */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Upload Images
+              </h2>
+              
+              {/* Desktop/Tablet Image Uploader */}
+              <div className="hidden md:block">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={handleImageUpload}
+                  multiple
+                  disabled={isProcessing}
+                  className="hidden"
+                />
+                <div
+                  className={`
+                    border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer
+                    hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200
+                    ${uploadedImages.length > 0 ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : ''}
+                    ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                  onClick={() => !isProcessing && fileInputRef.current?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                >
+                  <div className="space-y-2">
+                    <div className="text-4xl text-gray-400 dark:text-gray-500">📁</div>
+                    <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
+                      {uploadedImages.length > 0 ? `${uploadedImages.length} images uploaded` : 'Click to upload images'}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Or drag and drop your images here
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      Supports: JPG, PNG, GIF, WebP • Max: 30MB per file • Up to 5 images
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mobile Image Uploader */}
+              <div className="block md:hidden">
+                <MobileFileUploader
+                  label="Upload your images"
+                  onUpload={(file) => {
+                    const files = [file];
+                    handleMultipleFiles(files);
+                  }}
+                  onError={(error) => push('error', error)}
+                  maxSize={30}
+                  showCameraOption={true}
+                  showGalleryOption={true}
+                  enableGestures={true}
+                />
+              </div>
+
+              {/* Display uploaded images */}
+              {uploadedImages.length > 0 && (
+                <div className="mt-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {uploadedImages.map((image) => (
+                      <div key={image.id} className="relative">
+                        <TaskImageUploader
+                          fileObj={{
+                            url: image.url,
+                            name: image.name,
+                            size: image.size
+                          }}
+                          onUpload={() => {}} // Not used in display mode
+                          onClear={() => removeImage(image.id)}
+                          disabled={isProcessing}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <ParametersPanel
               parameters={effect.parameters}
               values={parameters}

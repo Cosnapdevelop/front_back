@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ErrorBoundary from './ErrorBoundary';
 
 interface TaskImageUploaderProps {
@@ -6,11 +6,13 @@ interface TaskImageUploaderProps {
   error?: string;
   disabled?: boolean;
   onUpload: (file: File) => void;
+  onClear?: () => void;
   label?: string;
 }
 
-const TaskImageUploaderCore: React.FC<TaskImageUploaderProps> = ({ fileObj, error, disabled, onUpload, label }) => {
+const TaskImageUploaderCore: React.FC<TaskImageUploaderProps> = ({ fileObj, error, disabled, onUpload, onClear, label }) => {
   const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB - RunningHub官方限制
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -47,8 +49,28 @@ const TaskImageUploaderCore: React.FC<TaskImageUploaderProps> = ({ fileObj, erro
       />
       {fileObj?.url && (
         <div className="mt-2">
-          <img src={fileObj.url} alt={fileObj.name} className="w-32 h-32 object-cover rounded" />
-          <div className="text-xs text-gray-500 dark:text-gray-400">
+          <div className="relative inline-block">
+            <img 
+              src={fileObj.url} 
+              alt={fileObj.name} 
+              className="w-32 h-32 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity" 
+              onClick={() => setShowPreviewModal(true)}
+              title="Click to view full size"
+            />
+            {onClear && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear();
+                }}
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                title="Remove image"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {fileObj.name} ({fileObj.size && (fileObj.size / 1024 / 1024).toFixed(1)}MB)
           </div>
         </div>
@@ -56,6 +78,27 @@ const TaskImageUploaderCore: React.FC<TaskImageUploaderProps> = ({ fileObj, erro
       {error && (
         <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
           {error}
+        </div>
+      )}
+
+      {/* Full-Screen Preview Modal */}
+      {showPreviewModal && fileObj?.url && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onClick={() => setShowPreviewModal(false)}>
+          <div className="relative max-w-full max-h-full p-4">
+            <button
+              onClick={() => setShowPreviewModal(false)}
+              className="absolute top-2 right-2 w-10 h-10 bg-white/20 hover:bg-white/30 text-white rounded-full flex items-center justify-center text-xl transition-colors z-10"
+              title="Close preview"
+            >
+              ×
+            </button>
+            <img 
+              src={fileObj.url} 
+              alt={fileObj.name}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         </div>
       )}
     </div>

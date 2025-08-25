@@ -57,6 +57,7 @@ export const ParameterInput: React.FC<ParameterInputProps> = ({
             label={param.label || param.name}
             onUpload={(file: File) => onImageUpload?.(param.name, file)}
             onError={(error: string) => console.error('Upload error:', error)}
+            onClear={() => onImageRemove?.(param.name)}
             currentFile={imageParamFiles[param.name] ? {
               url: imageParamFiles[param.name].url,
               name: imageParamFiles[param.name].name,
