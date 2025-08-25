@@ -720,9 +720,9 @@ const MobileFileUploader: React.FC<MobileFileUploaderProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Full-Screen Preview Modal for Beta Users */}
+      {/* Full-Screen Preview Modal */}
       <AnimatePresence>
-        {showPreviewModal && currentFile?.url && isFeatureEnabled('enhancedImageUploader') && (
+        {showPreviewModal && currentFile?.url && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
