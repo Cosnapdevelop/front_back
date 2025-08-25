@@ -484,12 +484,14 @@ class MonitoringService {
   // =============================================================================
 
   startTimer(name) {
+    const startTime = process.hrtime.bigint();
+    const service = this;
     return {
       name,
-      start: process.hrtime.bigint(),
+      start: startTime,
       end: () => {
-        const duration = Number(process.hrtime.bigint() - this.start) / 1e6; // Convert to ms
-        this.debug(`Performance: ${name} took ${duration.toFixed(2)}ms`);
+        const duration = Number(process.hrtime.bigint() - startTime) / 1e6; // Convert to ms
+        service.debug(`Performance: ${name} took ${duration.toFixed(2)}ms`);
         return duration;
       }
     };
