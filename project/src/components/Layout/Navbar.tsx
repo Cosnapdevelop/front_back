@@ -108,7 +108,10 @@ const Navbar = () => {
                 {/* Notification Badge */}
                 {state.notifications && state.notifications.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-sakura-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium animate-pulse">
-                    {state.notifications.filter(n => !n.read).length > 9 ? '9+' : state.notifications.filter(n => !n.read).length}
+                    {(() => {
+                      const unreadCount = state.notifications.filter(n => !n.read).length;
+                      return unreadCount > 9 ? '9+' : unreadCount;
+                    })()}
                   </span>
                 )}
               </button>

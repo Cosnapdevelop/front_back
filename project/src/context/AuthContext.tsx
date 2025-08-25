@@ -25,9 +25,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [bootstrapped, setBootstrapped] = useState(false);
   
-  // TODO(human) - Add mutex mechanism for token refresh concurrency control
+  // FIXED: Implemented mutex mechanism for token refresh concurrency control
   const [isRefreshing, setIsRefreshing] = useState(false);
   const refreshPromiseRef = useRef<Promise<boolean> | null>(null);
+  const refreshMutexRef = useRef<boolean>(false);
 
   const saveTokens = useCallback((access?: string, refresh?: string) => {
     if (access) {
@@ -58,14 +59,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     // If already refreshing, return the existing promise
-    if (isRefreshing || refreshPromiseRef.current) {
+    if (refreshMutexRef.current) {
       return refreshPromiseRef.current || Promise.resolve(false);
     }
-    
+    refreshMutexRef.current = true;
     const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (!refreshToken) return false;
+    if (!refreshToken) {
+      refreshMutexRef.current = false; // 释放锁
+      return false;
+    }
     
     setIsRefreshing(true);
+    if (refreshPromiseRef.current) {
+      refreshMutexRef.current = false; // 释放锁
+      return refreshPromiseRef.current;
+    }
     refreshPromiseRef.current = (async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
@@ -98,6 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         setIsRefreshing(false);
         refreshPromiseRef.current = null;
+        refreshMutexRef.current = false; // 释放互斥锁
+
       }
     })();
     

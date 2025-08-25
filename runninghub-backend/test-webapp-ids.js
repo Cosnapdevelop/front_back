@@ -25,7 +25,7 @@ async function testWebappId(webappId, region) {
     console.log(`\n[测试] webappId: ${webappId}, 地区: ${region.id}`);
     
     const response = await axios.post(`${region.domain}/task/openapi/ai-app/run`, {
-      webappId: parseInt(webappId),
+      webappId: webappId, // FIXED: Use string format as required by RunningHub API
       apiKey: API_KEY,
       nodeInfoList: [
         {

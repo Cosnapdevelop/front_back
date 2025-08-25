@@ -8,7 +8,7 @@ async function testPortraitUpscale() {
     console.log(`[测试] 顶级人像放大: webappId=${WEBAPP_ID}`);
     
     const response = await axios.post('https://www.runninghub.ai/task/openapi/ai-app/run', {
-      webappId: parseInt(WEBAPP_ID),
+      webappId: WEBAPP_ID, // FIXED: Use string format as required by RunningHub API
       apiKey: API_KEY,
       nodeInfoList: [
         {

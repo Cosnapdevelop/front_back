@@ -167,7 +167,10 @@ const MobileNavbar: React.FC<MobileNavbarProps> = ({
                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                 >
                   <span className="text-white text-xs font-medium">
-                    {state.notifications.filter(n => !n.read).length > 9 ? '9+' : state.notifications.filter(n => !n.read).length}
+                    {(() => {
+                      const unreadCount = state.notifications.filter(n => !n.read).length;
+                      return unreadCount > 9 ? '9+' : unreadCount;
+                    })()}
                   </span>
                 </motion.div>
               )}

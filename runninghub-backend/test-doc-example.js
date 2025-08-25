@@ -8,7 +8,7 @@ async function testDocExample() {
     console.log(`[测试] 文档示例webappId: ${WEBAPP_ID}`);
     
     const response = await axios.post('https://www.runninghub.ai/task/openapi/ai-app/run', {
-      webappId: parseInt(WEBAPP_ID),
+      webappId: WEBAPP_ID, // FIXED: Use string format as required by RunningHub API
       apiKey: API_KEY,
       nodeInfoList: [
         {

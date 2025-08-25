@@ -395,23 +395,45 @@ class AsyncErrorHandler {
       animate-slide-in-right
     `;
     
-    notification.innerHTML = `
-      <div class="flex items-start space-x-3">
-        <div class="flex-1">
-          <h4 class="font-medium">${options.title}</h4>
-          <p class="text-sm mt-1">${options.message}</p>
-          ${options.actions ? `
-            <div class="mt-3 space-x-2">
-              ${options.actions.map(action => `
-                <button 
-                  class="text-sm px-3 py-1 rounded ${action.primary ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'} hover:opacity-80"
-                  onclick="(${action.action.toString()})(); this.closest('[data-notification]').remove();"
-                >
-                  ${action.label}
-                </button>
-              `).join('')}
-            </div>
-          ` : ''}
+    // SECURITY FIX: Use textContent instead of innerHTML to prevent XSS
+    const titleElement = document.createElement('h4');
+    titleElement.className = 'font-medium';
+    titleElement.textContent = options.title;
+    
+    const messageElement = document.createElement('p');
+    messageElement.className = 'text-sm mt-1';
+    messageElement.textContent = options.message;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'flex-1';
+    contentDiv.appendChild(titleElement);
+    contentDiv.appendChild(messageElement);
+    
+    const containerDiv = document.createElement('div');
+    containerDiv.className = 'flex items-start space-x-3';
+    containerDiv.appendChild(contentDiv);
+    
+    
+    // Handle actions safely without innerHTML
+    if (options.actions) {
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'mt-3 space-x-2';
+      
+      options.actions.forEach(action => {
+        const button = document.createElement('button');
+        button.className = `text-sm px-3 py-1 rounded ${action.primary ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'} hover:opacity-80`;
+        button.textContent = action.label;
+        button.addEventListener('click', () => {
+          action.action();
+          notification.remove();
+        });
+        actionsDiv.appendChild(button);
+      });
+      
+      contentDiv.appendChild(actionsDiv);
+    }
+    
+    notification.appendChild(containerDiv);
         </div>
         <button 
           class="text-gray-400 hover:text-gray-600"

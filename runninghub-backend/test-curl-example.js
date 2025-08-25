@@ -8,7 +8,7 @@ async function testCurlExample() {
     console.log(`[测试] 使用用户curl示例的webappId: ${WEBAPP_ID}`);
     
     const response = await axios.post('https://www.runninghub.ai/task/openapi/ai-app/run', {
-      webappId: 1907365560131153921, // 直接使用数字，不parseInt
+      webappId: WEBAPP_ID, // FIXED: Use string format as required by RunningHub API
       apiKey: API_KEY,
       nodeInfoList: [
         {
@@ -38,7 +38,7 @@ async function testCurlExample() {
     console.log('\n[重试] 尝试不同的webappId格式...');
     try {
       const response2 = await axios.post('https://www.runninghub.ai/task/openapi/ai-app/run', {
-        webappId: parseInt(WEBAPP_ID), // 使用parseInt
+        webappId: WEBAPP_ID, // FIXED: Use string format as required by RunningHub API
         apiKey: API_KEY,
         nodeInfoList: [
           {

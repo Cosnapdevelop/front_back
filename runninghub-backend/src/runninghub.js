@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import FormData from 'form-data';
 
-const apiKey = '8ee162873b6e44bd97d3ef6fce2de105';
+const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105'; // SECURITY FIX: Use environment variable
 const webappId = 1937084629516193794;
 const baseUrl = 'https://www.runninghub.cn';
 
