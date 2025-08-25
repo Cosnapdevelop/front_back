@@ -135,7 +135,10 @@ export const paginationValidation = [
  */
 export const fileValidation = {
   image: (req, res, next) => {
-    if (!req.file) {
+    // 支持单文件上传 (req.file) 和多文件上传 (req.files)
+    const files = req.files || (req.file ? [req.file] : []);
+    
+    if (!files || files.length === 0) {
       return res.status(400).json({ 
         success: false, 
         error: '请上传图片文件' 
@@ -143,20 +146,23 @@ export const fileValidation = {
     }
     
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!allowedTypes.includes(req.file.mimetype)) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '仅支持 JPEG、PNG、GIF、WebP 格式的图片' 
-      });
-    }
+    const maxSize = 30 * 1024 * 1024; // 30MB 文件大小限制
     
-    // 30MB 文件大小限制
-    const maxSize = 30 * 1024 * 1024;
-    if (req.file.size > maxSize) {
-      return res.status(400).json({ 
-        success: false, 
-        error: '图片文件大小不能超过30MB' 
-      });
+    // 验证每个文件
+    for (const file of files) {
+      if (!allowedTypes.includes(file.mimetype)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `文件 "${file.originalname}" 格式不支持，仅支持 JPEG、PNG、GIF、WebP 格式的图片` 
+        });
+      }
+      
+      if (file.size > maxSize) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `文件 "${file.originalname}" 大小不能超过30MB` 
+        });
+      }
     }
     
     next();
