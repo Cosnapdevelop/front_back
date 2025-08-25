@@ -9,8 +9,6 @@ import { ParametersPanel } from '../components/EffectParameters/ParametersPanel'
 import { ProcessingControls } from '../components/ProcessingStatus/ProcessingControls';
 import { ResultsPanel } from '../components/Results/ResultsPanel';
 import { LoadingState } from '../components/UI/LoadingState';
-import TaskImageUploader from '../components/TaskImageUploader';
-import MobileFileUploader from '../components/Mobile/MobileFileUploader';
 import { trackEffectCreated, trackEngagement, trackFeatureUsage, trackPerformance } from '../utils/analytics';
 import { useAPIPerformance, useRenderPerformance } from '../hooks/usePerformanceMonitoring';
 import { 
@@ -25,10 +23,8 @@ const ApplyEffect = () => {
   const navigate = useNavigate();
   const { state } = useApp();
   const { isAuthenticated, bootstrapped } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { push } = useToast();
   
-  const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string, name: string, size: number}>>([]);
   const [parameters, setParameters] = useState<Record<string, any>>({});
   const [imageParamFiles, setImageParamFiles] = useState<Record<string, {file?: File, url?: string, name?: string, size?: number, fileId?: string}>>({});
 
@@ -143,80 +139,6 @@ const ApplyEffect = () => {
     return null;
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    trackEngagement('image_upload');
-    trackFeatureUsage('image_upload', 'clicked');
-    
-    // Track funnel step for image upload
-    if (effect && files.length > 0) {
-      trackFunnelStep(FunnelStep.IMAGE_UPLOADED, effect.id, 'webapp', {
-        file_count: files.length,
-        total_size: files.reduce((sum, file) => sum + file.size, 0),
-      });
-      trackEngagementAction(EngagementAction.BROWSE_EFFECTS, effect.id);
-    }
-    
-    handleMultipleFiles(files);
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  const handleMultipleFiles = (files: File[]) => {
-    const maxFiles = 5;
-    const currentCount = uploadedImages.length;
-    const runningHubLimit = 10 * 1024 * 1024; // 10MB
-    
-    if (currentCount + files.length > maxFiles) {
-      push('warning', `Maximum ${maxFiles} images allowed. You can upload ${maxFiles - currentCount} more.`);
-      return;
-    }
-
-    files.forEach((file) => {
-      const error = validateFile(file);
-      const fileId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      
-      if (error) {
-        push('error', error);
-        return;
-      }
-      
-      // Check for large files and notify user
-      if (file.size > runningHubLimit) {
-        const fileSizeMB = formatFileSize(file.size);
-        console.log(`[File Upload] Large file detected: ${file.name} (${fileSizeMB}), will use cloud storage upload`);
-        // Could add user notification here, but don't block upload
-      }
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const url = e.target?.result as string;
-        setUploadedImages(prev => [...prev, {
-          id: fileId,
-          url,
-          name: file.name,
-          size: file.size
-        }]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files);
-      handleMultipleFiles(files);
-  };
 
   const handleImageParamUpload = (paramName: string, file: File) => {
     const error = validateFile(file);
@@ -336,9 +258,6 @@ const ApplyEffect = () => {
     }
   };
 
-  const removeImage = (imageId: string) => {
-    setUploadedImages(prev => prev.filter(img => img.id !== imageId));
-  };
 
   const handleDebugState = () => {
     console.log('[Debug] Current state:', {
@@ -356,19 +275,16 @@ const ApplyEffect = () => {
     setEffectStartTime(performance.now());
     trackFeatureUsage('ai_effect_processing', 'clicked');
     
-    // Check if there are image files
-    const hasUploadedImages = uploadedImages.length > 0;
+    // Check if there are image files - only check parameter images now
     const hasParamImages = Object.values(imageParamFiles).some(paramFile => paramFile.file);
     
     console.log('[ApplyEffect] Image validation:', {
-      uploadedImages: uploadedImages.length,
       imageParamFiles: Object.keys(imageParamFiles),
-      hasUploadedImages,
       hasParamImages
     });
     
-    if (!hasUploadedImages && !hasParamImages) {
-      push('warning','Please upload at least one image');
+    if (!hasParamImages) {
+      push('warning','Please upload images through the parameter settings below');
       return;
     }
 
@@ -376,7 +292,7 @@ const ApplyEffect = () => {
       // Collect all image file objects in nodeInfoTemplate order
       const imageFileObjects: Array<{file: File}> = [];
       
-      // First get files from parameter images in nodeInfoTemplate order
+      // Get files from parameter images in nodeInfoTemplate order
       if (effect.nodeInfoTemplate) {
         for (const nodeInfo of effect.nodeInfoTemplate) {
           const paramKey = nodeInfo.paramKey;
@@ -385,16 +301,6 @@ const ApplyEffect = () => {
             console.log(`[ApplyEffect] Adding parameter image: ${paramKey} -> ${imageParamFiles[paramKey].file!.name}`);
           }
         }
-      }
-      
-      // Then get files from uploaded images (if any)
-      for (const image of uploadedImages) {
-        // Need to recreate File object from URL
-        const response = await fetch(image.url);
-        const blob = await response.blob();
-        const file = new File([blob], image.name, { type: blob.type });
-        imageFileObjects.push({ file });
-        console.log(`[ApplyEffect] Adding uploaded image: ${image.name}`);
       }
 
       console.log('[ApplyEffect] Collected image files:', {
@@ -497,88 +403,17 @@ const ApplyEffect = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Image Upload, Parameters & Controls */}
+          {/* Left Column - Parameters & Controls */}
           <div className="space-y-6">
-            {/* Main Image Upload Area */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Upload Images
-              </h2>
-              
-              {/* Desktop/Tablet Image Uploader */}
-              <div className="hidden md:block">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                  onChange={handleImageUpload}
-                  multiple
-                  disabled={isProcessing}
-                  className="hidden"
-                />
-                <div
-                  className={`
-                    border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center cursor-pointer
-                    hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-200
-                    ${uploadedImages.length > 0 ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : ''}
-                    ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}
-                  `}
-                  onClick={() => !isProcessing && fileInputRef.current?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                >
-                  <div className="space-y-2">
-                    <div className="text-4xl text-gray-400 dark:text-gray-500">📁</div>
-                    <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
-                      {uploadedImages.length > 0 ? `${uploadedImages.length} images uploaded` : 'Click to upload images'}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Or drag and drop your images here
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      Supports: JPG, PNG, GIF, WebP • Max: 30MB per file • Up to 5 images
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mobile Image Uploader */}
-              <div className="block md:hidden">
-                <MobileFileUploader
-                  label="Upload your images"
-                  onUpload={(file) => {
-                    const files = [file];
-                    handleMultipleFiles(files);
-                  }}
-                  onError={(error) => push('error', error)}
-                  maxSize={30}
-                  showCameraOption={true}
-                  showGalleryOption={true}
-                  enableGestures={true}
-                />
-              </div>
-
-              {/* Display uploaded images */}
-              {uploadedImages.length > 0 && (
-                <div className="mt-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {uploadedImages.map((image) => (
-                      <div key={image.id} className="relative">
-                        <TaskImageUploader
-                          fileObj={{
-                            url: image.url,
-                            name: image.name,
-                            size: image.size
-                          }}
-                          onUpload={() => {}} // Not used in display mode
-                          onClear={() => removeImage(image.id)}
-                          disabled={isProcessing}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+            {/* Workflow Instructions */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">
+                📸 How to use this effect
+              </h3>
+              <p className="text-blue-700 dark:text-blue-300 text-sm">
+                This AI effect uses a specialized workflow. Please upload your images through the parameter settings below. 
+                Each image parameter is specifically designed for this effect's requirements.
+              </p>
             </div>
 
             <ParametersPanel
@@ -598,7 +433,7 @@ const ApplyEffect = () => {
               onProcess={handleProcessImages}
               onCancel={handleCancelTask}
               onDebug={handleDebugState}
-              disabled={uploadedImages.length === 0 && Object.keys(imageParamFiles).length === 0}
+              disabled={Object.keys(imageParamFiles).length === 0}
             />
           </div>
 
