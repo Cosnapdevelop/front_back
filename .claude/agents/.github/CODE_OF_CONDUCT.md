@@ -1,3 +1,8 @@
+---
+name: "code-of-conduct"
+description: "Community code of conduct guidelines"
+---
+
 # Code of Conduct
 
 ## Our Pledge

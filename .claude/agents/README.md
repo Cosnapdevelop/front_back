@@ -1,3 +1,8 @@
+---
+name: "agents-readme"
+description: "README documentation for Claude agents"
+---
+
 <div align="right">
   <details>
     <summary >🌐 Language</summary>
