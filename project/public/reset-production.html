@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosnap AI - 生产环境数据重置</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            margin-bottom: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.2em;
+        }
+        h2 {
+            color: #ffd700;
+            margin: 20px 0 10px 0;
+        }
+        .warning {
+            background: rgba(220, 53, 69, 0.3);
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .step {
+            background: rgba(23, 162, 184, 0.2);
+            border: 1px solid #17a2b8;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .input-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            box-sizing: border-box;
+        }
+        .button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px 0 rgba(255, 107, 107, 0.3);
+        }
+        .button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(255, 107, 107, 0.4);
+        }
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .button.safe {
+            background: linear-gradient(45deg, #28a745, #20c997);
+        }
+        .success {
+            background: rgba(40, 167, 69, 0.3);
+            border: 2px solid #28a745;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+        .error {
+            background: rgba(220, 53, 69, 0.3);
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+        .stats {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            text-align: left;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            color: #ffd700;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Cosnap AI 生产环境重置</h1>
+        
+        <div class="warning">
+            <strong>⚠️ 极度危险操作</strong><br>
+            此工具将永久删除 Render 部署中的所有用户数据！<br>
+            包括用户账户、帖子、评论、支付记录等所有内容。<br>
+            <strong>此操作不可逆转！</strong>
+        </div>
+
+        <div class="step">
+            <h2>第一步：配置环境变量</h2>
+            <p>在 Render Dashboard 中添加以下环境变量：</p>
+            <div class="code">
+                ADMIN_RESET_KEY = [生成的密钥]<br>
+                ALLOW_PRODUCTION_RESET = true
+            </div>
+            <button class="button safe" onclick="generateAdminKey()">生成管理员密钥</button>
+        </div>
+
+        <div class="step">
+            <h2>第二步：配置API地址</h2>
+            <div class="input-group">
+                <label>后端API地址（Render部署地址）:</label>
+                <input type="text" id="apiUrl" placeholder="https://your-app.onrender.com" />
+                <small style="color: #ffd700;">请输入你的 Render 后端服务地址</small>
+            </div>
+        </div>
+
+        <div class="step">
+            <h2>第三步：输入管理员密钥</h2>
+            <div class="input-group">
+                <label>管理员密钥:</label>
+                <input type="password" id="adminKey" placeholder="输入ADMIN_RESET_KEY的值" />
+            </div>
+        </div>
+
+        <div class="step">
+            <h2>第四步：确认码</h2>
+            <div class="input-group">
+                <label>确认码（输入以下内容确认操作）:</label>
+                <div class="code">RESET_ALL_DATA_CONFIRMED</div>
+                <input type="text" id="confirmCode" placeholder="输入上方的确认码" />
+            </div>
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button class="button safe" onclick="checkDatabaseStats()">📊 检查当前数据</button>
+            <button class="button" onclick="resetDatabase()" id="resetBtn">🗑️ 重置数据库</button>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>处理中...</p>
+        </div>
+
+        <div id="successMessage" class="success">
+            <strong>✅ 重置成功！</strong>
+            <div id="resetResults"></div>
+        </div>
+
+        <div id="errorMessage" class="error">
+            <strong>❌ 操作失败</strong>
+            <div id="errorDetails"></div>
+        </div>
+
+        <div id="statsContainer" style="display: none;">
+            <h2>📊 数据库统计</h2>
+            <div id="statsDisplay" class="stats">
+                正在加载...
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>🧹 清除前端数据</h2>
+        <p>重置数据库后，也需要清除浏览器中的本地数据：</p>
+        
+        <div class="step">
+            <strong>当前存储的数据：</strong>
+            <div id="frontendData" class="stats">正在检测...</div>
+        </div>
+
+        <button class="button safe" onclick="clearFrontendData()">🗑️ 清除前端数据</button>
+        <button class="button safe" onclick="detectFrontendData()">🔄 重新检测</button>
+    </div>
+
+    <script>
+        const API_BASE = () => {
+            const url = document.getElementById('apiUrl').value.trim();
+            return url || 'https://your-app.onrender.com';
+        };
+
+        // 生成管理员密钥
+        async function generateAdminKey() {
+            showLoading(true);
+            hideMessages();
+            
+            try {
+                const response = await fetch(`${API_BASE()}/api/admin/generate-admin-key`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`
+                        <strong>生成的管理员密钥：</strong><br>
+                        <div class="code">${data.adminKey}</div>
+                        <br><strong>配置步骤：</strong><br>
+                        ${data.instructions.map(inst => `• ${inst}`).join('<br>')}
+                    `);
+                } else {
+                    showError(data.error || '生成密钥失败');
+                }
+            } catch (error) {
+                showError('网络错误: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 检查数据库统计
+        async function checkDatabaseStats() {
+            const adminKey = document.getElementById('adminKey').value.trim();
+            if (!adminKey) {
+                showError('请先输入管理员密钥');
+                return;
+            }
+
+            showLoading(true);
+            hideMessages();
+            
+            try {
+                const response = await fetch(`${API_BASE()}/api/admin/database-stats`, {
+                    method: 'GET',
+                    headers: { 
+                        'X-Admin-Key': adminKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('statsContainer').style.display = 'block';
+                    document.getElementById('statsDisplay').innerHTML = Object.entries(data.stats)
+                        .filter(([key]) => key !== 'timestamp')
+                        .map(([key, value]) => `${key}: ${value}`)
+                        .join('<br>') + '<br><br>最后更新: ' + new Date(data.stats.timestamp).toLocaleString();
+                } else {
+                    showError(data.error || '获取统计失败');
+                }
+            } catch (error) {
+                showError('网络错误: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 重置数据库
+        async function resetDatabase() {
+            const adminKey = document.getElementById('adminKey').value.trim();
+            const confirmCode = document.getElementById('confirmCode').value.trim();
+            
+            if (!adminKey) {
+                showError('请输入管理员密钥');
+                return;
+            }
+            
+            if (confirmCode !== 'RESET_ALL_DATA_CONFIRMED') {
+                showError('确认码不正确');
+                return;
+            }
+
+            // 二次确认
+            if (!confirm('最后确认：你确定要删除所有用户数据吗？此操作不可撤销！')) {
+                return;
+            }
+
+            showLoading(true);
+            hideMessages();
+            document.getElementById('resetBtn').disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE()}/api/admin/reset-database`, {
+                    method: 'POST',
+                    headers: { 
+                        'X-Admin-Key': adminKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        confirmationCode: confirmCode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showSuccess(`
+                        <strong>数据库重置完成！</strong><br><br>
+                        <strong>删除的数据：</strong><br>
+                        ${Object.entries(data.deletedCounts).map(([key, value]) => `• ${key}: ${value} 条记录`).join('<br>')}<br><br>
+                        <strong>重置时间：</strong> ${new Date(data.timestamp).toLocaleString()}<br><br>
+                        现在请清除前端数据以完成完整重置。
+                    `);
+                    
+                    // 重新检查数据库统计
+                    setTimeout(() => checkDatabaseStats(), 2000);
+                } else {
+                    showError(data.error || '重置失败');
+                }
+            } catch (error) {
+                showError('网络错误: ' + error.message);
+            } finally {
+                showLoading(false);
+                document.getElementById('resetBtn').disabled = false;
+            }
+        }
+
+        // 检测前端数据
+        function detectFrontendData() {
+            const dataList = document.getElementById('frontendData');
+            const storedKeys = [];
+            
+            // localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) {
+                    const value = localStorage.getItem(key);
+                    storedKeys.push(`localStorage.${key}: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : 'null'}`);
+                }
+            }
+            
+            // sessionStorage  
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key) {
+                    const value = sessionStorage.getItem(key);
+                    storedKeys.push(`sessionStorage.${key}: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : 'null'}`);
+                }
+            }
+
+            if (storedKeys.length === 0) {
+                dataList.innerHTML = '<em style="color: #90cdf4;">未检测到存储数据</em>';
+            } else {
+                dataList.innerHTML = storedKeys.map(item => `• ${item}`).join('<br>');
+            }
+        }
+
+        // 清除前端数据
+        function clearFrontendData() {
+            if (!confirm('确定要清除所有前端数据吗？')) {
+                return;
+            }
+
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                
+                // 清除cookies
+                const cookies = document.cookie.split(";");
+                cookies.forEach(cookie => {
+                    const eqPos = cookie.indexOf("=");
+                    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+                    if (name.toLowerCase().includes('cosnap') || name.toLowerCase().includes('token') || name.toLowerCase().includes('auth')) {
+                        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+                    }
+                });
+                
+                showSuccess('前端数据已清除！重置完成。');
+                setTimeout(() => detectFrontendData(), 500);
+                
+            } catch (error) {
+                showError('清除前端数据失败: ' + error.message);
+            }
+        }
+
+        // UI 辅助函数
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function hideMessages() {
+            document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            document.getElementById('resetResults').innerHTML = message;
+            document.getElementById('successMessage').style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('errorDetails').innerHTML = message;
+            document.getElementById('errorMessage').style.display = 'block';
+            document.getElementById('successMessage').style.display = 'none';
+        }
+
+        // 页面加载时检测前端数据
+        window.addEventListener('load', detectFrontendData);
+    </script>
+</body>
+</html>

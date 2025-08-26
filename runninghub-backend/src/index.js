@@ -9,6 +9,7 @@ import analyticsRouter from './routes/analytics.js';
 import betaRouter from './routes/beta.js';
 import mobileRouter from './routes/mobile.js';
 import monitoringRouter from './routes/monitoring.js';
+import adminRouter from './routes/admin.js';
 import { warmupConnection } from './services/comfyUITaskService.js';
 import { PrismaClient } from '@prisma/client';
 import monitoringService from './services/monitoringService.js';
@@ -130,6 +131,7 @@ app.use('/api/analytics', analyticsRouter);
 app.use('/api/beta', betaRouter);
 app.use('/api/mobile', mobileRouter);
 app.use('/api/monitoring', monitoringRouter);
+app.use('/api/admin', adminRouter);
 // 静态占位资源
 app.use('/assets', express.static('public'));
 

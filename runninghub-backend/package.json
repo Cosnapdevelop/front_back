@@ -15,7 +15,9 @@
     "migrate:run": "node scripts/run-migration.js",
     "validate:auth": "node scripts/validate-auth-endpoints.js",
     "verify:production": "node scripts/verify-production-ready.js",
-    "user:delete": "node scripts/delete-user-by-email.js"
+    "user:delete": "node scripts/delete-user-by-email.js",
+    "reset:database": "node scripts/reset-database.js",
+    "reset:all": "node scripts/reset-database.js && echo '✅ Database reset complete! Next: Open http://localhost:5173/reset-frontend.html to clear frontend data'"
   },
   "dependencies": {
     "@prisma/client": "^6.13.0",

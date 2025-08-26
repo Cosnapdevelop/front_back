@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosnap AI - 前端数据清理工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px 0 rgba(255, 107, 107, 0.3);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px 0 rgba(255, 107, 107, 0.4);
+        }
+        .success {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+        .info {
+            background: rgba(23, 162, 184, 0.2);
+            border: 1px solid #17a2b8;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .data-list {
+            text-align: left;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 前端数据清理</h1>
+        <p>此工具会清除浏览器中所有 Cosnap AI 相关的数据</p>
+        
+        <div class="warning">
+            <strong>⚠️ 警告</strong><br>
+            此操作会删除以下数据：
+            <ul style="text-align: left; margin-top: 10px;">
+                <li>用户登录状态和认证令牌</li>
+                <li>生成的图片库记录</li>
+                <li>应用设置和偏好</li>
+                <li>所有缓存数据</li>
+            </ul>
+        </div>
+
+        <div class="info">
+            <strong>📋 当前存储的数据：</strong>
+            <div id="currentData" class="data-list">
+                正在检测...
+            </div>
+        </div>
+
+        <button class="button" onclick="clearAllData()">
+            🗑️ 清除所有前端数据
+        </button>
+        
+        <button class="button" onclick="location.reload()" style="background: linear-gradient(45deg, #74b9ff, #0984e3);">
+            🔄 刷新检测
+        </button>
+
+        <div id="successMessage" class="success">
+            <strong>✅ 成功！</strong><br>
+            所有前端数据已清除。你现在可以重新开始测试了。
+        </div>
+    </div>
+
+    <script>
+        // 检测当前存储的数据
+        function detectStoredData() {
+            const dataList = document.getElementById('currentData');
+            const storedKeys = [];
+            
+            // 检查 localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) {
+                    const value = localStorage.getItem(key);
+                    storedKeys.push(`localStorage.${key}: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : 'null'}`);
+                }
+            }
+            
+            // 检查 sessionStorage  
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key) {
+                    const value = sessionStorage.getItem(key);
+                    storedKeys.push(`sessionStorage.${key}: ${value ? (value.length > 50 ? value.substring(0, 50) + '...' : value) : 'null'}`);
+                }
+            }
+
+            if (storedKeys.length === 0) {
+                dataList.innerHTML = '<em style="color: #90cdf4;">未检测到存储数据</em>';
+            } else {
+                dataList.innerHTML = storedKeys.map(item => `• ${item}`).join('<br>');
+            }
+        }
+
+        // 清除所有数据
+        function clearAllData() {
+            const confirmAction = confirm('确定要清除所有前端数据吗？此操作不可恢复！');
+            
+            if (!confirmAction) {
+                return;
+            }
+
+            try {
+                // 清除 localStorage
+                localStorage.clear();
+                
+                // 清除 sessionStorage
+                sessionStorage.clear();
+                
+                // 清除 cookies (Cosnap 相关的)
+                const cookies = document.cookie.split(";");
+                cookies.forEach(cookie => {
+                    const eqPos = cookie.indexOf("=");
+                    const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+                    if (name.toLowerCase().includes('cosnap') || name.toLowerCase().includes('token') || name.toLowerCase().includes('auth')) {
+                        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+                    }
+                });
+                
+                // 清除 IndexedDB (如果有使用)
+                if ('indexedDB' in window) {
+                    indexedDB.databases().then(databases => {
+                        databases.forEach(db => {
+                            if (db.name && db.name.toLowerCase().includes('cosnap')) {
+                                indexedDB.deleteDatabase(db.name);
+                            }
+                        });
+                    }).catch(() => {
+                        // IndexedDB databases() method not supported in all browsers
+                        console.log('无法清除 IndexedDB，可能需要手动清除');
+                    });
+                }
+
+                // 显示成功消息
+                document.getElementById('successMessage').style.display = 'block';
+                
+                // 重新检测数据
+                setTimeout(() => {
+                    detectStoredData();
+                }, 500);
+
+                console.log('✅ 所有前端数据已清除');
+                
+            } catch (error) {
+                alert('清除数据时出错：' + error.message);
+                console.error('Error clearing data:', error);
+            }
+        }
+
+        // 页面加载时检测数据
+        window.addEventListener('load', detectStoredData);
+    </script>
+</body>
+</html>
