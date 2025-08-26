@@ -166,8 +166,8 @@
             <h2>第二步：配置API地址</h2>
             <div class="input-group">
                 <label>后端API地址（Render部署地址）:</label>
-                <input type="text" id="apiUrl" placeholder="https://your-app.onrender.com" />
-                <small style="color: #ffd700;">请输入你的 Render 后端服务地址</small>
+                <input type="text" id="apiUrl" placeholder="https://cosnap-backend.onrender.com" />
+                <small style="color: #ffd700;">请输入你的 Render 后端服务完整地址，例如: https://your-service-name.onrender.com</small>
             </div>
         </div>
 
@@ -232,7 +232,12 @@
     <script>
         const API_BASE = () => {
             const url = document.getElementById('apiUrl').value.trim();
-            return url || 'https://your-app.onrender.com';
+            if (!url) {
+                alert('请先输入后端API地址！');
+                throw new Error('Backend API URL not configured');
+            }
+            // 确保URL格式正确，去掉末尾的斜杠
+            return url.replace(/\/$/, '');
         };
 
         // 生成管理员密钥
