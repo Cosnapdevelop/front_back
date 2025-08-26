@@ -29,6 +29,7 @@ const Profile = () => {
   const { state, dispatch } = useApp();
   const { user: authUser, isAuthenticated, bootstrapped } = useAuth();
   const { push } = useToast();
+  const API = API_BASE_URL; // Move API declaration to the top
   const [activeTab, setActiveTab] = useState<'history' | 'bookmarks' | 'posts' | 'settings'>('history');
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -108,7 +109,6 @@ const Profile = () => {
     fetchProfileData();
   }, [authUser, isAuthenticated, API, dispatch, state.theme]);
 
-  const API = API_BASE_URL;
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [avatarModalOpen, setAvatarModalOpen] = useState(false);
