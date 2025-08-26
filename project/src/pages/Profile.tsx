@@ -27,7 +27,7 @@ import EmailChangeModal from '../components/EmailChangeModal';
 
 const Profile = () => {
   const { state, dispatch } = useApp();
-  const { user: authUser, isAuthenticated, bootstrapped } = useAuth();
+  const { user: authUser, isAuthenticated, bootstrapped, updateUserData, refreshUserData } = useAuth();
   const { push } = useToast();
   const API = API_BASE_URL; // Move API declaration to the top
   const [activeTab, setActiveTab] = useState<'history' | 'bookmarks' | 'posts' | 'settings'>('history');
@@ -54,6 +54,9 @@ const Profile = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [loadingProfileData, setLoadingProfileData] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  
+  // UI feedback states
+  const [profileUpdated, setProfileUpdated] = useState(false);
 
   const tabs = [
     { id: 'history', label: 'Recent History', icon: Clock },
@@ -82,9 +85,8 @@ const Profile = () => {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.profile) {
-            // Update AppContext with extended profile data
-            const extendedUser = {
-              ...authUser,
+            // Update local profile extensions state
+            setProfileExtensions({
               bio: data.profile.bio || 'No bio available',
               effectsCreated: data.profile.effectsCreated || 0,
               totalLikes: data.profile.totalLikes || 0,
@@ -94,8 +96,7 @@ const Profile = () => {
                 notifications: true,
                 privacy: 'public'
               }
-            };
-            dispatch({ type: 'SET_USER', payload: extendedUser });
+            });
           }
         }
       } catch (error) {
@@ -107,7 +108,7 @@ const Profile = () => {
     };
 
     fetchProfileData();
-  }, [authUser, isAuthenticated, API, dispatch, state.theme]);
+  }, [authUser, isAuthenticated, API, state.theme]);
 
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
@@ -245,28 +246,61 @@ const Profile = () => {
   };
   const saveAvatar = async () => {
     if (!avatarPreview) return;
-    // dataURL -> Blob
-    const resFetch = await fetch(avatarPreview);
-    const blob = await resFetch.blob();
-    const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-    // 预签名直传
-    const resp = await fetch(`${API}/api/effects/upload/presign`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
-      body: JSON.stringify({ ext: 'jpg', dir: 'cosnap/avatar' })
-    });
-    const ps = await resp.json();
-    if (ps.success) {
-      if (ps.provider === 'aliyun-oss') {
-        const form = new FormData();
-        Object.entries(ps.form).forEach(([k, v]) => form.append(k, v as string));
-        if (!form.has('key')) form.append('key', ps.form.key);
-        form.append('file', file);
-        await fetch(ps.uploadUrl, { method: 'POST', body: form });
+    setUploadingAvatar(true);
+    
+    try {
+      // dataURL -> Blob
+      const resFetch = await fetch(avatarPreview);
+      const blob = await resFetch.blob();
+      const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+      
+      // 预签名直传
+      const resp = await fetch(`${API}/api/effects/upload/presign`, {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` },
+        body: JSON.stringify({ ext: 'jpg', dir: 'cosnap/avatar' })
+      });
+      const ps = await resp.json();
+      
+      if (ps.success) {
+        if (ps.provider === 'aliyun-oss') {
+          const form = new FormData();
+          Object.entries(ps.form).forEach(([k, v]) => form.append(k, v as string));
+          if (!form.has('key')) form.append('key', ps.form.key);
+          form.append('file', file);
+          await fetch(ps.uploadUrl, { method: 'POST', body: form });
+        }
+        
+        const avatarUrl = ps.publicUrl as string;
+        const put = await fetch(`${API}/auth/me/avatar`, { 
+          method: 'PUT', 
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }, 
+          body: JSON.stringify({ avatar: avatarUrl }) 
+        });
+        const data = await put.json();
+        
+        if (data.success) { 
+          // Update AuthContext immediately for consistent state across app
+          updateUserData({ avatar: avatarUrl });
+          
+          // Also update AppContext for legacy compatibility
+          localStorage.setItem('user', JSON.stringify(data.user)); 
+          dispatch({ type: 'SET_USER', payload: data.user }); 
+          
+          // Close modal and show success
+          setAvatarModalOpen(false);
+          push('success', 'Avatar updated successfully');
+        } else {
+          push('error', 'Failed to update avatar: ' + (data.error || 'Unknown error'));
+        }
+      } else {
+        push('error', 'Failed to upload avatar: ' + (ps.error || 'Upload failed'));
       }
-      const avatarUrl = ps.publicUrl as string;
-      const put = await fetch(`${API}/auth/me/avatar`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('cosnap_access_token') || ''}` }, body: JSON.stringify({ avatar: avatarUrl }) });
-      const data = await put.json();
-      if (data.success) { localStorage.setItem('user', JSON.stringify(data.user)); dispatch({ type: 'SET_USER', payload: data.user }); setAvatarModalOpen(false); }
+    } catch (error) {
+      console.error('Avatar save error:', error);
+      push('error', 'Failed to save avatar');
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -347,14 +381,8 @@ const Profile = () => {
       emailRef.current.value = newEmail;
     }
     
-    // Update the user data in AuthContext by triggering a refresh
-    // This will fetch updated user data from the server
-    if (authUser) {
-      // Update local state immediately for better UX
-      const updatedUser = { ...authUser, email: newEmail };
-      // Note: The AuthContext doesn't expose a direct user update method,
-      // but the user data will be refreshed on next auth check
-    }
+    // Update AuthContext immediately for consistent state
+    updateUserData({ email: newEmail });
     
     push('info', 'Please log in again with your new email address on your next session for enhanced security.');
   };
@@ -688,11 +716,15 @@ const Profile = () => {
               <button
                 onClick={async () => {
                   setSavingProfile(true);
+                  const newUsername = usernameRef.current?.value;
+                  const newBio = bioRef.current?.value;
+                  
                   const payload = {
-                    username: usernameRef.current?.value,
+                    username: newUsername,
                     // email: emailRef.current?.value, // Email changes handled via EmailChangeModal
-                    bio: bioRef.current?.value,
+                    bio: newBio,
                   };
+                  
                   try {
                     const res = await fetch(`${API}/auth/me`, {
                       method: 'PUT',
@@ -703,14 +735,37 @@ const Profile = () => {
                       body: JSON.stringify(payload)
                     });
                     const data = await res.json();
+                    
                     if (data.success) {
-                      localStorage.setItem('user', JSON.stringify(data.user));
-                      dispatch({ type: 'SET_USER', payload: data.user });
+                      // Update AuthContext immediately for consistent state
+                      updateUserData({ 
+                        username: newUsername || authUser.username,
+                        ...(data.user || {})
+                      });
+                      
+                      // Update profile extensions for bio changes  
+                      if (newBio !== undefined) {
+                        setProfileExtensions(prev => ({ ...prev, bio: newBio }));
+                      }
+                      
+                      // Also update AppContext and localStorage for legacy compatibility
+                      const updatedUser = { ...data.user, bio: newBio };
+                      localStorage.setItem('user', JSON.stringify(updatedUser));
+                      dispatch({ type: 'SET_USER', payload: updatedUser });
+                      
                       push('success','Profile updated successfully');
+                      
                       // Clear any previous errors
                       setProfileError(null);
-                      // Refresh the page display
-                      setActiveTab('settings');
+                      
+                      // Reset username validation state
+                      setUsernameAvailable(null);
+                      setCheckingUsername(false);
+                      
+                      // Show update success feedback
+                      setProfileUpdated(true);
+                      setTimeout(() => setProfileUpdated(false), 2000);
+                      
                     } else if (res.status === 409) {
                       push('warning', data.error || 'Username or email already taken');
                     } else {
@@ -779,15 +834,26 @@ const Profile = () => {
     );
   }
 
-  // Use authenticated user data with fallbacks from AppContext for additional profile data
+  // Create a unified user profile state from AuthContext with AppContext extensions
+  const [profileExtensions, setProfileExtensions] = useState({
+    bio: 'No bio available',
+    effectsCreated: 0,
+    totalLikes: 0,
+    joinDate: new Date().toISOString(),
+    preferences: {
+      theme: state.theme,
+      notifications: true,
+      privacy: 'public' as const
+    }
+  });
+
+  // Single source of truth for user display data
   const displayUser = {
     id: authUser.id,
     username: authUser.username,
     email: authUser.email,
     avatar: authUser.avatar || 'https://images.pexels.com/photos/1674752/pexels-photo-1674752.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-    bio: state.user?.bio || 'No bio available',
-    effectsCreated: state.user?.effectsCreated || 0,
-    totalLikes: state.user?.totalLikes || 0
+    ...profileExtensions
   };
 
   // Skeleton loading component
@@ -878,11 +944,25 @@ const Profile = () => {
               
               <div className="flex-1 text-center sm:text-left mt-4 sm:mt-0 sm:pb-4">
                 <div className="flex items-center justify-center sm:justify-start space-x-2">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <motion.h1 
+                    className="text-2xl font-bold text-gray-900 dark:text-white"
+                    animate={profileUpdated ? { scale: [1, 1.02, 1] } : {}}
+                    transition={{ duration: 0.5 }}
+                  >
                     @{displayUser.username}
-                  </h1>
+                  </motion.h1>
                   {loadingProfileData && (
                     <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {profileUpdated && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      className="flex items-center text-green-500 text-sm font-medium"
+                    >
+                      <span>✓</span>
+                    </motion.div>
                   )}
                 </div>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
@@ -1066,7 +1146,20 @@ const Profile = () => {
                 </div>
                 <div className="flex justify-end space-x-2">
                   <button onClick={()=> setAvatarModalOpen(false)} className="px-4 py-2 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Cancel</button>
-                  <button disabled={!avatarPreview} onClick={saveAvatar} className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50">Save</button>
+                  <button 
+                    disabled={!avatarPreview || uploadingAvatar} 
+                    onClick={saveAvatar} 
+                    className="px-4 py-2 rounded bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 flex items-center space-x-2"
+                  >
+                    {uploadingAvatar ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <span>Save</span>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>

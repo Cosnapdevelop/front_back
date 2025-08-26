@@ -13,6 +13,8 @@ type AuthContextValue = {
   logout: () => void;
   refresh: () => Promise<boolean>;
   requestRegisterCode: (email: string) => Promise<boolean>;
+  updateUserData: (updates: Partial<AuthUser>) => void;
+  refreshUserData: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -184,6 +186,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, [clearTokens]);
 
+  const updateUserData = useCallback((updates: Partial<AuthUser>) => {
+    if (user) {
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+    }
+  }, [user]);
+
+  const refreshUserData = useCallback(async () => {
+    if (!accessToken) return false;
+    try {
+      const updatedUser = await fetchMe(accessToken);
+      if (updatedUser) {
+        setUser(updatedUser);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+      return false;
+    }
+  }, [accessToken, fetchMe]);
+
   const value = useMemo<AuthContextValue>(() => ({
     user,
     isAuthenticated: !!user && !!accessToken,
@@ -194,7 +218,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refresh,
     requestRegisterCode,
-  }), [user, accessToken, bootstrapped, login, register, logout, refresh, requestRegisterCode]);
+    updateUserData,
+    refreshUserData,
+  }), [user, accessToken, bootstrapped, login, register, logout, refresh, requestRegisterCode, updateUserData, refreshUserData]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
