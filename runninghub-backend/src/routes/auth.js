@@ -1205,13 +1205,15 @@ router.post(
   ...authValidation.forgotPassword,
   async (req, res) => {
     const startTime = Date.now();
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.trim().toLowerCase(); // 标准化邮箱：去空格+转小写
     const clientIp = req.ip;
     const userAgent = req.get('User-Agent');
 
     try {
       // 查找用户（安全考虑：无论用户是否存在都返回相同响应）
-      const user = await prisma.user.findUnique({ 
+      // 先尝试精确匹配，如果失败则使用不区分大小写的查找
+      let user = await prisma.user.findUnique({ 
         where: { email },
         select: { 
           id: true, 
@@ -1221,6 +1223,33 @@ router.post(
           isBanned: true 
         }
       });
+
+      // 如果精确匹配失败，尝试不区分大小写的查找
+      if (!user) {
+        user = await prisma.user.findFirst({
+          where: { 
+            email: {
+              mode: 'insensitive',
+              equals: email
+            }
+          },
+          select: { 
+            id: true, 
+            email: true, 
+            username: true,
+            isActive: true,
+            isBanned: true 
+          }
+        });
+      }
+
+      // 开发环境调试日志
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[DEBUG] 密码重置 - 邮箱查找: "${email}" (原始: "${rawEmail}"), 找到用户: ${!!user}`);
+        if (user) {
+          console.log(`[DEBUG] 用户状态: isActive=${user.isActive}, isBanned=${user.isBanned}`);
+        }
+      }
 
       // 安全策略：始终返回成功响应，不泄露用户是否存在
       const successResponse = {
@@ -1235,6 +1264,10 @@ router.post(
           success: false,
           errorCode: 'USER_NOT_FOUND'
         });
+        // Debug logging for development (remove in production)
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`[DEBUG] User lookup failed for email: "${email}" (original: "${rawEmail}")`);
+        }
         return res.json(successResponse);
       }
 
