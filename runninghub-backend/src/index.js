@@ -134,9 +134,16 @@ app.use('/api/monitoring', monitoringRouter);
 app.use('/api/admin', adminRouter);
 // 静态占位资源 - 添加跨域支持
 app.use('/assets', (req, res, next) => {
-  // 为静态资源设置跨域头部
+  // 为静态资源设置完整的跨域头部
   res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.header('Vary', 'Origin');
+  
+  // 设置缓存头部，减少重复请求
+  res.header('Cache-Control', 'public, max-age=3600'); // 1小时缓存
+  
   next();
 }, express.static('public'));
 

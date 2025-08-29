@@ -30,8 +30,11 @@ export const generalLimiter = rateLimit({
   legacyHeaders: false, // 禁用 `X-RateLimit-*` 头部
   onLimitReached: logRateLimitHit,
   skip: (req) => {
-    // 跳过健康检查端点
-    return req.path === '/health' || req.path === '/health/db';
+    // 跳过健康检查端点和静态资源
+    return req.path === '/health' || 
+           req.path === '/health/db' ||
+           req.path.startsWith('/assets/') ||
+           req.path.startsWith('/public/');
   }
 });
 

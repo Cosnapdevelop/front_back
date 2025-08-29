@@ -203,15 +203,12 @@ router.post(
   }),
   async (req, res) => {
   try {
+    // 🚀 简化监控日志以提升性能
     monitoringService.info('effects.apply.request', {
       userId: req.user?.id,
-      ip: req.ip,
-      ua: req.get('User-Agent')
+      files: req.files ? req.files.length : 0
     });
-    monitoringService.debug?.('effects.apply.headers', { headers: req.headers });
-    monitoringService.debug?.('effects.apply.body', { body: req.body });
     console.log('[任务处理] 请求体参数详情:', Object.keys(req.body).map(key => `${key}: ${req.body[key]} (类型: ${typeof req.body[key]})`));
-    monitoringService.info('effects.apply.files', { count: req.files ? req.files.length : 0 });
     
     // 设置响应头确保正确的内容类型
     res.setHeader('Content-Type', 'application/json');
@@ -226,16 +223,13 @@ router.post(
     const isComfyUI = cleanWorkflowId && cleanWorkflowId !== 'undefined' && cleanWorkflowId !== '';
     const isWebapp = cleanWebappId && cleanWebappId !== 'undefined' && cleanWebappId !== '' && !isComfyUI;
     
-    monitoringService.info('effects.apply.params', {
-      workflowId: cleanWorkflowId,
-      webappId: cleanWebappId,
-      nodeInfoList,
-      regionId,
-      instanceType,
-      isComfyUI,
-      isWebapp,
-      nodeInfoListType: typeof nodeInfoList
-    });
+    // 🚀 简化参数记录
+    if (process.env.NODE_ENV !== 'production') {
+      monitoringService.info('effects.apply.params', {
+        taskType: isComfyUI ? 'ComfyUI' : 'Webapp',
+        regionId
+      });
+    }
     
     if (!isComfyUI && !isWebapp) {
       return res.status(400).json({ 
@@ -283,22 +277,27 @@ router.post(
       });
     }
 
-    // 上传图片并更新nodeInfoList
-    const uploadedImages = [];
-    for (const file of req.files) {
-      try {
-        const fileName = await uploadImageService(file, regionId);
-        uploadedImages.push(fileName);
-        console.log(`[${taskType}] 图片上传成功:`, fileName);
+    // 🚀 并行上传图片以提升性能
+    let uploadedImages;
+    try {
+      const uploadPromises = req.files.map(file => uploadImageService(file, regionId));
+      uploadedImages = await Promise.all(uploadPromises);
+      
+      // 批量记录上传成功
+      req.files.forEach((file, index) => {
         monitoringService.recordFileUpload('image', file.size, 'success');
-      } catch (error) {
-        monitoringService.error(`[${taskType}] upload failed`, error, { route: '/api/effects/comfyui/apply' });
+      });
+      
+      console.log(`[${taskType}] ${uploadedImages.length}个图片并行上传完成`);
+    } catch (error) {
+      monitoringService.error(`[${taskType}] parallel upload failed`, error, { route: '/api/effects/comfyui/apply' });
+      req.files.forEach(file => {
         monitoringService.recordFileUpload('image', file.size, 'error');
-        return res.status(500).json({ 
-          success: false, 
-          error: '图片上传失败: ' + error.message 
-        });
-      }
+      });
+      return res.status(500).json({ 
+        success: false, 
+        error: '图片上传失败: ' + error.message 
+      });
     }
 
     // ⚠️ 重要：nodeInfoList fieldValue 填充逻辑
@@ -316,17 +315,9 @@ router.post(
     // - 需要确保所有节点都有正确的 fieldValue
     // ⚠️ 重要提醒：RunningHub API要求所有fieldValue都必须是字符串类型！
     // 即使数值型参数（如scale, X_offset, Y_offset, rotation）也必须转换为字符串
+    // 🚀 优化节点处理，减少日志记录以提升性能
     let imageIndex = 0;
     const updatedNodeInfoList = parsedNodeInfoList.map((nodeInfo, index) => {
-      console.log(`[${taskType}] 处理节点 ${index}:`, {
-        nodeId: nodeInfo.nodeId,
-        fieldName: nodeInfo.fieldName,
-        paramKey: nodeInfo.paramKey,
-        hasParamKey: !!nodeInfo.paramKey,
-        uploadedImagesCount: uploadedImages.length,
-        imageIndex: imageIndex
-      });
-      
       if (nodeInfo.fieldName === 'image') {
         // 图片节点 - 按顺序分配上传的图片
         if (imageIndex < uploadedImages.length) {
@@ -334,121 +325,71 @@ router.post(
             ...nodeInfo,
             fieldValue: uploadedImages[imageIndex]
           };
-          console.log(`[${taskType}] 更新图片节点 ${index}:`, {
-            nodeId: nodeInfo.nodeId,
-            fieldName: nodeInfo.fieldName,
-            fieldValue: uploadedImages[imageIndex]
-          });
           imageIndex++;
           return updatedNode;
         } else {
-          console.warn(`[${taskType}] 图片节点 ${index} 缺少图片文件:`, {
-            nodeId: nodeInfo.nodeId,
-            imageIndex: imageIndex,
-            uploadedImagesLength: uploadedImages.length
-          });
+          console.warn(`[${taskType}] 图片节点 ${index} 缺少图片文件`);
         }
       } else if (nodeInfo.fieldName === 'text' || nodeInfo.fieldName === 'prompt') {
         // 文本节点 - 查找对应的参数
         const paramKey = nodeInfo.paramKey;
         if (paramKey && req.body[paramKey] !== undefined) {
-          const updatedNode = {
+          return {
             ...nodeInfo,
             fieldValue: String(req.body[paramKey]) // ⚠️ 必须转换为字符串！
           };
-          console.log(`[${taskType}] 更新文本节点 ${index}:`, {
-            nodeId: nodeInfo.nodeId,
-            paramKey: paramKey,
-            fieldValue: req.body[paramKey]
-          });
-          return updatedNode;
         } else {
           // 尝试根据nodeId查找参数
           const possibleParamKey = `prompt_${nodeInfo.nodeId}`;
           if (req.body[possibleParamKey] !== undefined) {
-            const updatedNode = {
+            return {
               ...nodeInfo,
               fieldValue: String(req.body[possibleParamKey]) // ⚠️ 必须转换为字符串！
             };
-            console.log(`[${taskType}] 更新文本节点 ${index} (通过nodeId):`, {
-              nodeId: nodeInfo.nodeId,
-              paramKey: possibleParamKey,
-              fieldValue: req.body[possibleParamKey]
-            });
-            return updatedNode;
           } else {
-            console.warn(`[${taskType}] 文本节点 ${index} 缺少参数:`, {
-              nodeId: nodeInfo.nodeId,
-              paramKey: paramKey,
-              possibleParamKey: possibleParamKey,
-              bodyParams: Object.keys(req.body)
-            });
+            console.warn(`[${taskType}] 文本节点 ${index} 缺少参数: ${paramKey || possibleParamKey}`);
           }
         }
-      } else if (nodeInfo.fieldName === 'select') {
-        // select节点 - 查找对应的参数
+      } else if (nodeInfo.fieldName === 'scale' || nodeInfo.fieldName === 'X_offset' || 
+                 nodeInfo.fieldName === 'Y_offset' || nodeInfo.fieldName === 'rotation') {
+        // 数值节点 - 查找对应的参数
         const paramKey = nodeInfo.paramKey;
         if (paramKey && req.body[paramKey] !== undefined) {
-          const updatedNode = {
+          return {
             ...nodeInfo,
-            fieldValue: String(parseInt(req.body[paramKey])) // ⚠️ select值先转整数再转字符串！
+            fieldValue: String(req.body[paramKey]) // ⚠️ 必须转换为字符串！
           };
-          console.log(`[${taskType}] 更新select节点 ${index}:`, {
-            nodeId: nodeInfo.nodeId,
-            paramKey: paramKey,
-            fieldValue: String(parseInt(req.body[paramKey]))
-          });
-          return updatedNode;
         } else {
-          console.warn(`[${taskType}] select节点 ${index} 缺少参数:`, {
-            nodeId: nodeInfo.nodeId,
-            paramKey: paramKey,
-            bodyParams: Object.keys(req.body)
-          });
+          // 使用默认值
+          let defaultValue = '0';
+          if (nodeInfo.fieldName === 'scale') {
+            defaultValue = '1';
+          } else if (nodeInfo.fieldName === 'X_offset' || 
+                     nodeInfo.fieldName === 'Y_offset' || 
+                     nodeInfo.fieldName === 'rotation') {
+            defaultValue = '0';
+          }
+          return {
+            ...nodeInfo,
+            fieldValue: defaultValue
+          };
         }
       } else {
-        // 处理其他类型的字段（如shape, X_offset, Y_offset, scale, rotation等）
+        // 其他节点类型的处理
         const paramKey = nodeInfo.paramKey;
         if (paramKey && req.body[paramKey] !== undefined) {
-          let fieldValue = req.body[paramKey];
-          
-          // RunningHub API要求所有fieldValue都是字符串类型
-          fieldValue = String(fieldValue);
-          
-          console.log(`[${taskType}] 参数转换:`, {
-            nodeId: nodeInfo.nodeId,
-            fieldName: nodeInfo.fieldName,
-            paramKey: paramKey,
-            originalValue: req.body[paramKey],
-            convertedValue: fieldValue,
-            convertedType: typeof fieldValue
-          });
-          
-          const updatedNode = {
+          return {
             ...nodeInfo,
-            fieldValue: fieldValue
+            fieldValue: String(req.body[paramKey])
           };
-          console.log(`[${taskType}] 更新其他类型节点 ${index}:`, {
-            nodeId: nodeInfo.nodeId,
-            fieldName: nodeInfo.fieldName,
-            paramKey: paramKey,
-            fieldValue: fieldValue
-          });
-          return updatedNode;
         } else {
-          console.warn(`[${taskType}] 其他类型节点 ${index} 缺少参数:`, {
-            nodeId: nodeInfo.nodeId,
-            fieldName: nodeInfo.fieldName,
-            paramKey: paramKey,
-            bodyParams: Object.keys(req.body)
-          });
-          // 返回带有默认值的节点，避免fieldValue为undefined
-          // RunningHub API要求所有fieldValue都是字符串类型
-          let defaultValue;
-          if (nodeInfo.fieldName === 'scale' || 
-              nodeInfo.fieldName === 'X_offset' || 
-              nodeInfo.fieldName === 'Y_offset' || 
-              nodeInfo.fieldName === 'rotation') {
+          // 根据字段类型设置默认值
+          let defaultValue = '';
+          if (nodeInfo.fieldName === 'scale') {
+            defaultValue = '1'; // scale字段默认值
+          } else if (nodeInfo.fieldName === 'X_offset' || 
+                     nodeInfo.fieldName === 'Y_offset' || 
+                     nodeInfo.fieldName === 'rotation') {
             defaultValue = '0'; // 数值类型默认值，字符串形式
           } else if (nodeInfo.fieldName === 'shape') {
             defaultValue = 'triangle'; // shape字段默认值
@@ -456,18 +397,19 @@ router.post(
             defaultValue = ''; // 其他字段默认值
           }
           
-          const defaultNode = {
+          return {
             ...nodeInfo,
             fieldValue: defaultValue
           };
-          console.warn(`[${taskType}] 使用默认值:`, defaultNode);
-          return defaultNode;
         }
       }
     });
 
-    console.log(`[${taskType}] 更新后的nodeInfoList:`, updatedNodeInfoList);
-    console.log(`[${taskType}] 上传的图片文件:`, uploadedImages);
+    // 只在开发环境输出详细日志
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[${taskType}] 更新后的nodeInfoList:`, updatedNodeInfoList);
+      console.log(`[${taskType}] 上传的图片文件:`, uploadedImages);
+    }
 
     // 根据任务类型启动相应的服务
     try {

@@ -103,22 +103,32 @@ class RedisService {
     });
 
     this.client.on('error', (error) => {
-      console.error('❌ Redis connection error:', error.message);
+      // 减少Redis错误日志噪音，只在首次失败时记录
+      if (this.isConnected) {
+        console.error('❌ Redis connection error:', error.message);
+      }
       this.isConnected = false;
       this.handleConnectionError(error);
     });
 
     this.client.on('close', () => {
-      console.log('🔌 Redis connection closed');
+      if (this.isConnected) {
+        console.log('⚠️ Redis connection closed');
+      }
       this.isConnected = false;
     });
 
     this.client.on('reconnecting', () => {
-      console.log('🔄 Redis reconnecting...');
+      // 减少重连日志，避免日志噪音
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔄 Redis reconnecting...');
+      }
     });
 
     this.client.on('end', () => {
-      console.log('🔚 Redis connection ended');
+      if (this.isConnected) {
+        console.log('🔚 Redis connection ended');
+      }
       this.isConnected = false;
     });
   }

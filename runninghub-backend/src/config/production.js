@@ -61,18 +61,18 @@ export const productionConfig = {
 
   // Redis Configuration
   redis: {
-    enabled: process.env.REDIS_ENABLED === 'true',
+    enabled: process.env.REDIS_ENABLED === 'true' && process.env.REDIS_URL,
     url: process.env.REDIS_URL,
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD,
     db: parseInt(process.env.REDIS_DB) || 0,
     
-    // Connection Pool
-    maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES) || 3,
-    retryDelayOnFailover: parseInt(process.env.REDIS_RETRY_DELAY) || 100,
-    connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT) || 10000,
-    commandTimeout: parseInt(process.env.REDIS_COMMAND_TIMEOUT) || 5000,
+    // Connection Pool - 减少重试和超时以优化性能
+    maxRetriesPerRequest: parseInt(process.env.REDIS_MAX_RETRIES) || 1, // 减少重试次数
+    retryDelayOnFailover: parseInt(process.env.REDIS_RETRY_DELAY) || 1000,
+    connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT) || 3000, // 减少连接超时
+    commandTimeout: parseInt(process.env.REDIS_COMMAND_TIMEOUT) || 2000, // 减少命令超时
     
     // Cluster Configuration
     cluster: {
