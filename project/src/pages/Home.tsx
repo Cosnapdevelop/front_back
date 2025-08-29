@@ -136,6 +136,9 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* SEO优化的主标题 - 隐藏但对SEO可见 */}
+      <h1 className="sr-only">Cosnap AI - 专业AI二次元修图平台 | 动漫风格转换和头像生成</h1>
+      
       {/* Hero Carousel */}
       <section className="relative h-64 sm:h-80 lg:h-96 overflow-hidden">
         <div className="relative w-full h-full">
@@ -157,14 +160,14 @@ const Home = () => {
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                 <div className="absolute bottom-0 left-0 p-6 sm:p-8 lg:p-12 text-white max-w-2xl">
-                  <motion.h1
+                  <motion.h2
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                     className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2"
                   >
                     {effect.name}
-                  </motion.h1>
+                  </motion.h2>
                   <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -214,9 +217,9 @@ const Home = () => {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-2">
                 <Clock className="h-6 w-6 text-purple-500" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Recently Viewed
-                </h3>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  最近浏览的AI特效
+                </h2>
               </div>
               <Link
                 to="/profile"
@@ -239,9 +242,9 @@ const Home = () => {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-6 w-6 text-pink-500" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  🔥 Trending Effects
-                </h3>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  🔥 热门AI二次元特效
+                </h2>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                   <span className="text-sm text-gray-600 dark:text-gray-400">Hot right now</span>

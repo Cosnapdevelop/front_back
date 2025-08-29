@@ -33,6 +33,7 @@ const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
 const EmailSent = React.lazy(() => import('./pages/EmailSent'));
 const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
 const ResetSuccess = React.lazy(() => import('./pages/ResetSuccess'));
+const NotFound = React.lazy(() => import('./pages/NotFound'));
 
 // Analytics tracking component
 const AnalyticsTracker: React.FC = () => {
@@ -90,6 +91,8 @@ function App() {
                         <Route path="/forgot-password/email-sent" element={<EmailSent />} />
                         <Route path="/reset-password/:token" element={<ResetPassword />} />
                         <Route path="/reset-password/success" element={<ResetSuccess />} />
+                        {/* 404 页面 - 必须放在最后 */}
+                        <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>
                   </ErrorBoundary>

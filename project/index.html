@@ -33,8 +33,8 @@
     <meta name="mobile-agent" content="format=html5;url=/" />
     
     <!-- SEO and Social Sharing -->
-    <title>Cosnap AI - 专业AI二次元修图平台 | 动漫风格转换 头像生成</title>
-    <meta name="description" content="Cosnap是专业的AI二次元修图平台，提供动漫风格转换、二次元头像生成、卡通化滤镜。一键将真实照片转换为精美动漫风格，支持多种二次元特效和kawaii风格。" />
+    <title>Cosnap AI - 专业AI二次元修图平台 | 动漫风格转换</title>
+    <meta name="description" content="Cosnap是专业AI二次元修图平台，提供动漫风格转换、二次元头像生成、卡通化滤镜。一键将真实照片转换为精美动漫风格，支持多种二次元特效。" />
     <meta name="keywords" content="AI二次元头像生成,动漫风格转换,二次元修图,AI动漫头像,卡通化图片,动漫特效,kawaii风格,日系滤镜,二次元滤镜,动漫美化,Cosnap" />
     <meta name="author" content="Cosnap Team" />
     
@@ -69,6 +69,11 @@
     <link rel="dns-prefetch" href="//fonts.gstatic.com" />
     <link rel="dns-prefetch" href="//api.cosnap.ai" />
     <link rel="dns-prefetch" href="//cdn.cosnap.ai" />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/src/main.tsx" as="script" />
+    <link rel="preload" href="/icons/icon-32x32.png" as="image" />
+    <link rel="modulepreload" href="/src/App.tsx" />
     
     <!-- Fonts with Display Swap for Performance -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
