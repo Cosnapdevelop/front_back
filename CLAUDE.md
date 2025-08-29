@@ -124,10 +124,31 @@ The project includes comprehensive test scripts in `runninghub-backend/`:
 
 ## Production Deployment
 
-- **Frontend**: Deployed on Vercel with Vite build
-- **Backend**: Deployed on Railway with environment variables
+- **Frontend**: Deployed on Vercel with Vite build (https://cosnap.vercel.app)
+- **Backend**: Deployed on Render with environment variables
 - **Database**: PostgreSQL database with Prisma migrations
 - **CDN**: Static assets served from Ali OSS
+
+### Platform Configuration
+
+**Render Backend Configuration:**
+- Platform: Render.com (https://dashboard.render.com)
+- Deploy from: runninghub-backend/ directory
+- Auto-deployment: Triggered by GitHub main branch commits
+- Environment Variables (set in Render Dashboard):
+  - RUNNINGHUB_API_KEY: 50dcc0fbc848467092f853a9fcb49d50
+  - DATABASE_URL: PostgreSQL connection string
+  - JWT_ACCESS_SECRET: JWT signing secret
+  - JWT_REFRESH_SECRET: JWT refresh token secret
+  - Other service-specific variables as needed
+
+**Vercel Frontend Configuration:**
+- Platform: Vercel.com (https://vercel.com)
+- Deploy from: project/ directory
+- Build command: npm run build (Vite)
+- Output directory: dist/
+- Auto-deployment: Triggered by GitHub main branch commits
+- Environment Variables: Configure in Vercel Dashboard as needed
 
 ## Authentication Flow
 
