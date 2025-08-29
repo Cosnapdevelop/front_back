@@ -397,7 +397,7 @@ export const mockEffects: Effect[] = [
     difficulty: 'Easy',
     processingTime: '2-4 minutes',
     webappId: '1941076109855453186', // 从API调用中获取的webappId
-    apiKey: '8ee162873b6e44bd97d3ef6fce2de105', // 从API调用中获取的apiKey
+    apiKey: '50dcc0fbc848467092f853a9fcb49d50', // 从API调用中获取的apiKey
     isWebapp: true, // 标记为AI应用任务
     isTrending: true,
     parameters: [

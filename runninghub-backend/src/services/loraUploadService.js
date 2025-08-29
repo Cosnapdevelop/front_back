@@ -27,7 +27,7 @@ export async function getLoraUploadUrl(loraName, md5Hex, regionId = DEFAULT_REGI
   const axiosInstance = createLoraAxiosInstance(regionId);
   
   const requestData = {
-    apiKey: process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105',
+    apiKey: process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50',
     loraName,
     md5Hex
   };

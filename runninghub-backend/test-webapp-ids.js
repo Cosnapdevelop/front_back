@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const API_KEY = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105';
+const API_KEY = process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50';
 
 // 测试的webappId列表
 const webappIds = [

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import FormData from 'form-data';
 
-const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105';
+const apiKey = process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50';
 const webappId = '1949831786093264897'; // Cosnap背景替换的webappId
 
 // 地区配置

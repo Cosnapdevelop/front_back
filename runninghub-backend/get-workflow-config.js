@@ -6,7 +6,7 @@ async function getWorkflowConfig() {
   try {
     // 使用RunningHub的API获取工作流配置
     const response = await axios.post('https://www.runninghub.cn/task/openapi/getWorkflowJson', {
-      apiKey: '8ee162873b6e44bd97d3ef6fce2de105',
+      apiKey: '50dcc0fbc848467092f853a9fcb49d50',
       workflowId: String('1952448857223442433') // 确保workflowId是字符串类型
     }, {
       headers: {

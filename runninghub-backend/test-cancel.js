@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiKey = '8ee162873b6e44bd97d3ef6fce2de105';
+const apiKey = '50dcc0fbc848467092f853a9fcb49d50';
 const testTaskId = '1950186290735161345'; // 使用一个测试taskId
 
 async function testCancelTask() {

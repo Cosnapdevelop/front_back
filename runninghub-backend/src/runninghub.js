@@ -2,7 +2,7 @@ import axios from 'axios';
 import fs from 'fs';
 import FormData from 'form-data';
 
-const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105'; // SECURITY FIX: Use environment variable
+const apiKey = process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50'; // SECURITY FIX: Use environment variable
 const webappId = 1937084629516193794;
 const baseUrl = 'https://www.runninghub.cn';
 
@@ -43,7 +43,7 @@ export async function uploadImage(filePath) {
 export async function startComfyUITask(imageFileName, nodeInfoList) {
   const requestBody = {
     webappId: '1947926545896734722', // 顶级人像放大-支持全身（体验版），用字符串传递
-    apiKey: '8ee162873b6e44bd97d3ef6fce2de105',
+    apiKey: '50dcc0fbc848467092f853a9fcb49d50',
     nodeInfoList: [
       {
         nodeId: '6011',

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_KEY = '8ee162873b6e44bd97d3ef6fce2de105';
+const API_KEY = '50dcc0fbc848467092f853a9fcb49d50';
 const WEBAPP_ID = '1907365560131153921'; // 超强换脸的webappId
 
 async function testFaceSwapCN() {

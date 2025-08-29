@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105';
+const apiKey = process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50';
 
 // 地区配置
 const REGIONS = {

@@ -3,7 +3,7 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 
-const apiKey = process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105';
+const apiKey = process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50';
 const webappId = process.env.RUNNINGHUB_WEBAPP_ID || 1937084629516193794;
 
 // 地区配置

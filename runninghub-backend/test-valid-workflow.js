@@ -6,7 +6,7 @@ async function testValidWorkflow() {
   try {
     // 测试已知可用的工作流ID
     const response = await axios.post('https://www.runninghub.cn/task/openapi/getWorkflowJson', {
-      apiKey: '8ee162873b6e44bd97d3ef6fce2de105',
+      apiKey: '50dcc0fbc848467092f853a9fcb49d50',
       workflowId: String('1949831786093264897')  // Cosnap换背景工作流ID，确保是字符串类型
     }, {
       headers: {

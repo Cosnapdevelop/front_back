@@ -101,7 +101,7 @@ async function startWebappTaskService(webappId, nodeInfoList, regionId = DEFAULT
   
   const requestData = {
     webappId: webappId, // 使用字符串形式，不转换为整数
-    apiKey: process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105',
+    apiKey: process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50',
     nodeInfoList: nodeInfoList
   };
   
@@ -216,7 +216,7 @@ async function getWebappTaskStatus(taskId, regionId = DEFAULT_REGION) {
         const axiosInstance = createWebappAxiosInstance(regionId);
         
         const requestData = {
-          apiKey: process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105',
+          apiKey: process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50',
           taskId: taskId
         };
         
@@ -286,7 +286,7 @@ async function getWebappTaskResult(taskId, regionId = DEFAULT_REGION) {
   const axiosInstance = createWebappAxiosInstance(regionId);
   
   const requestData = {
-    apiKey: process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105',
+    apiKey: process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50',
     taskId: taskId
   };
   
@@ -407,7 +407,7 @@ async function cancelWebappTask(taskId, regionId = DEFAULT_REGION) {
   const axiosInstance = createWebappAxiosInstance(regionId);
   
   const requestData = {
-    apiKey: process.env.RUNNINGHUB_API_KEY || '8ee162873b6e44bd97d3ef6fce2de105',
+    apiKey: process.env.RUNNINGHUB_API_KEY || '50dcc0fbc848467092f853a9fcb49d50',
     taskId: taskId
   };
   
