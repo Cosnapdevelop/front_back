@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Sparkles, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { APP_STRINGS } from '../constants/strings';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useSEO } from '../hooks/useSEO';
+import { useCountdown } from '../hooks/useCountdown';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeSending, setCodeSending] = useState(false);
-  const [codeCountdown, setCodeCountdown] = useState(0);
+  const countdown = useCountdown(60); // 60 seconds default countdown
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,7 +25,20 @@ export default function Register() {
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const debounceRef = useRef<number | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<{email?: string; username?: string; password?: string; confirmPassword?: string}>({});
+  const [fieldErrors, setFieldErrors] = useState<{email?: string; username?: string; password?: string; confirmPassword?: string; code?: string}>({});
+
+  // Error message mapping for specific backend error codes
+  const ERROR_MESSAGES = {
+    INVALID_CODE: '输入的验证码不正确，请检查后重试',
+    EXPIRED_CODE: '验证码已过期，请重新获取验证码',
+    ALREADY_USED: '验证码已使用过，请重新获取',
+    RATE_LIMITED: '请求过于频繁，请稍后再试',
+    EMAIL_EXISTS: '该邮箱已注册，请直接登录或使用其他邮箱',
+    USERNAME_EXISTS: '用户名已存在，请选择其他用户名',
+    WEAK_PASSWORD: '密码强度不够，请包含大小写字母和数字',
+    NETWORK_ERROR: '网络连接异常，请检查网络后重试',
+    UNKNOWN_ERROR: '注册失败，请稍后重试'
+  } as const;
 
   // SEO optimization for register page
   useSEO({
@@ -91,19 +105,28 @@ export default function Register() {
     setFieldErrors({});
     
     try {
-      const ok = await register(email.trim(), username.trim(), password, code.trim() || undefined);
+      const result = await register(email.trim(), username.trim(), password, code.trim() || undefined);
       
-      if (ok) {
+      if (result.success) {
         // Add a small delay for better UX
         setTimeout(() => {
           navigate('/');
         }, 100);
       } else {
-        setError(APP_STRINGS.AUTH.REGISTER_ERROR);
+        // Handle specific error codes with appropriate messages
+        const errorCode = result.error?.code as keyof typeof ERROR_MESSAGES;
+        const errorMessage = ERROR_MESSAGES[errorCode] || result.error?.message || APP_STRINGS.AUTH.REGISTER_ERROR;
+        
+        // Handle verification code specific errors
+        if (['INVALID_CODE', 'EXPIRED_CODE', 'ALREADY_USED'].includes(errorCode)) {
+          setFieldErrors(prev => ({ ...prev, code: errorMessage }));
+        } else {
+          setError(errorMessage);
+        }
       }
     } catch (error) {
       console.error('Registration error:', error);
-      setError('Network error. Please check your connection and try again.');
+      setError(ERROR_MESSAGES.NETWORK_ERROR);
     } finally {
       setLoading(false);
     }
@@ -287,64 +310,114 @@ export default function Register() {
 
             {/* Email verification code */}
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                邮箱验证码（可选，若后端已开启）
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  邮箱验证码（可选，若后端已开启）
+                </label>
+                <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
+                  <Clock className="h-3 w-3 mr-1" />
+                  验证码有效期5分钟
+                </div>
+              </div>
               <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="输入收到的6位验证码"
-                  className="flex-1 w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600"
-                  disabled={loading}
-                />
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => {
+                      setCode(e.target.value);
+                      if (fieldErrors.code) {
+                        setFieldErrors(prev => ({ ...prev, code: undefined }));
+                      }
+                    }}
+                    placeholder="输入收到的6位验证码"
+                    className={`w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${
+                      fieldErrors.code 
+                        ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
+                        : 'border-gray-300 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600'
+                    }`}
+                    disabled={loading}
+                    aria-describedby={fieldErrors.code ? 'code-error' : undefined}
+                    maxLength={6}
+                  />
+                  {code && code.length === 6 && (
+                    <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={async ()=>{
+                  onClick={async () => {
                     if (!email || !/\S+@\S+\.\S+/.test(email)) {
-                      setFieldErrors(prev=>({ ...prev, email: '请输入有效邮箱后再获取验证码' }));
+                      setFieldErrors(prev => ({ ...prev, email: '请输入有效邮箱后再获取验证码' }));
                       return;
                     }
                     setCodeSending(true);
+                    setError(''); // Clear any previous errors
+                    
                     try {
-                      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/send-code`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: email.trim(), scene: 'register' })
-                      });
+                      const result = await requestRegisterCode(email.trim());
                       
-                      if (response.status === 429) {
-                        const errorData = await response.json();
-                        if (errorData.remainingTime) {
-                          // TODO(human): Implement countdown timer logic here
-                          // Start with errorData.remainingTime seconds and count down to 0
-                          // Update codeCountdown state and use setInterval for the countdown
-                          // Remember to clear the interval when countdown reaches 0 or component unmounts
-                          console.log('Countdown should start with:', errorData.remainingTime, 'seconds');
-                        }
-                        setError(errorData.error || '请等待后再次发送验证码');
-                      } else if (!response.ok) {
-                        setError('验证码发送失败或未开通');
+                      if (result.success) {
+                        // Start 60-second countdown for successful sends
+                        countdown.start(60);
+                        // Show success message briefly
+                        const tempSuccess = '验证码已发送到您的邮箱';
+                        setError('');
+                        // Could show a success toast here instead
                       } else {
-                        setError(''); // Clear any previous errors
-                        // TODO(human): Start 60-second countdown for successful sends
-                        console.log('Success! Start 60-second countdown');
+                        // Handle specific error codes
+                        const errorCode = result.error?.code;
+                        const errorMessage = ERROR_MESSAGES[errorCode as keyof typeof ERROR_MESSAGES] || result.error?.message || '验证码发送失败';
+                        
+                        if (errorCode === 'RATE_LIMITED' && result.error?.remainingTime) {
+                          // Start countdown with remaining time from server
+                          countdown.start(result.error.remainingTime);
+                        }
+                        
+                        setError(errorMessage);
                       }
                     } catch (err) {
-                      setError('网络错误，请重试');
+                      setError(ERROR_MESSAGES.NETWORK_ERROR);
                     } finally {
                       setCodeSending(false);
                     }
                   }}
-                  className="whitespace-nowrap px-4 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white disabled:bg-gray-500"
-                  disabled={loading || codeSending || codeCountdown > 0}
+                  className={`whitespace-nowrap px-4 py-3 rounded-xl font-medium transition-all duration-300 flex items-center space-x-1 ${
+                    countdown.isActive
+                      ? 'bg-gray-400 text-white cursor-not-allowed'
+                      : codeSending
+                      ? 'bg-purple-400 text-white cursor-wait'
+                      : 'bg-purple-500 hover:bg-purple-600 text-white hover:shadow-md'
+                  }`}
+                  disabled={loading || codeSending || countdown.isActive}
+                  aria-label={countdown.isActive ? `等待 ${countdown.timeLeft} 秒后重新发送验证码` : '发送验证码'}
                 >
-                  {codeSending ? '发送中...' : 
-                   codeCountdown > 0 ? `${codeCountdown}秒后重试` : 
-                   '获取验证码'}
+                  {codeSending ? (
+                    <>
+                      <LoadingSpinner size="sm" color="white" />
+                      <span>发送中...</span>
+                    </>
+                  ) : countdown.isActive ? (
+                    <>
+                      <Clock className="h-4 w-4" />
+                      <span>{countdown.timeLeft}秒后重试</span>
+                    </>
+                  ) : (
+                    '获取验证码'
+                  )}
                 </button>
               </div>
+              {fieldErrors.code && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center mt-2 text-sm text-red-500"
+                  id="code-error"
+                >
+                  <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+                  <span>{fieldErrors.code}</span>
+                </motion.div>
+              )}
             </div>
 
             {/* Password field */}

@@ -3,16 +3,29 @@ import { API_BASE_URL } from '../config/api';
 
 type AuthUser = { id: string; email: string; username: string; avatar?: string } | null;
 
+// Enhanced error response type for better UX
+type AuthError = {
+  code?: string;
+  message: string;
+  remainingTime?: number;
+};
+
+type AuthResult<T = void> = {
+  success: boolean;
+  data?: T;
+  error?: AuthError;
+};
+
 type AuthContextValue = {
   user: AuthUser;
   isAuthenticated: boolean;
   accessToken: string | null;
   bootstrapped: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, username: string, password: string, code?: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (email: string, username: string, password: string, code?: string) => Promise<AuthResult>;
   logout: () => void;
   refresh: () => Promise<boolean>;
-  requestRegisterCode: (email: string) => Promise<boolean>;
+  requestRegisterCode: (email: string) => Promise<AuthResult>;
   updateUserData: (updates: Partial<AuthUser>) => void;
   refreshUserData: () => Promise<boolean>;
 };
@@ -133,50 +146,106 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [fetchMe, refresh, clearTokens]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
-      if (!res.ok) return false;
+      
       const data = await res.json();
+      
+      if (!res.ok) {
+        return {
+          success: false,
+          error: {
+            code: data.code || 'INVALID_CREDENTIALS',
+            message: data.error || data.message || 'Invalid email or password',
+            remainingTime: data.remainingTime
+          }
+        };
+      }
+      
       saveTokens(data.accessToken, data.refreshToken);
       setUser(data.user);
-      return true;
-    } catch {
-      return false;
+      return { success: true, data: data.user };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error. Please check your connection and try again.'
+        }
+      };
     }
   }, [saveTokens]);
 
-  const register = useCallback(async (email: string, username: string, password: string, code?: string) => {
+  const register = useCallback(async (email: string, username: string, password: string, code?: string): Promise<AuthResult> => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, username, password, code })
       });
-      if (!res.ok) return false;
+      
       const data = await res.json();
+      
+      if (!res.ok) {
+        return {
+          success: false,
+          error: {
+            code: data.code || 'UNKNOWN_ERROR',
+            message: data.error || data.message || 'Registration failed',
+            remainingTime: data.remainingTime
+          }
+        };
+      }
+      
       saveTokens(data.accessToken, data.refreshToken);
       setUser(data.user);
-      return true;
-    } catch {
-      return false;
+      return { success: true, data: data.user };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error. Please check your connection and try again.'
+        }
+      };
     }
   }, [saveTokens]);
 
-  const requestRegisterCode = useCallback(async (email: string) => {
+  const requestRegisterCode = useCallback(async (email: string): Promise<AuthResult> => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/send-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, scene: 'register' })
       });
-      return res.ok;
-    } catch {
-      return false;
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        return {
+          success: false,
+          error: {
+            code: data.code || (res.status === 429 ? 'RATE_LIMITED' : 'UNKNOWN_ERROR'),
+            message: data.error || data.message || 'Failed to send verification code',
+            remainingTime: data.remainingTime
+          }
+        };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'Network error. Please try again.'
+        }
+      };
     }
   }, []);
 

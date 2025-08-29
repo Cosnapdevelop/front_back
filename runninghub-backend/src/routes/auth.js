@@ -24,6 +24,111 @@ const prisma = prismaClient;
 const ACCESS_EXPIRES = '15m';
 const REFRESH_EXPIRES_DAYS = 30; // days
 
+// ========== 验证码系统配置和错误类型 ==========
+const VERIFICATION_CODE_EXPIRY_SECONDS = 300; // 5分钟有效期
+const VERIFICATION_CODE_SEND_COOLDOWN = 60; // 发送间隔60秒
+
+// 验证码错误类型枚举
+const VerificationCodeError = {
+  INVALID_CODE: 'INVALID_CODE',
+  EXPIRED_CODE: 'EXPIRED_CODE', 
+  ALREADY_USED: 'ALREADY_USED',
+  CODE_NOT_FOUND: 'CODE_NOT_FOUND'
+};
+
+// 验证码错误消息映射
+const VerificationCodeMessages = {
+  [VerificationCodeError.INVALID_CODE]: '输入的验证码不正确',
+  [VerificationCodeError.EXPIRED_CODE]: '验证码已过期，请重新获取',
+  [VerificationCodeError.ALREADY_USED]: '验证码已使用过，请重新获取',
+  [VerificationCodeError.CODE_NOT_FOUND]: '验证码不存在，请重新获取'
+};
+
+/**
+ * 验证验证码的辅助函数
+ * @param {string} email - 邮箱地址
+ * @param {string} scene - 场景类型
+ * @param {string} code - 验证码
+ * @returns {Promise<{isValid: boolean, error?: string, errorCode?: string, verificationRecord?: Object}>}
+ */
+async function validateVerificationCode(email, scene, code) {
+  const now = new Date();
+  
+  // 查找验证码记录
+  const verificationRecord = await prisma.verificationCode.findFirst({
+    where: {
+      email,
+      scene,
+      code
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // 验证码不存在
+  if (!verificationRecord) {
+    return {
+      isValid: false,
+      error: VerificationCodeMessages[VerificationCodeError.CODE_NOT_FOUND],
+      errorCode: VerificationCodeError.CODE_NOT_FOUND
+    };
+  }
+
+  // 验证码已被使用
+  if (verificationRecord.usedAt) {
+    return {
+      isValid: false,
+      error: VerificationCodeMessages[VerificationCodeError.ALREADY_USED],
+      errorCode: VerificationCodeError.ALREADY_USED
+    };
+  }
+
+  // 验证码已过期
+  if (verificationRecord.expiresAt <= now) {
+    return {
+      isValid: false,
+      error: VerificationCodeMessages[VerificationCodeError.EXPIRED_CODE],
+      errorCode: VerificationCodeError.EXPIRED_CODE
+    };
+  }
+
+  // 验证码有效
+  return {
+    isValid: true,
+    verificationRecord
+  };
+}
+
+/**
+ * 标记验证码为已使用
+ * @param {number} verificationId - 验证码记录ID
+ */
+async function markVerificationCodeAsUsed(verificationId) {
+  await prisma.verificationCode.update({
+    where: { id: verificationId },
+    data: { usedAt: new Date() }
+  });
+}
+
+/**
+ * 使旧验证码失效（发送新验证码时调用）
+ * @param {string} email - 邮箱地址
+ * @param {string} scene - 场景类型
+ */
+async function invalidateOldVerificationCodes(email, scene) {
+  const now = new Date();
+  await prisma.verificationCode.updateMany({
+    where: {
+      email,
+      scene,
+      usedAt: null,
+      expiresAt: { gt: now } // 只处理未过期且未使用的验证码
+    },
+    data: {
+      usedAt: now // 标记为已使用，实现失效
+    }
+  });
+}
+
 function signAccessToken(user) {
   return jwt.sign(
     { sub: user.id, email: user.email, username: user.username },
@@ -69,24 +174,17 @@ router.post(
 
       // 若提供验证码，则校验
       if (code) {
-        const now = new Date();
-        const found = await prisma.verificationCode.findFirst({
-          where: {
-            email,
-            scene,
-            code,
-            expiresAt: { gt: now },
-            usedAt: null
-          },
-          orderBy: { createdAt: 'desc' }
-        });
-        if (!found) {
-          return res.status(400).json({ success: false, error: '验证码无效或已过期' });
+        const validation = await validateVerificationCode(email, scene, code);
+        if (!validation.isValid) {
+          console.warn(`[注册验证码校验失败] Email: ${email}, Scene: ${scene}, 错误: ${validation.errorCode}, IP: ${req.ip}`);
+          return res.status(400).json({ 
+            success: false, 
+            error: validation.error,
+            errorCode: validation.errorCode
+          });
         }
-        await prisma.verificationCode.update({
-          where: { id: found.id },
-          data: { usedAt: new Date() }
-        });
+        // 标记验证码为已使用
+        await markVerificationCodeAsUsed(validation.verificationRecord.id);
       }
 
       // 密码强度验证（已在validation.js中处理）
@@ -232,19 +330,19 @@ router.post(
         }
       }
 
-      // 检查是否在60秒内已发送过验证码（防止频繁发送）
+      // 检查是否在冷却时间内已发送过验证码（防止频繁发送）
       const now = new Date();
       const recentCode = await prisma.verificationCode.findFirst({
         where: {
           email,
           scene,
-          createdAt: { gt: new Date(now.getTime() - 60 * 1000) } // 60秒内
+          createdAt: { gt: new Date(now.getTime() - VERIFICATION_CODE_SEND_COOLDOWN * 1000) }
         },
         orderBy: { createdAt: 'desc' }
       });
 
       if (recentCode) {
-        const remainingTime = Math.ceil((recentCode.createdAt.getTime() + 60 * 1000 - now.getTime()) / 1000);
+        const remainingTime = Math.ceil((recentCode.createdAt.getTime() + VERIFICATION_CODE_SEND_COOLDOWN * 1000 - now.getTime()) / 1000);
         return res.status(429).json({
           success: false,
           error: `请等待 ${remainingTime} 秒后再次发送验证码`,
@@ -252,9 +350,12 @@ router.post(
         });
       }
 
+      // 使之前的验证码失效
+      await invalidateOldVerificationCodes(email, scene);
+
       // 生成6位数字验证码
       const code = ('' + Math.floor(100000 + Math.random() * 900000));
-      const expiresAt = new Date(Date.now() + 60 * 1000); // 60秒有效期
+      const expiresAt = new Date(Date.now() + VERIFICATION_CODE_EXPIRY_SECONDS * 1000); // 5分钟有效期
 
       await prisma.verificationCode.create({
         data: { email, code, scene, expiresAt }
@@ -793,31 +894,19 @@ router.delete(
           });
         }
 
-        // Verify email verification code
-        const now = new Date();
-        const found = await prisma.verificationCode.findFirst({
-          where: {
-            email,
-            scene: 'delete_account',
-            code,
-            expiresAt: { gt: now },
-            usedAt: null
-          },
-          orderBy: { createdAt: 'desc' }
-        });
-
-        if (!found) {
+        // 验证邮箱验证码
+        const validation = await validateVerificationCode(email, 'delete_account', code);
+        if (!validation.isValid) {
+          console.warn(`[账户删除验证码校验失败] Email: ${email}, 错误: ${validation.errorCode}, IP: ${req.ip}`);
           return res.status(400).json({ 
             success: false, 
-            error: '验证码无效或已过期' 
+            error: validation.error,
+            errorCode: validation.errorCode
           });
         }
 
-        // Mark verification code as used
-        await prisma.verificationCode.update({
-          where: { id: found.id },
-          data: { usedAt: new Date() }
-        });
+        // 标记验证码为已使用
+        await markVerificationCodeAsUsed(validation.verificationRecord.id);
       }
 
       // Start comprehensive transaction for account deletion
@@ -1040,40 +1129,24 @@ router.post(
       const now = new Date();
 
       // 4. 验证当前邮箱的验证码
-      const currentEmailVerification = await prisma.verificationCode.findFirst({
-        where: {
-          email: currentUser.email,
-          scene: 'change_email',
-          code: currentEmailCode,
-          expiresAt: { gt: now },
-          usedAt: null
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      if (!currentEmailVerification) {
+      const currentEmailValidation = await validateVerificationCode(currentUser.email, 'change_email', currentEmailCode);
+      if (!currentEmailValidation.isValid) {
+        console.warn(`[邮箱更改-当前邮箱验证码校验失败] Email: ${currentUser.email}, 错误: ${currentEmailValidation.errorCode}, IP: ${req.ip}`);
         return res.status(400).json({
           success: false,
-          error: '当前邮箱验证码无效或已过期'
+          error: `当前邮箱${currentEmailValidation.error}`,
+          errorCode: currentEmailValidation.errorCode
         });
       }
 
-      // 5. 验证新邮箱的验证码
-      const newEmailVerification = await prisma.verificationCode.findFirst({
-        where: {
-          email: newEmail,
-          scene: 'change_email',
-          code: newEmailCode,
-          expiresAt: { gt: now },
-          usedAt: null
-        },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      if (!newEmailVerification) {
+      // 5. 验证新邮箱的验证码  
+      const newEmailValidation = await validateVerificationCode(newEmail, 'change_email', newEmailCode);
+      if (!newEmailValidation.isValid) {
+        console.warn(`[邮箱更改-新邮箱验证码校验失败] Email: ${newEmail}, 错误: ${newEmailValidation.errorCode}, IP: ${req.ip}`);
         return res.status(400).json({
           success: false,
-          error: '新邮箱验证码无效或已过期'
+          error: `新邮箱${newEmailValidation.error}`,
+          errorCode: newEmailValidation.errorCode
         });
       }
 
@@ -1081,12 +1154,12 @@ router.post(
       await prisma.$transaction(async (tx) => {
         // 标记验证码为已使用
         await tx.verificationCode.update({
-          where: { id: currentEmailVerification.id },
+          where: { id: currentEmailValidation.verificationRecord.id },
           data: { usedAt: new Date() }
         });
 
         await tx.verificationCode.update({
-          where: { id: newEmailVerification.id },
+          where: { id: newEmailValidation.verificationRecord.id },
           data: { usedAt: new Date() }
         });
 

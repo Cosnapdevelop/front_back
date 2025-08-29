@@ -63,15 +63,15 @@ export default function Login() {
     setFieldErrors({});
     
     try {
-      const ok = await login(email.trim(), password);
+      const result = await login(email.trim(), password);
       
-      if (ok) {
+      if (result.success) {
         // Add a small delay for better UX
         setTimeout(() => {
           navigate('/');
         }, 100);
       } else {
-        setError(APP_STRINGS.AUTH.LOGIN_ERROR);
+        setError(result.error?.message || APP_STRINGS.AUTH.LOGIN_ERROR);
       }
     } catch (error) {
       console.error('Login error:', error);
