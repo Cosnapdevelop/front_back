@@ -132,8 +132,13 @@ app.use('/api/beta', betaRouter);
 app.use('/api/mobile', mobileRouter);
 app.use('/api/monitoring', monitoringRouter);
 app.use('/api/admin', adminRouter);
-// 静态占位资源
-app.use('/assets', express.static('public'));
+// 静态占位资源 - 添加跨域支持
+app.use('/assets', (req, res, next) => {
+  // 为静态资源设置跨域头部
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  next();
+}, express.static('public'));
 
 // 404处理中间件（放在所有路由之后）
 app.use(notFoundHandler);

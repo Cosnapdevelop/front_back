@@ -100,9 +100,13 @@ export const securityHeaders = helmet({
   },
 
   // Cross-Origin Resource Policy
-  crossOriginResourcePolicy: {
-    policy: 'cross-origin'
-  },
+  // TODO(human): Temporarily disable to fix cross-origin image loading issue
+  crossOriginResourcePolicy: false,
+  
+  // Original config causing issues:
+  // crossOriginResourcePolicy: {
+  //   policy: 'cross-origin'
+  // },
 
   // Origin Agent Cluster
   originAgentCluster: true,
