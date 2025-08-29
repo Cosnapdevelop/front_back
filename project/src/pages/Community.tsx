@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, TrendingUp, Clock, Users, X, Upload, Image as ImageIcon, Send, Camera, Trash2 } from 'lucide-react';
+import { Plus, TrendingUp, Clock, Users, X, Upload, Image as ImageIcon, Send, Camera, Trash2, Move, Eye, GripVertical, ZoomIn } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/Cards/PostCard';
@@ -18,6 +18,8 @@ const Community = () => {
   const [selectedEffect, setSelectedEffect] = useState<string>('');
   const [postCaption, setPostCaption] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const tabs = [
     { id: 'trending', label: 'Trending', icon: TrendingUp },
@@ -157,7 +159,48 @@ const Community = () => {
     setSelectedImages([]);
     setPostCaption('');
     setSelectedEffect('');
+    setPreviewImage(null);
+    setDraggedIndex(null);
     setShowCreateModal(false);
+  };
+
+  // 图片拖拽排序功能实现
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', index.toString());
+    
+    // 添加拖拽时的视觉反馈
+    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
+    dragImage.style.transform = 'rotate(5deg)';
+    dragImage.style.opacity = '0.8';
+    e.dataTransfer.setDragImage(dragImage, 50, 50);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    // 重新排列图片数组
+    const newImages = [...selectedImages];
+    const draggedImage = newImages[draggedIndex];
+    
+    // 移除被拖拽的图片
+    newImages.splice(draggedIndex, 1);
+    // 插入到新位置
+    newImages.splice(dropIndex, 0, draggedImage);
+    
+    setSelectedImages(newImages);
+    setDraggedIndex(null);
   };
 
   return (
@@ -298,24 +341,67 @@ const Community = () => {
                         Upload Your Images ({selectedImages.length}/5)
                       </label>
                       
-                      {/* Selected Images */}
+                      {/* Selected Images with Enhanced UX */}
                       {selectedImages.length > 0 && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-                          {selectedImages.map((image, index) => (
-                            <div key={index} className="relative group">
-                              <img
-                                src={image}
-                                alt={`Selected ${index + 1}`}
-                                className="w-full h-24 object-cover rounded-lg"
-                              />
-                              <button
-                                onClick={() => removeImage(index)}
-                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        <div className="space-y-3 mb-4">
+                          {/* Images Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            {selectedImages.map((image, index) => (
+                              <div 
+                                key={index} 
+                                className={`relative group cursor-move border-2 border-transparent rounded-lg transition-all duration-200 ${
+                                  draggedIndex === index ? 'opacity-50 border-purple-400' : 'hover:border-purple-300'
+                                }`}
+                                draggable
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, index)}
                               >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </div>
-                          ))}
+                                {/* Image */}
+                                <img
+                                  src={image}
+                                  alt={`Selected ${index + 1}`}
+                                  className="w-full h-24 object-cover rounded-lg"
+                                />
+                                
+                                {/* Overlay Controls */}
+                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2">
+                                  {/* Preview Button */}
+                                  <button
+                                    onClick={() => setPreviewImage(image)}
+                                    className="p-1.5 bg-white bg-opacity-90 text-gray-800 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110"
+                                    title="预览大图"
+                                  >
+                                    <ZoomIn className="h-3 w-3" />
+                                  </button>
+                                  
+                                  {/* Drag Handle */}
+                                  <div className="p-1.5 bg-white bg-opacity-90 text-gray-800 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                    <GripVertical className="h-3 w-3" />
+                                  </div>
+                                  
+                                  {/* Delete Button */}
+                                  <button
+                                    onClick={() => removeImage(index)}
+                                    className="p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 hover:scale-110"
+                                    title="删除图片"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                                
+                                {/* Image Order Indicator */}
+                                <div className="absolute top-2 left-2 bg-purple-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                  {index + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Drag & Drop Instructions */}
+                          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                            🔄 拖拽图片调整顺序 • 🔍 点击预览大图 • 🗑️ 点击删除图片
+                          </p>
                         </div>
                       )}
                       
@@ -387,35 +473,96 @@ const Community = () => {
                   </div>
                 </div>
 
-                {/* Footer */}
-                <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                  <button
-                    onClick={resetCreateForm}
-                    className="px-6 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreatePost}
-                    disabled={selectedImages.length === 0 || !postCaption.trim() || !selectedEffect || isSubmitting}
-                    className="flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-semibold transition-all duration-300"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Sharing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        <span>Share Creation</span>
-                      </>
-                    )}
-                  </button>
+                {/* Enhanced Mobile-Friendly Footer */}
+                <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                  {/* Safe Area for Mobile */}
+                  <div className="p-4 pb-safe">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                      {/* Cancel Button */}
+                      <button
+                        onClick={resetCreateForm}
+                        className="flex items-center justify-center px-6 py-3 sm:py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 font-medium transition-colors border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        <span>取消</span>
+                      </button>
+                      
+                      {/* Publish Button */}
+                      <button
+                        onClick={handleCreatePost}
+                        disabled={selectedImages.length === 0 || !postCaption.trim() || !selectedEffect || isSubmitting}
+                        className="flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 sm:py-2 rounded-lg font-semibold transition-all duration-300 min-h-[44px] sm:min-h-[40px]"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>发布中...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4" />
+                            <span>发布作品</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    {/* Validation Status */}
+                    {selectedImages.length === 0 || !postCaption.trim() || !selectedEffect ? (
+                      <div className="mt-3 text-center">
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {selectedImages.length === 0 ? '📷 请上传至少1张图片' : 
+                           !selectedEffect ? '🎨 请选择使用的特效' : 
+                           !postCaption.trim() ? '✍️ 请填写作品描述' : ''}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Image Preview Modal */}
+      <AnimatePresence>
+        {previewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+            onClick={() => setPreviewImage(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="relative max-w-4xl max-h-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="absolute top-4 right-4 z-10 p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              
+              {/* Preview Image */}
+              <img
+                src={previewImage}
+                alt="预览大图"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              />
+              
+              {/* Image Info */}
+              <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-2 rounded-lg">
+                <p className="text-sm">点击图片外区域关闭预览</p>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
