@@ -7,14 +7,15 @@ import {
   authLimiter, 
   loginLimiter, 
   registerLimiter, 
-  sensitiveOperationLimiter 
+  sensitiveOperationLimiter,
+  passwordResetLimiter 
 } from '../middleware/rateLimiting.js';
 import { 
   authValidation,
   sanitizeInput 
 } from '../middleware/validation.js';
 import { auth, checkTokenExpiry } from '../middleware/auth.js';
-import { isEmailEnabled, sendVerificationEmail } from '../services/emailService.js';
+import { isEmailEnabled, sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 import prismaClient from '../config/prisma.js';
 
 const router = express.Router();
@@ -140,7 +141,13 @@ router.get(
   '/check-availability',
   [
     query('email').optional().isEmail().withMessage('email格式不正确'),
-    query('username').optional().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_-]+$/),
+    query('username').optional().isLength({ min: 3, max: 50 }).custom((value) => {
+      // Allow alphanumeric, underscore, hyphen, period, and @ symbol for email-as-username
+      if (!/^[a-zA-Z0-9_.-@]+$/.test(value)) {
+        throw new Error('用户名只能包含字母、数字、下划线、连字符、句点和@符号');
+      }
+      return true;
+    }),
     (req, res, next) => {
       const result = validationResult(req);
       if (!result.isEmpty()) {
@@ -225,9 +232,29 @@ router.post(
         }
       }
 
+      // 检查是否在60秒内已发送过验证码（防止频繁发送）
+      const now = new Date();
+      const recentCode = await prisma.verificationCode.findFirst({
+        where: {
+          email,
+          scene,
+          createdAt: { gt: new Date(now.getTime() - 60 * 1000) } // 60秒内
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (recentCode) {
+        const remainingTime = Math.ceil((recentCode.createdAt.getTime() + 60 * 1000 - now.getTime()) / 1000);
+        return res.status(429).json({
+          success: false,
+          error: `请等待 ${remainingTime} 秒后再次发送验证码`,
+          remainingTime
+        });
+      }
+
       // 生成6位数字验证码
       const code = ('' + Math.floor(100000 + Math.random() * 900000));
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟
+      const expiresAt = new Date(Date.now() + 60 * 1000); // 60秒有效期
 
       await prisma.verificationCode.create({
         data: { email, code, scene, expiresAt }
@@ -236,13 +263,31 @@ router.post(
       if (await isEmailEnabled()) {
         try {
           await sendVerificationEmail(email, code, scene);
+          console.log(`[Email] 验证码邮件发送成功 - email=${email}, scene=${scene}`);
         } catch (e) {
-          console.warn('[Email] 发送失败，降级为日志输出:', e?.message);
-          console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
+          console.error('[Email] 发送失败，降级为日志输出:', {
+            error: e?.message,
+            code: e?.code,
+            command: e?.command,
+            response: e?.response,
+            email: email,
+            scene: scene
+          });
+          
+          // Provide specific error guidance in logs
+          if (e?.message?.includes('534-5.7.9')) {
+            console.error('[Email] Gmail认证错误 - 可能使用了常规密码而非App密码。请检查GMAIL_SMTP_SETUP.md文件获取解决方案。');
+          } else if (e?.message?.includes('535-5.7.8')) {
+            console.error('[Email] SMTP用户名或密码错误 - 请检查SMTP_USER和SMTP_PASS环境变量');
+          } else if (e?.message?.includes('ENOTFOUND') || e?.message?.includes('ECONNREFUSED')) {
+            console.error('[Email] 网络连接错误 - 请检查网络连接和防火墙设置');
+          }
+          
+          console.log(`[验证码] 邮件发送失败，仅日志记录 - email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
         }
       } else {
         // 未配置SMTP，降级日志输出
-        console.log(`[验证码] email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
+        console.log(`[验证码] SMTP未配置，仅日志记录 - email=${email}, scene=${scene}, code=${code}, expiresAt=${expiresAt.toISOString()}`);
       }
 
       return res.json({ success: true });
@@ -1094,6 +1139,452 @@ router.post(
       return res.status(500).json({
         success: false,
         error: '邮箱更改失败，请稍后重试'
+      });
+    }
+  }
+);
+
+// ========== 密码重置功能 ==========
+
+/**
+ * 辅助函数：生成安全的重置令牌
+ */
+function generateResetToken(userId, email) {
+  const payload = {
+    userId: userId,
+    email: email,
+    type: 'password_reset',
+    iat: Math.floor(Date.now() / 1000)
+  };
+  
+  const token = jwt.sign(payload, process.env.JWT_RESET_SECRET, {
+    expiresIn: '1h',
+    issuer: process.env.JWT_ISSUER || 'cosnap-api',
+    audience: process.env.JWT_AUDIENCE || 'cosnap-reset'
+  });
+  
+  return token;
+}
+
+/**
+ * 辅助函数：验证重置令牌
+ */
+function verifyResetToken(token) {
+  try {
+    const payload = jwt.verify(token, process.env.JWT_RESET_SECRET, {
+      issuer: process.env.JWT_ISSUER || 'cosnap-api',
+      audience: process.env.JWT_AUDIENCE || 'cosnap-reset'
+    });
+    
+    if (payload.type !== 'password_reset') {
+      throw new Error('Invalid token type');
+    }
+    
+    return payload;
+  } catch (error) {
+    throw new Error('Token verification failed');
+  }
+}
+
+/**
+ * 辅助函数：安全日志记录
+ */
+function logPasswordResetAttempt(type, details) {
+  console.log(`[密码重置] ${type.toUpperCase()} - IP: ${details.ip}, 成功: ${details.success || false}, 邮箱: ${details.email || 'N/A'}`);
+  
+  if (!details.success && details.errorCode) {
+    console.warn(`[密码重置] 错误详情 - 类型: ${details.errorCode}, IP: ${details.ip}`);
+  }
+}
+
+// 1. 发起密码重置请求
+router.post(
+  '/forgot-password',
+  passwordResetLimiter,
+  sanitizeInput,
+  ...authValidation.forgotPassword,
+  async (req, res) => {
+    const startTime = Date.now();
+    const { email } = req.body;
+    const clientIp = req.ip;
+    const userAgent = req.get('User-Agent');
+
+    try {
+      // 查找用户（安全考虑：无论用户是否存在都返回相同响应）
+      const user = await prisma.user.findUnique({ 
+        where: { email },
+        select: { 
+          id: true, 
+          email: true, 
+          username: true,
+          isActive: true,
+          isBanned: true 
+        }
+      });
+
+      // 安全策略：始终返回成功响应，不泄露用户是否存在
+      const successResponse = {
+        success: true,
+        message: '如果该邮箱已注册，您将收到重置链接'
+      };
+
+      if (!user) {
+        logPasswordResetAttempt('request', {
+          ip: clientIp,
+          email: email,
+          success: false,
+          errorCode: 'USER_NOT_FOUND'
+        });
+        return res.json(successResponse);
+      }
+
+      // 检查用户状态
+      if (user.isBanned) {
+        logPasswordResetAttempt('request', {
+          ip: clientIp,
+          email: email,
+          success: false,
+          errorCode: 'USER_BANNED'
+        });
+        return res.json(successResponse);
+      }
+
+      if (!user.isActive) {
+        logPasswordResetAttempt('request', {
+          ip: clientIp,
+          email: email,
+          success: false,
+          errorCode: 'USER_INACTIVE'
+        });
+        return res.json(successResponse);
+      }
+
+      // 检查是否存在未过期的重置令牌（防止重复请求）
+      const existingToken = await prisma.passwordResetToken.findFirst({
+        where: {
+          userId: user.id,
+          expiresAt: { gt: new Date() },
+          usedAt: null
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      let token;
+      if (existingToken) {
+        // 使用现有未过期的令牌
+        token = existingToken.token;
+        console.log(`[密码重置] 重复使用现有令牌 - 用户: ${user.username} (${user.id}), IP: ${clientIp}`);
+      } else {
+        // 生成新的重置令牌
+        token = generateResetToken(user.id, user.email);
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1小时后过期
+
+        // 在数据库中存储令牌
+        await prisma.passwordResetToken.create({
+          data: {
+            email: user.email,
+            token: token,
+            userId: user.id,
+            expiresAt: expiresAt,
+            ipAddress: clientIp,
+            userAgent: userAgent
+          }
+        });
+
+        console.log(`[密码重置] 新令牌已创建 - 用户: ${user.username} (${user.id}), IP: ${clientIp}`);
+      }
+
+      // 发送密码重置邮件
+      if (await isEmailEnabled()) {
+        try {
+          const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${token}`;
+          await sendPasswordResetEmail(user.email, resetLink, user.username);
+          
+          logPasswordResetAttempt('request', {
+            ip: clientIp,
+            email: email,
+            success: true
+          });
+        } catch (emailError) {
+          console.error('[密码重置] 邮件发送失败:', emailError.message);
+          // 不向客户端暴露邮件发送失败，但在日志中记录
+          logPasswordResetAttempt('request', {
+            ip: clientIp,
+            email: email,
+            success: false,
+            errorCode: 'EMAIL_SEND_FAILED'
+          });
+        }
+      } else {
+        console.log(`[密码重置] 邮件未配置，令牌: ${token}`);
+      }
+
+      return res.json(successResponse);
+
+    } catch (error) {
+      console.error(`[密码重置] 请求处理失败 - IP: ${clientIp}, 错误:`, error);
+      logPasswordResetAttempt('request', {
+        ip: clientIp,
+        email: email,
+        success: false,
+        errorCode: 'INTERNAL_ERROR'
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: '服务器错误，请稍后重试'
+      });
+    }
+  }
+);
+
+// 2. 验证重置令牌
+router.get(
+  '/reset-password/:token',
+  authLimiter,
+  ...authValidation.verifyResetToken,
+  async (req, res) => {
+    const { token } = req.params;
+    const clientIp = req.ip;
+
+    try {
+      // 验证JWT令牌
+      const payload = verifyResetToken(token);
+      
+      // 检查数据库中的令牌记录
+      const tokenRecord = await prisma.passwordResetToken.findUnique({
+        where: { token },
+        include: { 
+          user: { 
+            select: { 
+              id: true, 
+              email: true, 
+              username: true, 
+              isActive: true, 
+              isBanned: true 
+            } 
+          } 
+        }
+      });
+
+      if (!tokenRecord || tokenRecord.usedAt) {
+        logPasswordResetAttempt('verify', {
+          ip: clientIp,
+          success: false,
+          errorCode: tokenRecord ? 'TOKEN_USED' : 'TOKEN_NOT_FOUND'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '重置链接无效或已使用'
+        });
+      }
+
+      if (tokenRecord.expiresAt < new Date()) {
+        logPasswordResetAttempt('verify', {
+          ip: clientIp,
+          success: false,
+          errorCode: 'TOKEN_EXPIRED'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '重置链接已过期'
+        });
+      }
+
+      if (!tokenRecord.user || tokenRecord.user.isBanned || !tokenRecord.user.isActive) {
+        logPasswordResetAttempt('verify', {
+          ip: clientIp,
+          email: tokenRecord.email,
+          success: false,
+          errorCode: 'USER_INVALID'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '用户账户状态异常'
+        });
+      }
+
+      logPasswordResetAttempt('verify', {
+        ip: clientIp,
+        email: tokenRecord.email,
+        success: true
+      });
+
+      return res.json({
+        success: true,
+        email: tokenRecord.email
+      });
+
+    } catch (error) {
+      console.error(`[密码重置] 令牌验证失败 - IP: ${clientIp}, 错误:`, error.message);
+      logPasswordResetAttempt('verify', {
+        ip: clientIp,
+        success: false,
+        errorCode: 'VERIFICATION_FAILED'
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: '重置链接无效或已过期'
+      });
+    }
+  }
+);
+
+// 3. 执行密码重置
+router.post(
+  '/reset-password',
+  passwordResetLimiter,
+  sanitizeInput,
+  ...authValidation.resetPassword,
+  async (req, res) => {
+    const { token, password } = req.body;
+    const clientIp = req.ip;
+    const userAgent = req.get('User-Agent');
+
+    try {
+      // 验证JWT令牌
+      const payload = verifyResetToken(token);
+      
+      // 获取数据库中的令牌记录
+      const tokenRecord = await prisma.passwordResetToken.findUnique({
+        where: { token },
+        include: { 
+          user: { 
+            select: { 
+              id: true, 
+              email: true, 
+              username: true, 
+              isActive: true, 
+              isBanned: true,
+              passwordHash: true 
+            } 
+          } 
+        }
+      });
+
+      if (!tokenRecord || tokenRecord.usedAt) {
+        logPasswordResetAttempt('reset', {
+          ip: clientIp,
+          success: false,
+          errorCode: tokenRecord ? 'TOKEN_USED' : 'TOKEN_NOT_FOUND'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '重置链接无效或已使用'
+        });
+      }
+
+      if (tokenRecord.expiresAt < new Date()) {
+        logPasswordResetAttempt('reset', {
+          ip: clientIp,
+          email: tokenRecord.email,
+          success: false,
+          errorCode: 'TOKEN_EXPIRED'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '重置链接已过期'
+        });
+      }
+
+      if (!tokenRecord.user || tokenRecord.user.isBanned || !tokenRecord.user.isActive) {
+        logPasswordResetAttempt('reset', {
+          ip: clientIp,
+          email: tokenRecord.email,
+          success: false,
+          errorCode: 'USER_INVALID'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '用户账户状态异常'
+        });
+      }
+
+      // 检查新密码是否与当前密码相同
+      const isSamePassword = await bcrypt.compare(password, tokenRecord.user.passwordHash);
+      if (isSamePassword) {
+        logPasswordResetAttempt('reset', {
+          ip: clientIp,
+          email: tokenRecord.email,
+          success: false,
+          errorCode: 'SAME_PASSWORD'
+        });
+        return res.status(400).json({
+          success: false,
+          error: '新密码不能与当前密码相同'
+        });
+      }
+
+      // 在事务中执行密码重置
+      await prisma.$transaction(async (tx) => {
+        // 1. 更新用户密码
+        const passwordHash = await bcrypt.hash(password, 12);
+        await tx.user.update({
+          where: { id: tokenRecord.userId },
+          data: { passwordHash }
+        });
+
+        // 2. 标记令牌为已使用
+        await tx.passwordResetToken.update({
+          where: { token },
+          data: { usedAt: new Date() }
+        });
+
+        // 3. 撤销所有现有的刷新令牌（强制重新登录）
+        await tx.refreshToken.updateMany({
+          where: { 
+            userId: tokenRecord.userId, 
+            isRevoked: false 
+          },
+          data: { 
+            isRevoked: true,
+            revokedAt: new Date() 
+          }
+        });
+
+        // 4. 删除该用户的其他未使用的密码重置令牌
+        await tx.passwordResetToken.deleteMany({
+          where: {
+            userId: tokenRecord.userId,
+            usedAt: null,
+            id: { not: tokenRecord.id }
+          }
+        });
+      });
+
+      logPasswordResetAttempt('reset', {
+        ip: clientIp,
+        email: tokenRecord.email,
+        success: true
+      });
+
+      console.log(`[密码重置] 成功 - 用户: ${tokenRecord.user.username} (${tokenRecord.userId}), IP: ${clientIp}`);
+
+      return res.json({
+        success: true,
+        message: '密码重置成功，请使用新密码登录'
+      });
+
+    } catch (error) {
+      console.error(`[密码重置] 执行失败 - IP: ${clientIp}, 错误:`, error);
+      logPasswordResetAttempt('reset', {
+        ip: clientIp,
+        success: false,
+        errorCode: 'EXECUTION_FAILED'
+      });
+
+      // 处理特定的数据库错误
+      if (error.code === 'P2025') {
+        return res.status(400).json({
+          success: false,
+          error: '重置链接无效'
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: '密码重置失败，请稍后重试'
       });
     }
   }

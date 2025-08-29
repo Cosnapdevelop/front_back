@@ -276,23 +276,46 @@ const Home = () => {
         {/* Featured Categories */}
         <section className="mb-12">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-            Popular Categories
+            🎌 二次元特效专区
           </h3>
           <div className="flex flex-wrap gap-3">
-            {['Portrait', 'Artistic', 'Photography', 'Fantasy', 'Vintage', 'Modern', 'Video', 'Ecommerce', 'Upscale', 'FaceSwap', 'Edit'].map((category) => (
-              <Link
-                key={category}
-                to={`/effects?category=${category}`}
-                className="group flex items-center space-x-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-full shadow-sm hover:shadow-md transition-all duration-300 border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600"
-              >
-                <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Sparkles className="h-3 w-3 text-white" />
-                </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                  {category}
-                </span>
-              </Link>
-            ))}
+            {['二次元头像', '动漫风格', 'Kawaii风格', '日系滤镜', 'Portrait', 'Artistic', 'Fantasy', 'Video', 'FaceSwap', 'Edit'].map((category, index) => {
+              // 特殊的二次元分类样式
+              const isAnimeCategory = index < 4;
+              const animeGradients = [
+                'from-pink-500 to-purple-500', // 二次元头像
+                'from-blue-500 to-purple-500',  // 动漫风格  
+                'from-pink-400 to-rose-500',    // Kawaii风格
+                'from-orange-400 to-purple-500' // 日系滤镜
+              ];
+              
+              return (
+                <Link
+                  key={category}
+                  to={`/effects?category=${category}`}
+                  className={`group flex items-center space-x-2 px-4 py-3 rounded-full shadow-sm hover:shadow-md transition-all duration-300 ${
+                    isAnimeCategory 
+                      ? 'bg-gradient-to-r ' + animeGradients[index] + ' text-white hover:shadow-lg transform hover:scale-105 border-2 border-white/20' 
+                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600'
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform ${
+                    isAnimeCategory 
+                      ? 'bg-white/20 backdrop-blur-sm' 
+                      : 'bg-gradient-to-br from-purple-500 to-pink-500'
+                  }`}>
+                    <Sparkles className={`h-3 w-3 ${isAnimeCategory ? 'text-white' : 'text-white'}`} />
+                  </div>
+                  <span className={`text-sm font-medium transition-colors ${
+                    isAnimeCategory 
+                      ? 'text-white group-hover:text-white' 
+                      : 'text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'
+                  }`}>
+                    {category}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
@@ -315,11 +338,11 @@ const Home = () => {
           <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.1%22%3E%3Ccircle cx=%2230%22 cy=%2230%22 r=%224%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-30" />
           <div className="relative">
             <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-              Ready to Create Something Amazing?
+              🎌 准备创造你的二次元作品吗？
             </h2>
             <p className="text-lg opacity-90 mb-6 max-w-2xl mx-auto">
-              Join our community of creators and start transforming your images with
-              cutting-edge AI effects today.
+              加入我们的创作者社区，使用专业AI技术将你的照片转换为精美的动漫风格，
+              体验最先进的二次元修图特效。
             </p>
             <Link
               to="/effects"
@@ -327,7 +350,7 @@ const Home = () => {
               title="Explore all AI photo effects and filters"
             >
               <Sparkles className="h-5 w-5" />
-              <span>Explore Effects</span>
+              <span>开始二次元创作</span>
             </Link>
           </div>
         </motion.section>

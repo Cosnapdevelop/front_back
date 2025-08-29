@@ -36,10 +36,15 @@ export const sanitizeInput = mongoSanitize({
  */
 export const stringValidation = {
   username: body('username')
-    .isLength({ min: 3, max: 30 })
-    .withMessage('用户名长度必须在3-30个字符之间')
-    .matches(/^[a-zA-Z0-9_-]+$/)
-    .withMessage('用户名只能包含字母、数字、下划线和连字符'),
+    .isLength({ min: 3, max: 50 })
+    .withMessage('用户名长度必须在3-50个字符之间')
+    .custom((value) => {
+      // Allow email addresses as usernames along with traditional usernames
+      if (!/^[a-zA-Z0-9_.-@]+$/.test(value)) {
+        throw new Error('用户名只能包含字母、数字、下划线、连字符、句点和@符号');
+      }
+      return true;
+    }),
     
   email: body('email')
     .isEmail()
@@ -277,6 +282,46 @@ export const authValidation = {
       .optional()
       .isIn(['register', 'reset_password', 'delete_account', 'change_email'])
       .withMessage('无效的验证场景'),
+    handleValidationErrors
+  ],
+
+  forgotPassword: [
+    body('email')
+      .isEmail()
+      .withMessage('请提供有效邮箱')
+      .normalizeEmail()
+      .isLength({ max: 254 })
+      .withMessage('邮箱地址过长'),
+    handleValidationErrors
+  ],
+
+  resetPassword: [
+    body('token')
+      .notEmpty()
+      .withMessage('重置令牌不能为空')
+      .isLength({ min: 10, max: 500 })
+      .withMessage('重置令牌格式无效'),
+    body('password')
+      .isLength({ min: 8, max: 128 })
+      .withMessage('密码长度必须在8-128个字符之间')
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+      .withMessage('密码必须包含大小写字母、数字和特殊字符'),
+    body('confirmPassword')
+      .custom((value, { req }) => {
+        if (value !== req.body.password) {
+          throw new Error('确认密码不匹配');
+        }
+        return true;
+      }),
+    handleValidationErrors
+  ],
+
+  verifyResetToken: [
+    param('token')
+      .notEmpty()
+      .withMessage('重置令牌不能为空')
+      .isLength({ min: 10, max: 500 })
+      .withMessage('重置令牌格式无效'),
     handleValidationErrors
   ]
 };

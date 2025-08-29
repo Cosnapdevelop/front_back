@@ -13,6 +13,7 @@ import LoadingState from './components/UI/LoadingState';
 import BetaOnboardingFlow from './components/Beta/BetaOnboardingFlow';
 import BetaOnboardingTutorial from './components/Onboarding/BetaOnboardingTutorial';
 import FeedbackWidget from './components/Feedback/FeedbackWidget';
+import AnimeOnboardingFlow, { useAnimeOnboarding } from './components/Anime/AnimeOnboardingFlow';
 import { trackPageView, trackPerformance } from './utils/analytics';
 import { usePerformanceMonitoring } from './hooks/usePerformanceMonitoring';
 
@@ -28,6 +29,10 @@ const UserProfile = React.lazy(() => import('./pages/UserProfile'));
 const ImageLibrary = React.lazy(() => import('./pages/ImageLibrary'));
 const Login = React.lazy(() => import('./pages/Login'));
 const Register = React.lazy(() => import('./pages/Register'));
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
+const EmailSent = React.lazy(() => import('./pages/EmailSent'));
+const ResetPassword = React.lazy(() => import('./pages/ResetPassword'));
+const ResetSuccess = React.lazy(() => import('./pages/ResetSuccess'));
 
 // Analytics tracking component
 const AnalyticsTracker: React.FC = () => {
@@ -53,6 +58,8 @@ const AnalyticsTracker: React.FC = () => {
 };
 
 function App() {
+  const animeOnboarding = useAnimeOnboarding();
+  
   return (
     <ErrorBoundary>
       <AppProvider>
@@ -79,6 +86,10 @@ function App() {
                         <Route path="/user/:userId" element={<UserProfile />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/forgot-password/email-sent" element={<EmailSent />} />
+                        <Route path="/reset-password/:token" element={<ResetPassword />} />
+                        <Route path="/reset-password/success" element={<ResetSuccess />} />
                       </Routes>
                     </Suspense>
                   </ErrorBoundary>
@@ -86,6 +97,13 @@ function App() {
                   {/* Beta Onboarding System */}
                   <BetaOnboardingFlow />
                   <BetaOnboardingTutorial />
+                  
+                  {/* Anime Onboarding Flow */}
+                  <AnimeOnboardingFlow
+                    isOpen={animeOnboarding.isOpen}
+                    onClose={animeOnboarding.handleClose}
+                    onComplete={animeOnboarding.handleComplete}
+                  />
                   
                   {/* Feedback Collection System */}
                   <FeedbackWidget 

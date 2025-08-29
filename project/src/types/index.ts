@@ -114,3 +114,32 @@ export interface GeneratedImage {
   originalImageName?: string;
   processedImageName?: string;
 }
+
+// Forgot Password Flow Types
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  success: boolean;
+  message: string;
+  expiresIn?: number; // Token expiration time in minutes
+}
+
+export interface ResetPasswordTokenResponse {
+  success: boolean;
+  valid: boolean;
+  email?: string;
+  message: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  password: string;
+  confirmPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  success: boolean;
+  message: string;
+}

@@ -16,6 +16,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [code, setCode] = useState('');
   const [codeSending, setCodeSending] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,8 +57,10 @@ export default function Register() {
       errors.username = 'Username is required';
     } else if (username.trim().length < 3) {
       errors.username = 'Username must be at least 3 characters';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
-      errors.username = 'Username can only contain letters, numbers, and underscores';
+    } else if (username.trim().length > 50) {
+      errors.username = 'Username cannot exceed 50 characters';
+    } else if (!/^[a-zA-Z0-9_.@-]+$/.test(username.trim())) {
+      errors.username = 'Username can contain letters, numbers, underscores, dots, hyphens, and @ symbols (email format allowed)';
     }
     
     if (!password) {
@@ -211,9 +214,26 @@ export default function Register() {
 
             {/* Username field */}
             <div>
-              <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
-                {APP_STRINGS.AUTH.USERNAME_LABEL}
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {APP_STRINGS.AUTH.USERNAME_LABEL}
+                </label>
+                {email && /\S+@\S+\.\S+/.test(email) && email !== username && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUsername(email);
+                      if (fieldErrors.username) {
+                        setFieldErrors(prev => ({ ...prev, username: undefined }));
+                      }
+                    }}
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors"
+                    disabled={loading}
+                  >
+                    Use email as username
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
@@ -229,7 +249,7 @@ export default function Register() {
                       setFieldErrors(prev => ({ ...prev, username: undefined }));
                     }
                   }}
-                  placeholder={APP_STRINGS.AUTH.USERNAME_PLACEHOLDER}
+                  placeholder="Username or email address"
                   className={`w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-700 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[44px] text-base ${
                     fieldErrors.username 
                       ? 'border-red-500 bg-red-50 dark:bg-red-900/20' 
@@ -250,6 +270,17 @@ export default function Register() {
                   className="text-sm text-red-500 mt-1"
                 >
                   {fieldErrors.username}
+                </motion.p>
+              )}
+              {/* Helpful hint for email-as-username */}
+              {email && username === email && (
+                <motion.p
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center"
+                >
+                  <span className="text-green-500 mr-1">✓</span>
+                  Using your email as username - this is perfectly fine!
                 </motion.p>
               )}
             </div>
@@ -277,17 +308,42 @@ export default function Register() {
                     }
                     setCodeSending(true);
                     try {
-                      const ok = await requestRegisterCode(email.trim());
-                      if (!ok) {
+                      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/send-code`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email.trim(), scene: 'register' })
+                      });
+                      
+                      if (response.status === 429) {
+                        const errorData = await response.json();
+                        if (errorData.remainingTime) {
+                          // TODO(human): Implement countdown timer logic here
+                          // Start with errorData.remainingTime seconds and count down to 0
+                          // Update codeCountdown state and use setInterval for the countdown
+                          // Remember to clear the interval when countdown reaches 0 or component unmounts
+                          console.log('Countdown should start with:', errorData.remainingTime, 'seconds');
+                        }
+                        setError(errorData.error || '请等待后再次发送验证码');
+                      } else if (!response.ok) {
                         setError('验证码发送失败或未开通');
+                      } else {
+                        setError(''); // Clear any previous errors
+                        // TODO(human): Start 60-second countdown for successful sends
+                        console.log('Success! Start 60-second countdown');
                       }
+                    } catch (err) {
+                      setError('网络错误，请重试');
                     } finally {
                       setCodeSending(false);
                     }
                   }}
                   className="whitespace-nowrap px-4 py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white disabled:bg-gray-500"
-                  disabled={loading || codeSending}
-                >{codeSending ? '发送中...' : '获取验证码'}</button>
+                  disabled={loading || codeSending || codeCountdown > 0}
+                >
+                  {codeSending ? '发送中...' : 
+                   codeCountdown > 0 ? `${codeCountdown}秒后重试` : 
+                   '获取验证码'}
+                </button>
               </div>
             </div>
 
