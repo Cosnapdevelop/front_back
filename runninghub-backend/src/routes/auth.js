@@ -321,21 +321,9 @@ router.post(
           });
         }
 
-        // TODO(human): 修复邮箱验证逻辑
-        // 当前逻辑阻止了对原邮箱的验证，但用户需要验证原邮箱作为安全措施
-        // 建议方案：1) 添加emailType参数区分验证场景 2) 或简化为只验证新邮箱
-        // 
-        // 建议实现：
-        // const emailType = req.body.emailType; // 'current' 或 'new' 
-        // if (emailType === 'new' && email === req.user.email) {
-        //   return res.status(400).json({
-        //     success: false, 
-        //     error: '新邮箱不能与当前邮箱相同'
-        //   });
-        // }
-        
-        // 临时禁用此检查以允许原邮箱验证
-        if (false && email === req.user.email) {
+        // 简化邮箱更改流程：仅验证新邮箱（符合业界最佳实践）
+        // 防止用户将邮箱改为相同邮箱
+        if (email === req.user.email) {
           return res.status(400).json({
             success: false,
             error: '新邮箱不能与当前邮箱相同'
@@ -1097,7 +1085,7 @@ router.post(
   ...authValidation.changeEmail,
   async (req, res) => {
     try {
-      const { newEmail, currentEmailCode, newEmailCode, password } = req.body;
+      const { newEmail, newEmailCode, password } = req.body;
       const userId = req.user.sub;
 
       // 获取当前用户信息
@@ -1141,18 +1129,7 @@ router.post(
 
       const now = new Date();
 
-      // 4. 验证当前邮箱的验证码
-      const currentEmailValidation = await validateVerificationCode(currentUser.email, 'change_email', currentEmailCode);
-      if (!currentEmailValidation.isValid) {
-        console.warn(`[邮箱更改-当前邮箱验证码校验失败] Email: ${currentUser.email}, 错误: ${currentEmailValidation.errorCode}, IP: ${req.ip}`);
-        return res.status(400).json({
-          success: false,
-          error: `当前邮箱${currentEmailValidation.error}`,
-          errorCode: currentEmailValidation.errorCode
-        });
-      }
-
-      // 5. 验证新邮箱的验证码  
+      // 4. 验证新邮箱的验证码（简化流程：仅验证新邮箱）  
       const newEmailValidation = await validateVerificationCode(newEmail, 'change_email', newEmailCode);
       if (!newEmailValidation.isValid) {
         console.warn(`[邮箱更改-新邮箱验证码校验失败] Email: ${newEmail}, 错误: ${newEmailValidation.errorCode}, IP: ${req.ip}`);
@@ -1163,14 +1140,9 @@ router.post(
         });
       }
 
-      // 6. 在事务中执行邮箱更改操作
+      // 5. 在事务中执行邮箱更改操作
       await prisma.$transaction(async (tx) => {
-        // 标记验证码为已使用
-        await tx.verificationCode.update({
-          where: { id: currentEmailValidation.verificationRecord.id },
-          data: { usedAt: new Date() }
-        });
-
+        // 标记新邮箱验证码为已使用
         await tx.verificationCode.update({
           where: { id: newEmailValidation.verificationRecord.id },
           data: { usedAt: new Date() }

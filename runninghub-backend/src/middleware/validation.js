@@ -257,11 +257,6 @@ export const authValidation = {
       .normalizeEmail()
       .isLength({ max: 254 })
       .withMessage('邮箱地址过长'),
-    body('currentEmailCode')
-      .isLength({ min: 6, max: 6 })
-      .withMessage('当前邮箱验证码必须为6位数字')
-      .isNumeric()
-      .withMessage('验证码必须为数字'),
     body('newEmailCode')
       .isLength({ min: 6, max: 6 })
       .withMessage('新邮箱验证码必须为6位数字')

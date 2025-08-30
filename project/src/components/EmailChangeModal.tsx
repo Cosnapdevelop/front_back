@@ -10,20 +10,19 @@ interface EmailChangeModalProps {
   onSuccess?: (newEmail: string) => void;
 }
 
-type Step = 'current-email' | 'new-email' | 'verification' | 'complete';
+type Step = 'password' | 'new-email' | 'verification' | 'complete';
 
 interface FormData {
   currentEmail: string;
   newEmail: string;
   password: string;
-  currentEmailCode: string;
   newEmailCode: string;
 }
 
 const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const { push } = useToast();
   const { user, accessToken } = useAuth();
-  const [currentStep, setCurrentStep] = useState<Step>('current-email');
+  const [currentStep, setCurrentStep] = useState<Step>('password');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Partial<FormData>>({});
   
@@ -32,52 +31,43 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
     currentEmail: user?.email || '',
     newEmail: '',
     password: '',
-    currentEmailCode: '',
     newEmailCode: ''
   });
 
-  // Countdown timers for verification codes
-  const [currentEmailCountdown, setCurrentEmailCountdown] = useState(0);
+  // Countdown timer for new email verification code
   const [newEmailCountdown, setNewEmailCountdown] = useState(0);
-  const currentEmailTimerRef = useRef<NodeJS.Timeout | null>(null);
   const newEmailTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Code sending states
-  const [sendingCurrentEmailCode, setSendingCurrentEmailCode] = useState(false);
+  // Code sending state
   const [sendingNewEmailCode, setSendingNewEmailCode] = useState(false);
-  const [currentEmailCodeSent, setCurrentEmailCodeSent] = useState(false);
   const [newEmailCodeSent, setNewEmailCodeSent] = useState(false);
 
   // Step configuration
   const steps = [
-    { id: 'current-email', title: 'Current Email', description: 'Verify your current email address' },
+    { id: 'password', title: 'Verify Identity', description: 'Confirm your password' },
     { id: 'new-email', title: 'New Email', description: 'Enter your new email address' },
-    { id: 'verification', title: 'Verification', description: 'Verify both email addresses' },
+    { id: 'verification', title: 'Verification', description: 'Verify your new email' },
     { id: 'complete', title: 'Complete', description: 'Email successfully changed' }
   ];
 
   const stepIndex = steps.findIndex(step => step.id === currentStep);
 
-  // Cleanup timers on unmount
+  // Cleanup timer on unmount
   useEffect(() => {
     return () => {
-      if (currentEmailTimerRef.current) clearInterval(currentEmailTimerRef.current);
       if (newEmailTimerRef.current) clearInterval(newEmailTimerRef.current);
     };
   }, []);
 
-  // Start countdown timer
-  const startCountdown = (type: 'current' | 'new', duration = 60) => {
-    const setCountdown = type === 'current' ? setCurrentEmailCountdown : setNewEmailCountdown;
-    const timerRef = type === 'current' ? currentEmailTimerRef : newEmailTimerRef;
-
-    setCountdown(duration);
-    if (timerRef.current) clearInterval(timerRef.current);
+  // Start countdown timer for new email
+  const startCountdown = (duration = 60) => {
+    setNewEmailCountdown(duration);
+    if (newEmailTimerRef.current) clearInterval(newEmailTimerRef.current);
     
-    timerRef.current = setInterval(() => {
-      setCountdown((prev) => {
+    newEmailTimerRef.current = setInterval(() => {
+      setNewEmailCountdown((prev) => {
         if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
+          if (newEmailTimerRef.current) clearInterval(newEmailTimerRef.current);
           return 0;
         }
         return prev - 1;
@@ -87,20 +77,16 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
 
   // Reset modal state
   const resetModal = () => {
-    setCurrentStep('current-email');
+    setCurrentStep('password');
     setFormData({
       currentEmail: user?.email || '',
       newEmail: '',
       password: '',
-      currentEmailCode: '',
       newEmailCode: ''
     });
     setErrors({});
-    setCurrentEmailCodeSent(false);
     setNewEmailCodeSent(false);
-    setCurrentEmailCountdown(0);
     setNewEmailCountdown(0);
-    if (currentEmailTimerRef.current) clearInterval(currentEmailTimerRef.current);
     if (newEmailTimerRef.current) clearInterval(newEmailTimerRef.current);
   };
 
@@ -123,7 +109,7 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
     const newErrors: Partial<FormData> = {};
 
     switch (currentStep) {
-      case 'current-email':
+      case 'password':
         if (!formData.password) {
           newErrors.password = 'Password is required';
         }
@@ -138,9 +124,6 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
         }
         break;
       case 'verification':
-        if (!formData.currentEmailCode || formData.currentEmailCode.length !== 6) {
-          newErrors.currentEmailCode = 'Please enter the 6-digit code from your current email';
-        }
         if (!formData.newEmailCode || formData.newEmailCode.length !== 6) {
           newErrors.newEmailCode = 'Please enter the 6-digit code from your new email';
         }
@@ -151,12 +134,9 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
     return Object.keys(newErrors).length === 0;
   };
 
-  // Send verification code
-  const sendVerificationCode = async (email: string, type: 'current' | 'new') => {
-    const setSending = type === 'current' ? setSendingCurrentEmailCode : setSendingNewEmailCode;
-    const setCodeSent = type === 'current' ? setCurrentEmailCodeSent : setNewEmailCodeSent;
-    
-    setSending(true);
+  // Send verification code to new email
+  const sendVerificationCode = async (email: string) => {
+    setSendingNewEmailCode(true);
     try {
       const response = await fetch(`${API_BASE_URL}/auth/send-code`, {
         method: 'POST',
@@ -172,8 +152,8 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
 
       const data = await response.json();
       if (data.success) {
-        setCodeSent(true);
-        startCountdown(type);
+        setNewEmailCodeSent(true);
+        startCountdown();
         push('success', `Verification code sent to ${email}`);
       } else {
         push('error', data.error || 'Failed to send verification code');
@@ -181,7 +161,7 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
     } catch (error) {
       push('error', 'Failed to send verification code');
     } finally {
-      setSending(false);
+      setSendingNewEmailCode(false);
     }
   };
 
@@ -193,20 +173,19 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
     
     try {
       switch (currentStep) {
-        case 'current-email':
-          // Verify password and send code to current email
-          await sendVerificationCode(formData.currentEmail, 'current');
+        case 'password':
+          // Step 1: Just validate password and proceed
           setCurrentStep('new-email');
           break;
           
         case 'new-email':
-          // Send code to new email
-          await sendVerificationCode(formData.newEmail, 'new');
+          // Step 2: Send verification code to new email
+          await sendVerificationCode(formData.newEmail);
           setCurrentStep('verification');
           break;
           
         case 'verification':
-          // Submit email change request
+          // Step 3: Submit email change request with simplified payload
           const response = await fetch(`${API_BASE_URL}/auth/change-email`, {
             method: 'POST',
             headers: {
@@ -214,10 +193,8 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
               Authorization: `Bearer ${accessToken}`
             },
             body: JSON.stringify({
-              currentEmail: formData.currentEmail,
               newEmail: formData.newEmail,
               password: formData.password,
-              currentEmailCode: formData.currentEmailCode,
               newEmailCode: formData.newEmailCode
             })
           });
@@ -245,7 +222,7 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
   const handlePrevious = () => {
     switch (currentStep) {
       case 'new-email':
-        setCurrentStep('current-email');
+        setCurrentStep('password');
         break;
       case 'verification':
         setCurrentStep('new-email');
@@ -335,7 +312,7 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
 
         {/* Step Content */}
         <div className="p-6">
-          {currentStep === 'current-email' && (
+          {currentStep === 'password' && (
             <div className="space-y-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center">
@@ -432,73 +409,31 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
           )}
 
           {currentStep === 'verification' && (
-            <div className="space-y-6">
-              {/* Current Email Verification */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                <h3 className="font-medium text-blue-800 dark:text-blue-200 mb-3 flex items-center">
-                  <Shield className="h-5 w-5 mr-2" />
-                  Verify Current Email
-                </h3>
-                <p className="text-sm text-blue-600 dark:text-blue-300 mb-3">
-                  Enter the code sent to {formData.currentEmail}
-                </p>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    value={formData.currentEmailCode}
-                    onChange={(e) => updateFormData('currentEmailCode', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className={`flex-1 px-3 py-2 border rounded-lg text-center font-mono text-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors ${
-                      errors.currentEmailCode ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
-                    }`}
-                    placeholder="000000"
-                    maxLength={6}
-                  />
-                  <button
-                    onClick={() => sendVerificationCode(formData.currentEmail, 'current')}
-                    disabled={sendingCurrentEmailCode || currentEmailCountdown > 0}
-                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                  >
-                    {sendingCurrentEmailCode ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : currentEmailCountdown > 0 ? (
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-4 w-4" />
-                        <span>{currentEmailCountdown}s</span>
-                      </div>
-                    ) : (
-                      'Resend'
-                    )}
-                  </button>
-                </div>
-                {errors.currentEmailCode && (
-                  <p className="text-sm text-red-500 mt-2">{errors.currentEmailCode}</p>
-                )}
-              </div>
-
-              {/* New Email Verification */}
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
-                <h3 className="font-medium text-green-800 dark:text-green-200 mb-3 flex items-center">
+            <div className="space-y-4">
+              {/* New Email Verification Only - Simplified Flow */}
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-lg border border-purple-200 dark:border-purple-800">
+                <h3 className="font-medium text-purple-800 dark:text-purple-200 mb-3 flex items-center">
                   <Mail className="h-5 w-5 mr-2" />
-                  Verify New Email
+                  Verify Your New Email Address
                 </h3>
-                <p className="text-sm text-green-600 dark:text-green-300 mb-3">
-                  Enter the code sent to {formData.newEmail}
+                <p className="text-sm text-purple-600 dark:text-purple-300 mb-4">
+                  We've sent a 6-digit verification code to <strong>{formData.newEmail}</strong>
                 </p>
                 <div className="flex space-x-2">
                   <input
                     type="text"
                     value={formData.newEmailCode}
                     onChange={(e) => updateFormData('newEmailCode', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className={`flex-1 px-3 py-2 border rounded-lg text-center font-mono text-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors ${
+                    className={`flex-1 px-3 py-2 border rounded-lg text-center font-mono text-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors ${
                       errors.newEmailCode ? 'border-red-300 dark:border-red-600' : 'border-gray-300 dark:border-gray-600'
                     }`}
                     placeholder="000000"
                     maxLength={6}
                   />
                   <button
-                    onClick={() => sendVerificationCode(formData.newEmail, 'new')}
+                    onClick={() => sendVerificationCode(formData.newEmail)}
                     disabled={sendingNewEmailCode || newEmailCountdown > 0}
-                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                   >
                     {sendingNewEmailCode ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -515,6 +450,12 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
                 {errors.newEmailCode && (
                   <p className="text-sm text-red-500 mt-2">{errors.newEmailCode}</p>
                 )}
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                  ✨ Simplified email change process - only verification of your new email is required
+                </p>
               </div>
             </div>
           )}
@@ -548,9 +489,9 @@ const EmailChangeModal: React.FC<EmailChangeModalProps> = ({ isOpen, onClose, on
           <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between">
             <button
               onClick={handlePrevious}
-              disabled={currentStep === 'current-email' || loading}
+              disabled={currentStep === 'password' || loading}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                currentStep === 'current-email' || loading
+                currentStep === 'password' || loading
                   ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 cursor-not-allowed'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
