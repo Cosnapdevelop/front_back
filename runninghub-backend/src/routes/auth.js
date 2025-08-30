@@ -321,8 +321,21 @@ router.post(
           });
         }
 
-        // 防止用户给自己当前邮箱发送更改验证码
-        if (email === req.user.email) {
+        // TODO(human): 修复邮箱验证逻辑
+        // 当前逻辑阻止了对原邮箱的验证，但用户需要验证原邮箱作为安全措施
+        // 建议方案：1) 添加emailType参数区分验证场景 2) 或简化为只验证新邮箱
+        // 
+        // 建议实现：
+        // const emailType = req.body.emailType; // 'current' 或 'new' 
+        // if (emailType === 'new' && email === req.user.email) {
+        //   return res.status(400).json({
+        //     success: false, 
+        //     error: '新邮箱不能与当前邮箱相同'
+        //   });
+        // }
+        
+        // 临时禁用此检查以允许原邮箱验证
+        if (false && email === req.user.email) {
           return res.status(400).json({
             success: false,
             error: '新邮箱不能与当前邮箱相同'
