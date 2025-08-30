@@ -26,7 +26,7 @@ router.get(
   ...paginationValidation,
   query('sort')
     .optional()
-    .matches(/^(createdAt|likesCount|commentsCount):(asc|desc)$/)
+    .matches(/^(createdAt|likesCount):(asc|desc)$/)
     .withMessage('排序格式不正确，应为 field:direction'),
   handleValidationErrors,
   async (req, res) => {
@@ -211,8 +211,7 @@ router.post(
           images,
           caption,
           createdAt: new Date(),
-          likesCount: 0,
-          commentsCount: 0
+          likesCount: 0
         },
         include: {
           user: {

@@ -168,13 +168,7 @@ const Community = () => {
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', index.toString());
-    
-    // 添加拖拽时的视觉反馈
-    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
-    dragImage.style.transform = 'rotate(5deg)';
-    dragImage.style.opacity = '0.8';
-    e.dataTransfer.setDragImage(dragImage, 50, 50);
+    e.dataTransfer.setData('text/plain', index.toString());
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -200,6 +194,10 @@ const Community = () => {
     newImages.splice(dropIndex, 0, draggedImage);
     
     setSelectedImages(newImages);
+    setDraggedIndex(null);
+  };
+
+  const handleDragEnd = () => {
     setDraggedIndex(null);
   };
 
@@ -356,6 +354,7 @@ const Community = () => {
                                 onDragStart={(e) => handleDragStart(e, index)}
                                 onDragOver={handleDragOver}
                                 onDrop={(e) => handleDrop(e, index)}
+                                onDragEnd={handleDragEnd}
                               >
                                 {/* Image */}
                                 <img
