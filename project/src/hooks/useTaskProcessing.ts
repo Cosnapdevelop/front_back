@@ -144,7 +144,44 @@ export function useTaskProcessing() {
       });
 
       if (!response.ok) {
-        throw createError.api(`HTTP ${response.status}: ${response.statusText}`, response.status);
+        // 尝试解析错误响应
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          // 如果无法解析 JSON，使用默认错误信息
+          throw createError.api(`HTTP ${response.status}: ${response.statusText}`, response.status);
+        }
+        
+        // 检查是否是订阅限制错误
+        if (errorData.code === 'MONTHLY_LIMIT_EXCEEDED') {
+          throw createError.subscription(
+            errorData.message,
+            ErrorCode.MONTHLY_LIMIT_EXCEEDED,
+            errorData.currentUsage,
+            errorData.limit,
+            errorData
+          );
+        } else if (errorData.code === 'SUBSCRIPTION_EXPIRED') {
+          throw createError.subscription(
+            errorData.message,
+            ErrorCode.SUBSCRIPTION_EXPIRED,
+            undefined,
+            undefined,
+            errorData
+          );
+        } else if (errorData.code === 'EXCLUSIVE_FEATURE_REQUIRED') {
+          throw createError.subscription(
+            errorData.message,
+            ErrorCode.EXCLUSIVE_FEATURE_REQUIRED,
+            undefined,
+            undefined,
+            errorData
+          );
+        }
+        
+        // 其他API错误
+        throw createError.api(errorData.message || `HTTP ${response.status}: ${response.statusText}`, response.status);
       }
 
       const result = await response.json();

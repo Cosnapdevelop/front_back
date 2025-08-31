@@ -17,6 +17,7 @@ model User {
   bio           String?
   isActive      Boolean        @default(true)
   isBanned      Boolean        @default(false)
+  isTestAccount Boolean        @default(false)
   lastLoginAt   DateTime?
   createdAt     DateTime       @default(now())
   refreshTokens RefreshToken[]

@@ -4,9 +4,7 @@
     <meta charset="UTF-8" />
     
     <!-- PWA Icons and Manifest -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180x180.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
     
     <!-- Mobile Optimization Meta Tags -->
@@ -70,10 +68,7 @@
     <link rel="dns-prefetch" href="//api.cosnap.ai" />
     <link rel="dns-prefetch" href="//cdn.cosnap.ai" />
     
-    <!-- Preload critical resources -->
-    <link rel="preload" href="/src/main.tsx" as="script" />
-    <link rel="preload" href="/icons/icon-32x32.png" as="image" />
-    <link rel="modulepreload" href="/src/App.tsx" />
+    <!-- Module preloading handled by Vite build process -->
     
     <!-- Fonts with Display Swap for Performance -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />

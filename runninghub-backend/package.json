@@ -18,7 +18,10 @@
     "user:delete": "node scripts/delete-user-by-email.js",
     "reset:database": "node scripts/reset-database.js",
     "reset:all": "node scripts/reset-database.js && echo '✅ Database reset complete! Next: Open http://localhost:5173/reset-frontend.html to clear frontend data'",
-    "test:gmail-smtp": "node scripts/test-gmail-smtp.js"
+    "test:gmail-smtp": "node scripts/test-gmail-smtp.js",
+    "test:create-user": "node scripts/test-account-manager.js create",
+    "test:list-users": "node scripts/test-account-manager.js list",
+    "test:quick-setup": "node scripts/test-account-manager.js quick-setup"
   },
   "dependencies": {
     "@prisma/client": "^6.13.0",

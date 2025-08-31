@@ -25,6 +25,11 @@ export enum ErrorCode {
   USER_CANCELLED = 'USER_CANCELLED',
   INVALID_INPUT = 'INVALID_INPUT',
   
+  // 订阅和限制错误
+  MONTHLY_LIMIT_EXCEEDED = 'MONTHLY_LIMIT_EXCEEDED',
+  SUBSCRIPTION_EXPIRED = 'SUBSCRIPTION_EXPIRED',
+  EXCLUSIVE_FEATURE_REQUIRED = 'EXCLUSIVE_FEATURE_REQUIRED',
+  
   // 系统错误
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   STORAGE_ERROR = 'STORAGE_ERROR'
@@ -119,6 +124,19 @@ export class UserError extends BaseError {
   }
 }
 
+// 订阅错误
+export class SubscriptionError extends BaseError {
+  constructor(
+    message: string,
+    code: ErrorCode,
+    public currentUsage?: number,
+    public limit?: number,
+    details?: any
+  ) {
+    super(message, code, ErrorSeverity.MEDIUM, false, details);
+  }
+}
+
 // 存储错误
 export class StorageError extends BaseError {
   constructor(message: string, public operation?: string, details?: any) {
@@ -148,6 +166,9 @@ export const createError = {
   
   user: (message: string, details?: any) => 
     new UserError(message, details),
+  
+  subscription: (message: string, code: ErrorCode, currentUsage?: number, limit?: number, details?: any) => 
+    new SubscriptionError(message, code, currentUsage, limit, details),
   
   storage: (message: string, operation?: string, details?: any) => 
     new StorageError(message, operation, details),
@@ -183,6 +204,15 @@ export const errorUtils = {
           return '不支持的文件类型，请选择图片文件';
         case ErrorCode.USER_CANCELLED:
           return '操作已取消';
+        case ErrorCode.MONTHLY_LIMIT_EXCEEDED:
+          if (error instanceof SubscriptionError && error.limit) {
+            return `本月使用次数已达上限（${error.limit}张），请升级订阅或等待下月重置`;
+          }
+          return '本月使用次数已达上限，请升级订阅或等待下月重置';
+        case ErrorCode.SUBSCRIPTION_EXPIRED:
+          return '订阅已过期，请续费后继续使用';
+        case ErrorCode.EXCLUSIVE_FEATURE_REQUIRED:
+          return '此为独家特效，请升级到会员版后使用';
         default:
           return error.message || '操作失败，请重试';
       }

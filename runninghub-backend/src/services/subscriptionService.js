@@ -13,7 +13,7 @@ class SubscriptionService {
     // 订阅等级配置
     this.subscriptionLimits = {
       FREE: {
-        monthlyLimit: 5,           // 每月5次AI特效处理
+        monthlyLimit: 20,          // 每月20次AI特效处理
         hasWatermark: true,        // 带水印
         priorityProcessing: false, // 无优先处理
         exclusiveEffects: false,   // 无独家特效
@@ -431,7 +431,7 @@ class SubscriptionService {
   getTierFeatures(tier) {
     const features = {
       FREE: [
-        '每月5次AI特效处理',
+        '每月20次AI特效处理',
         '基础特效库',
         '带水印输出',
         '社区支持'

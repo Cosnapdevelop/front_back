@@ -9,6 +9,8 @@ import { ParametersPanel } from '../components/EffectParameters/ParametersPanel'
 import { ProcessingControls } from '../components/ProcessingStatus/ProcessingControls';
 import { ResultsPanel } from '../components/Results/ResultsPanel';
 import { LoadingState } from '../components/UI/LoadingState';
+import { SubscriptionErrorDisplay } from '../components/UI/SubscriptionErrorDisplay';
+import { SubscriptionError } from '../types/errors';
 import { trackEffectCreated, trackEngagement, trackFeatureUsage, trackPerformance } from '../utils/analytics';
 import { useAPIPerformance, useRenderPerformance } from '../hooks/usePerformanceMonitoring';
 import { 
@@ -27,6 +29,7 @@ const ApplyEffect = () => {
   
   const [parameters, setParameters] = useState<Record<string, any>>({});
   const [imageParamFiles, setImageParamFiles] = useState<Record<string, {file?: File, url?: string, name?: string, size?: number, fileId?: string}>>({});
+  const [subscriptionError, setSubscriptionError] = useState<SubscriptionError | null>(null);
 
   // Component initialization state
   const [testState, setTestState] = useState('Component loaded');
@@ -338,7 +341,22 @@ const ApplyEffect = () => {
       console.error('Processing failed:', error);
       const processingTime = performance.now() - effectStartTime;
       trackPerformance('effect_processing_time', processingTime);
+      
+      // 检查是否是订阅错误
+      if (error instanceof SubscriptionError) {
+        setSubscriptionError(error);
+      }
     }
+  };
+
+  const handleSubscriptionUpgrade = () => {
+    // 导航到升级页面或打开升级对话框
+    // 这里可以根据实际需求实现升级逻辑
+    push('info', '升级功能即将推出，敬请期待！');
+  };
+
+  const handleSubscriptionErrorDismiss = () => {
+    setSubscriptionError(null);
   };
 
   const handleCancelTask = async () => {
@@ -405,6 +423,17 @@ const ApplyEffect = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Parameters & Controls */}
           <div className="space-y-6">
+            {/* Subscription Error Display */}
+            {subscriptionError && (
+              <SubscriptionErrorDisplay
+                errorCode={subscriptionError.code as any}
+                currentUsage={subscriptionError.currentUsage}
+                limit={subscriptionError.limit}
+                onUpgrade={handleSubscriptionUpgrade}
+                onDismiss={handleSubscriptionErrorDismiss}
+              />
+            )}
+            
             {/* Workflow Instructions */}
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-2">

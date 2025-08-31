@@ -142,7 +142,8 @@ export default defineConfig({
           if (/woff2?|ttf|eot/i.test(ext)) {
             return `assets/fonts/[name]-[hash:8][extname]`;
           }
-          return `assets/[ext]/[name]-[hash:8][extname]`;
+          // Fix: Don't create tsx directory, put assets in generic assets folder
+          return `assets/[name]-[hash:8][extname]`;
         },
         chunkFileNames: 'assets/js/[name]-[hash:8].js',
         entryFileNames: 'assets/js/[name]-[hash:8].js',
