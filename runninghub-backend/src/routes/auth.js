@@ -453,11 +453,30 @@ router.post(
         });
       }
 
-      // Update last login time
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { lastLoginAt: new Date() }
-      });
+      // 特殊处理：自动升级测试账号
+      if (user.email === 'terrylzr123@gmail.com' && user.subscriptionTier !== 'VIP') {
+        console.log(`🎯 自动升级测试账号 ${user.email} 为VIP`);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { 
+            lastLoginAt: new Date(),
+            subscriptionTier: 'VIP',
+            subscriptionStatus: 'ACTIVE',
+            subscriptionStart: new Date(),
+            subscriptionEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            monthlyUsage: 0,
+            usageResetDate: new Date(),
+            isTestAccount: true
+          }
+        });
+        console.log(`✅ ${user.email} 已升级为VIP测试账号！`);
+      } else {
+        // Update last login time
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() }
+        });
+      }
 
       const accessToken = signAccessToken(user);
       const refreshToken = jwt.sign({ sub: user.id }, process.env.JWT_REFRESH_SECRET, {
